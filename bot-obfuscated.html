@@ -794,6 +794,11 @@
         window.sessionTimer = null;
         window.sessionStartTime = null;
         
+        // PnL Tracking
+        window.sessionProfitLoss = 0.0;
+        window.sessionInvestment = 0.0;
+        window.sessionPayout = 0.0;
+        
         // DOM Elements
         const toggleButton = document.getElementById('toggleButton');
         const statusBadge = document.getElementById('status-badge');
@@ -986,7 +991,7 @@
         }
         
         // ============================================================================
-        // PnL UPDATE SYSTEM
+        // PnL UPDATE SYSTEM - FIXED TO START FROM ZERO
         // ============================================================================
         
         function startPnLUpdate(payout) {
@@ -1006,7 +1011,9 @@
             metricTotalProfit.classList.remove('profit-positive', 'profit-negative', 'profit-neutral');
             metricTotalProfit.classList.add('profit-bold-green');
             
-            updatePnL();
+            // Calculate session PnL
+            const sessionPnL = window.sessionPayout - window.sessionInvestment;
+            updatePnLDisplay(sessionPnL);
             
             window.pnlUpdateInterval = setInterval(() => {
                 const elapsed = Date.now() - window.pnlUpdateStartTime;
@@ -1016,14 +1023,18 @@
                 pnlProgressBar.style.width = `${progressPercent}%`;
                 pnlTimer.textContent = `${(remaining / 1000).toFixed(1)}s`;
                 
-                updatePnL();
+                // Update PnL display
+                const currentPnL = window.sessionPayout - window.sessionInvestment;
+                updatePnLDisplay(currentPnL);
                 
                 if (elapsed >= 3000) {
                     clearInterval(window.pnlUpdateInterval);
                     window.pnlUpdateInterval = null;
                     window.pnlUpdateActive = false;
                     
-                    updatePnL();
+                    // Final update
+                    const finalPnL = window.sessionPayout - window.sessionInvestment;
+                    updatePnLDisplay(finalPnL);
                     log('PnL update complete', 'PNL');
                     
                     setTimeout(() => {
@@ -1033,8 +1044,7 @@
             }, 100);
         }
         
-        function updatePnL() {
-            const netProfit = window.totalPayout - window.totalInvestment;
+        function updatePnLDisplay(netProfit) {
             const formattedProfit = Math.abs(netProfit).toFixed(2);
             
             metricTotalProfit.textContent = `${netProfit >= 0 ? '+' : '-'}$${formattedProfit}`;
@@ -1048,7 +1058,7 @@
                 metricTotalProfit.classList.add('profit-neutral');
             }
             
-            pnlBreakdown.textContent = `Investment: $${window.totalInvestment.toFixed(2)} • Payout: $${window.totalPayout.toFixed(2)}`;
+            pnlBreakdown.textContent = `Investment: $${window.sessionInvestment.toFixed(2)} • Payout: $${window.sessionPayout.toFixed(2)}`;
             
             return netProfit;
         }
@@ -1122,7 +1132,7 @@
         }
         
         // ============================================================================
-        // TRADING ENGINE FUNCTIONS
+        // TRADING ENGINE FUNCTIONS - FIXED PnL RESET
         // ============================================================================
         
         function resetTradingState() {
@@ -1135,6 +1145,11 @@
             window.martingaleStep = 0;
             window.totalInvestment = 0.0;
             window.totalPayout = 0.0;
+            
+            // RESET SESSION PnL TRACKING
+            window.sessionInvestment = 0.0;
+            window.sessionPayout = 0.0;
+            window.sessionProfitLoss = 0.0;
             
             window.stats = { 
                 wins: 0, 
@@ -1159,7 +1174,8 @@
             firstTickStatus.textContent = 'Waiting';
             firstTickStatus.className = 'px-3 py-1 rounded-full bg-yellow-900/30 text-yellow-400 text-sm';
             
-            updatePnL();
+            // RESET PnL DISPLAY TO ZERO
+            updatePnLDisplay(0);
             updateBalanceDisplay();
             updateWinRate();
             updateBotStatus('STOPPED', 'Ready to start');
@@ -1233,6 +1249,7 @@
                 
                 const payout = window.currentStake * 9;
                 window.totalPayout += payout;
+                window.sessionPayout += payout; // Add to session payout
                 
                 playVictorySound();
                 createWinCelebration();
@@ -1274,6 +1291,7 @@
                 window.stats.totalTrades++;
                 
                 window.totalInvestment += window.currentStake;
+                window.sessionInvestment += window.currentStake; // Add to session investment
                 
                 updateTradeProgress();
                 
@@ -1352,7 +1370,7 @@
                     `Next stake: $${window.currentStake.toFixed(2)}`);
                 
                 updateStakeDisplay();
-                updatePnL();
+                updatePnLDisplay(window.sessionPayout - window.sessionInvestment);
                 updateWinRate();
                 
                 window.nextTradeAllowed = true;
@@ -1553,7 +1571,9 @@
             
             window.currentBalance = newBalance;
             updateBalanceDisplay();
-            updatePnL();
+            
+            // Update PnL display with current session data
+            updatePnLDisplay(window.sessionPayout - window.sessionInvestment);
         }
         
         function subscribeToTicks(symbol) {
@@ -1635,13 +1655,13 @@
                 window.pnlUpdateInterval = null;
             }
             
-            const finalPnL = window.totalPayout - window.totalInvestment;
-            log(`SESSION COMPLETE: PnL = $${finalPnL.toFixed(2)}`, 'SYSTEM');
+            const sessionPnL = window.sessionPayout - window.sessionInvestment;
+            log(`SESSION COMPLETE: PnL = $${sessionPnL.toFixed(2)}`, 'SYSTEM');
             log(`Stats: ${window.stats.wins} wins • ${window.stats.losses} losses • ${window.stats.totalTrades} total trades`, 'SYSTEM');
             
             updateBotStatus('STOPPED', 'Session ended');
             updateStatus('BOT STOPPED', 
-                `Final PnL: $${finalPnL.toFixed(2)}`, 
+                `Final PnL: $${sessionPnL.toFixed(2)}`, 
                 'Click START to begin new session');
         }
         
