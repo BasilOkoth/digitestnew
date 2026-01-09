@@ -728,7 +728,7 @@
         // PnL UPDATE SYSTEM
         window.pnlUpdateInterval = null;
         window.pnlUpdateStartTime = 0;
-        window.pnlUpdateDuration = 3000; // Reduced to 3 seconds after win
+        window.pnlUpdateDuration = 3000;
         window.pnlUpdateActive = false;
         
         // TRADING EXECUTION
@@ -789,7 +789,6 @@
                 calculatorContent.classList.remove('collapsed');
                 calculatorContent.classList.add('expanded');
                 collapseIcon.classList.remove('rotated');
-                // Recalculate table when expanded
                 calculateMartingaleTable();
             }
         }
@@ -847,10 +846,15 @@
         }
         
         // ============================================================================
-        // ENHANCED PnL UPDATE SYSTEM (STARTS NEW SESSION AFTER WIN)
+        // ENHANCED PnL UPDATE SYSTEM (COMPLETELY STOPS BOT AFTER WIN)
         // ============================================================================
         
         function startProfessionalPnLUpdate(payout) {
+            // IMMEDIATELY STOP ALL TRADING
+            window.stopAfterWin = true;
+            window.nextTradeAllowed = false;
+            window.executionLock = true;
+            
             window.pnlUpdateActive = true;
             window.pnlUpdateStartTime = Date.now();
             
@@ -883,44 +887,12 @@
                     updatePnL();
                     log('PnL update complete', 'PNL');
                     
-                    // FIX: Instead of stopping bot, prepare for next session
+                    // COMPLETELY STOP THE BOT AFTER WIN
                     setTimeout(() => {
-                        prepareForNextSession();
-                    }, 1000);
+                        stopBot();
+                    }, 500);
                 }
             }, 100);
-        }
-        
-        function prepareForNextSession() {
-            // Reset trading state but keep bot running
-            window.stopAfterWin = false;
-            window.nextTradeAllowed = true;
-            window.executionLock = false;
-            
-            // Reset first tick detection for next session
-            window.firstTickReceived = false;
-            window.firstTickDigit = null;
-            window.predictedDigit = null;
-            window.waitingForFirstTick = true;
-            
-            // Keep current stake and martingale step at 0 for fresh start
-            window.martingaleStep = 0;
-            window.currentStake = window.baseStake;
-            
-            // Reset trade count for new session
-            window.tradeCount = 0;
-            
-            // Update UI for new session
-            metricPredictedDigit.textContent = '?';
-            metricCurrentStake.textContent = `$${window.currentStake.toFixed(2)}`;
-            metricTradeCount.textContent = '0';
-            tradeProgressBar.style.width = '0%';
-            tradeProgressText.textContent = '0/' + window.maxTrades;
-            firstTickStatus.textContent = 'Waiting';
-            firstTickStatus.className = 'px-3 py-1 rounded-full bg-yellow-900/30 text-yellow-400 text-sm';
-            
-            log('Ready for next trading session', 'SYSTEM');
-            updateStatus('READY', 'New session prepared', 'Waiting for first tick...');
         }
         
         function updatePnL() {
@@ -1010,6 +982,10 @@
             window.stats = { wins: 0, losses: 0, totalTrades: 0, winRate: 0 };
             window.tradeHistory = [];
             
+            window.stopAfterWin = false;
+            window.nextTradeAllowed = false;
+            window.executionLock = false;
+            
             metricPredictedDigit.textContent = '?';
             metricCurrentStake.textContent = '$0.00';
             metricTradeCount.textContent = '0';
@@ -1051,6 +1027,11 @@
                 return;
             }
             
+            // CHECK: If bot should stop after win, don't process ticks
+            if (window.stopAfterWin || !window.isBotRunning) {
+                return;
+            }
+            
             const tickData = extractDigitFromTick(tick);
             if (!tickData) return;
             
@@ -1078,12 +1059,19 @@
         // ============================================================================
         
         function checkForDigitMatch(tick, currentDigit) {
-            if (!window.isBotRunning || window.stopAfterWin) return false;
+            // IMPORTANT: Check if bot should stop after win
+            if (!window.isBotRunning || window.stopAfterWin) {
+                return false;
+            }
             
             if (currentDigit === window.predictedDigit) {
                 log(`DIGIT MATCH! ${currentDigit} = ${window.predictedDigit}`, 'WIN');
                 
+                // CRITICAL: Set stop flags BEFORE anything else
                 window.stopAfterWin = true;
+                window.nextTradeAllowed = false;
+                window.executionLock = true;
+                
                 window.stats.wins++;
                 window.stats.totalTrades++;
                 
@@ -1095,8 +1083,9 @@
                 
                 updateStatus('VICTORY!', 
                     `Digit ${currentDigit} matched! Payout: $${payout.toFixed(2)}`,
-                    'PnL updating for 3 seconds');
+                    'Bot stopping after PnL update');
                 
+                // Start PnL update which will stop the bot
                 startProfessionalPnLUpdate(payout);
                 
                 window.martingaleStep = 0;
@@ -1109,7 +1098,10 @@
         }
         
         function executeTradeOnTick(tick) {
-            if (window.stopAfterWin || window.executionLock) return;
+            // CRITICAL CHECKS: Prevent trading after win
+            if (window.stopAfterWin || window.executionLock || !window.isBotRunning) {
+                return;
+            }
             
             if (window.tradeCount >= window.maxTrades) {
                 log(`MAX TRADES REACHED (${window.maxTrades})`, 'WARNING');
@@ -1145,6 +1137,13 @@
         }
         
         function sendTradeRequest(tick) {
+            // CHECK: Don't send trade if we should stop after win
+            if (window.stopAfterWin) {
+                log('Trade cancelled - win condition met', 'SYSTEM');
+                handleTradeResult(false);
+                return;
+            }
+            
             const contractType = "DIGITMATCH";
             const symbol = document.getElementById('symbol').value;
             
@@ -1177,8 +1176,14 @@
             window.executionLock = false;
             
             if (isWin) {
+                // Win is already handled in checkForDigitMatch
                 return;
             } else {
+                // CHECK: Don't process losses if we should stop after win
+                if (window.stopAfterWin) {
+                    return;
+                }
+                
                 window.stats.losses++;
                 window.martingaleStep++;
                 
@@ -1341,7 +1346,10 @@
         }
         
         function handleTick(tick) {
-            if (!window.isBotRunning) return;
+            // CRITICAL: Don't process ticks if bot is not running or should stop after win
+            if (!window.isBotRunning || window.stopAfterWin) {
+                return;
+            }
             
             window.totalTicksReceived++;
             updateStatsDisplay();
@@ -1368,6 +1376,7 @@
                 }
             }
             
+            // ADDED CHECK: Ensure we don't execute trades after win
             if (window.predictedDigit && window.nextTradeAllowed && !window.executionLock && !window.stopAfterWin) {
                 executeTradeOnTick(tick);
             }
@@ -1404,6 +1413,12 @@
             
             window.pendingProposals.delete(data.req_id);
             
+            // CHECK: Don't process proposal if we should stop after win
+            if (window.stopAfterWin) {
+                log('Proposal cancelled - win condition met', 'SYSTEM');
+                return;
+            }
+            
             if (data.proposal && data.proposal.id) {
                 executeBuy(data.proposal.id, data.proposal.ask_price, pending);
             } else {
@@ -1413,6 +1428,13 @@
         }
         
         function executeBuy(proposal_id, ask_price, pending) {
+            // CHECK: Don't execute buy if we should stop after win
+            if (window.stopAfterWin) {
+                log('Buy cancelled - win condition met', 'SYSTEM');
+                handleTradeResult(false);
+                return;
+            }
+            
             const buyRequest = {
                 buy: proposal_id,
                 price: ask_price,
@@ -1479,6 +1501,7 @@
             
             resetTradingState();
             window.isBotRunning = true;
+            window.stopAfterWin = false; // Ensure this is false when starting
             
             toggleButton.innerHTML = 'STOP TRADING';
             toggleButton.classList.remove('gradient-success');
@@ -1499,6 +1522,8 @@
             
             window.isBotRunning = false;
             window.nextTradeAllowed = false;
+            window.stopAfterWin = true; // Ensure this is true when stopping
+            window.executionLock = false;
             
             toggleButton.innerHTML = 'START TRADING BOT';
             toggleButton.classList.remove('gradient-danger');
@@ -1510,7 +1535,6 @@
             }
             
             window.pendingProposals.clear();
-            window.executionLock = false;
             
             if (window.pnlUpdateInterval) {
                 clearInterval(window.pnlUpdateInterval);
@@ -1521,9 +1545,9 @@
             log(`SESSION COMPLETE: PnL = $${finalPnL.toFixed(2)}`, 'SYSTEM');
             log(`Stats: ${window.stats.wins} wins • ${window.stats.losses} losses • ${window.stats.totalTrades} total trades`, 'SYSTEM');
             
-            updateStatus('SESSION ENDED', 
+            updateStatus('BOT STOPPED', 
                 `Final PnL: $${finalPnL.toFixed(2)}`, 
-                'Ready for new session');
+                'Click START to begin new session');
         }
         
         function toggleBot() {
