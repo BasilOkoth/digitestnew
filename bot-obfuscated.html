@@ -445,7 +445,8 @@
                         <label class="flex items-center gap-2 text-sm text-gray-300">
                             <span>DEMO</span>
                             <label class="pro-toggle">
-                                <input type="checkbox" id="accTypeToggle" onchange="switchAccount()">
+                                <!-- SIMPLE TOGGLE - JUST FOR UI, DOESN'T AFFECT AUTH -->
+                                <input type="checkbox" id="accTypeToggle" onchange="toggleAccountType()">
                                 <span class="pro-toggle-slider"></span>
                             </label>
                             <span>REAL</span>
@@ -794,8 +795,10 @@
         window.sessionTimer = null;
         window.sessionStartTime = null;
         
-        // Account State (Simple - just for UI)
-        window.currentAccountMode = 'demo'; // demo or real
+        // PnL Update State
+        window.pnlUpdateInterval = null;
+        window.pnlUpdateStartTime = null;
+        window.pnlUpdateActive = false;
         
         // DOM Elements
         const toggleButton = document.getElementById('toggleButton');
@@ -834,51 +837,48 @@
         const baseStakeInput = document.getElementById('baseStake');
         
         // ============================================================================
-        // ACCOUNT SWITCHING FUNCTION (MINIMAL - JUST UI)
+        // SIMPLE ACCOUNT TOGGLE (UI ONLY)
         // ============================================================================
         
-        function switchAccount() {
+        function toggleAccountType() {
             const isReal = document.getElementById('accTypeToggle').checked;
-            window.currentAccountMode = isReal ? 'real' : 'demo';
             
-            // Update stake minimum based on account type
             if (isReal) {
-                // Real account - minimum $0.35
+                // REAL account mode
                 baseStakeInput.min = "0.35";
-                baseStakeInput.value = "0.35";
                 baseStakeInput.title = "Minimum stake for real account: $0.35";
                 
-                // Apply more conservative settings
-                document.getElementById('multiplier').value = "1.15";
-                document.getElementById('maxTrades').value = "10";
+                // Check current value
+                if (parseFloat(baseStakeInput.value) < 0.35) {
+                    baseStakeInput.value = "0.35";
+                    log('Stake adjusted to $0.35 minimum for real account', 'WARNING');
+                }
                 
-                log(`Switched to REAL account mode (Minimum stake: $0.35)`, 'SYSTEM');
+                log('Switched to REAL account mode', 'SYSTEM');
                 updateStatus('REAL ACCOUNT', 'Real money trading enabled', 'Minimum stake: $0.35');
             } else {
-                // Demo account - minimum $0.10
+                // DEMO account mode  
                 baseStakeInput.min = "0.10";
-                baseStakeInput.value = "0.10";
                 baseStakeInput.title = "Minimum stake for demo account: $0.10";
                 
-                // Apply demo settings
-                document.getElementById('multiplier').value = "1.25";
-                document.getElementById('maxTrades').value = "15";
+                // Check current value
+                if (parseFloat(baseStakeInput.value) < 0.10) {
+                    baseStakeInput.value = "0.10";
+                    log('Stake adjusted to $0.10 minimum for demo account', 'WARNING');
+                }
                 
-                log(`Switched to DEMO account mode (Minimum stake: $0.10)`, 'SYSTEM');
+                log('Switched to DEMO account mode', 'SYSTEM');
                 updateStatus('DEMO ACCOUNT', 'Virtual money trading enabled', 'Minimum stake: $0.10');
-            }
-            
-            // Update max trades display
-            maxTradesDisplay.textContent = document.getElementById('maxTrades').value;
-            
-            // Reset trading state if bot is running
-            if (window.isBotRunning) {
-                log(`Account switched - stopping current session`, 'SYSTEM');
-                stopBot();
             }
             
             // Recalculate martingale table
             calculateMartingaleTable();
+            
+            // Stop bot if running
+            if (window.isBotRunning) {
+                log('Account mode changed - stopping current session', 'SYSTEM');
+                stopBot();
+            }
         }
         
         // ============================================================================
@@ -943,6 +943,7 @@
             // Enforce minimum stake
             let adjustedBaseStake = baseStake;
             const isReal = document.getElementById('accTypeToggle').checked;
+            
             if (isReal && baseStake < 0.35) {
                 adjustedBaseStake = 0.35;
                 document.getElementById('baseStake').value = "0.35";
@@ -1675,8 +1676,9 @@
             }
             
             // Log account type
-            log(`Starting with ${isReal ? 'REAL' : 'DEMO'} account`, 'SYSTEM');
-            log(`Minimum stake: $${isReal ? '0.35' : '0.10'}`, 'SYSTEM');
+            const accountMode = isReal ? 'REAL' : 'DEMO';
+            log(`DIGITMATCHSTARv2 STARTED (${accountMode} mode)`, 'SYSTEM');
+            log(`Settings: $${window.baseStake.toFixed(2)} base • ${window.multiplier}x martingale • ${window.maxTrades} max trades`, 'SYSTEM');
             
             resetTradingState();
             window.isBotRunning = true;
@@ -1685,9 +1687,6 @@
             toggleButton.innerHTML = 'STOP TRADING';
             toggleButton.classList.remove('gradient-success');
             toggleButton.classList.add('gradient-danger');
-            
-            log('DIGITMATCHSTARv2 STARTED', 'SYSTEM');
-            log(`Settings: $${window.baseStake.toFixed(2)} base • ${window.multiplier}x martingale • ${window.maxTrades} max trades`, 'SYSTEM');
             
             updateBotStatus('STARTING', 'Initializing session...');
             updateStatus('INITIALIZING', 'Starting trading session', 'Connecting to market...');
@@ -1831,18 +1830,16 @@
         document.addEventListener('DOMContentLoaded', () => {
             console.log('DIGITMATCHSTARv2 Professional Trading Bot initialized');
             
-            // Initialize with demo mode
-            document.getElementById('accTypeToggle').checked = false;
-            window.currentAccountMode = 'demo';
-            baseStakeInput.min = "0.10";
-            baseStakeInput.value = "0.10";
-            baseStakeInput.title = "Minimum stake for demo account: $0.10";
-            
-            // Set default values
-            document.getElementById('baseStake').value = '0.10';
+            // Set default values - start with DEMO mode
+            document.getElementById('accTypeToggle').checked = false; // DEMO mode
+            document.getElementById('baseStake').value = '1.0';
             document.getElementById('multiplier').value = '1.15';
             document.getElementById('maxTrades').value = '15';
             maxTradesDisplay.textContent = '15';
+            
+            // Set minimum stake based on initial mode (DEMO)
+            baseStakeInput.min = "0.10";
+            baseStakeInput.title = "Minimum stake for demo account: $0.10";
             
             calculateMartingaleTable();
             
@@ -1857,8 +1854,8 @@
             initTone();
             
             log('DIGITMATCHSTARv2 Professional Trading Bot ready', 'SYSTEM');
-            log('DEMO account mode active (Minimum stake: $0.10)', 'SYSTEM');
-            log('REAL account minimum: $0.35 (use toggle to switch)', 'SYSTEM');
+            log('DEMO account mode active (use toggle to switch to REAL)', 'SYSTEM');
+            log('Minimum stake: $0.10 for DEMO, $0.35 for REAL', 'SYSTEM');
             log('First Tick Martingale System with 1.15x multiplier', 'SYSTEM');
             log('Ready for professional trading', 'SYSTEM');
         });
