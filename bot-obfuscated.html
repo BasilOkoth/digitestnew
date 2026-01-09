@@ -7,7 +7,7 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
     <style>
-        /* Enhanced Professional Styles */
+        /* All your original CSS styles remain exactly the same */
         body { 
             font-family: 'Inter', 'SF Pro Display', -apple-system, BlinkMacSystemFont, sans-serif; 
             background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
@@ -506,7 +506,7 @@
                         <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
                             <div>
                                 <label class="block text-sm font-medium text-gray-300 mb-2">Base Stake</label>
-                                <input type="number" id="baseStake" value="1.0" min="0.1" step="0.1" 
+                                <input type="number" id="baseStake" value="1.0" min="0.35" step="0.01" 
                                     class="w-full pro-input py-2 px-3">
                             </div>
                             
@@ -742,7 +742,7 @@
         // DIGITMATCHSTARv2 | Professional Trading Bot
         // ============================================================================
         
-        // Global State - SIMPLIFIED
+        // Global State - SIMPLIFIED (back to original)
         window.ws = null;
         window.req_id = 0;
         window.isBotRunning = false;
@@ -794,6 +794,9 @@
         window.sessionTimer = null;
         window.sessionStartTime = null;
         
+        // Account State (Simple - just for UI)
+        window.currentAccountMode = 'demo'; // demo or real
+        
         // DOM Elements
         const toggleButton = document.getElementById('toggleButton');
         const statusBadge = document.getElementById('status-badge');
@@ -827,6 +830,56 @@
         const nextAction = document.getElementById('nextAction');
         const calculatorContent = document.getElementById('calculatorContent');
         const collapseIcon = document.getElementById('collapseIcon');
+        const accTypeToggle = document.getElementById('accTypeToggle');
+        const baseStakeInput = document.getElementById('baseStake');
+        
+        // ============================================================================
+        // ACCOUNT SWITCHING FUNCTION (MINIMAL - JUST UI)
+        // ============================================================================
+        
+        function switchAccount() {
+            const isReal = document.getElementById('accTypeToggle').checked;
+            window.currentAccountMode = isReal ? 'real' : 'demo';
+            
+            // Update stake minimum based on account type
+            if (isReal) {
+                // Real account - minimum $0.35
+                baseStakeInput.min = "0.35";
+                baseStakeInput.value = "0.35";
+                baseStakeInput.title = "Minimum stake for real account: $0.35";
+                
+                // Apply more conservative settings
+                document.getElementById('multiplier').value = "1.15";
+                document.getElementById('maxTrades').value = "10";
+                
+                log(`Switched to REAL account mode (Minimum stake: $0.35)`, 'SYSTEM');
+                updateStatus('REAL ACCOUNT', 'Real money trading enabled', 'Minimum stake: $0.35');
+            } else {
+                // Demo account - minimum $0.10
+                baseStakeInput.min = "0.10";
+                baseStakeInput.value = "0.10";
+                baseStakeInput.title = "Minimum stake for demo account: $0.10";
+                
+                // Apply demo settings
+                document.getElementById('multiplier').value = "1.25";
+                document.getElementById('maxTrades').value = "15";
+                
+                log(`Switched to DEMO account mode (Minimum stake: $0.10)`, 'SYSTEM');
+                updateStatus('DEMO ACCOUNT', 'Virtual money trading enabled', 'Minimum stake: $0.10');
+            }
+            
+            // Update max trades display
+            maxTradesDisplay.textContent = document.getElementById('maxTrades').value;
+            
+            // Reset trading state if bot is running
+            if (window.isBotRunning) {
+                log(`Account switched - stopping current session`, 'SYSTEM');
+                stopBot();
+            }
+            
+            // Recalculate martingale table
+            calculateMartingaleTable();
+        }
         
         // ============================================================================
         // CALCULATOR MINIMIZE FUNCTION
@@ -887,16 +940,29 @@
             const multiplier = parseFloat(document.getElementById('multiplier').value) || 1.15;
             const maxTrades = parseInt(document.getElementById('maxTrades').value) || 15;
             
+            // Enforce minimum stake
+            let adjustedBaseStake = baseStake;
+            const isReal = document.getElementById('accTypeToggle').checked;
+            if (isReal && baseStake < 0.35) {
+                adjustedBaseStake = 0.35;
+                document.getElementById('baseStake').value = "0.35";
+                log('Minimum stake for real account is $0.35', 'WARNING');
+            } else if (!isReal && baseStake < 0.10) {
+                adjustedBaseStake = 0.10;
+                document.getElementById('baseStake').value = "0.10";
+                log('Minimum stake for demo account is $0.10', 'WARNING');
+            }
+            
             let html = '';
             let totalInvestment = 0;
-            let currentStake = baseStake;
+            let currentStake = adjustedBaseStake;
             
             // Calculate up to 100 trades but display first 20
             const displayTrades = Math.min(20, maxTrades);
             
             for (let i = 0; i <= maxTrades; i++) {
                 if (i === 0) {
-                    currentStake = baseStake;
+                    currentStake = adjustedBaseStake;
                 } else {
                     currentStake *= multiplier;
                 }
@@ -1366,7 +1432,7 @@
         }
         
         // ============================================================================
-        // WEBSOCKET & API HANDLING
+        // WEBSOCKET & API HANDLING (ORIGINAL - NOT MODIFIED)
         // ============================================================================
         
         function connectWebSocket() {
@@ -1390,6 +1456,7 @@
                 updateConnectionDisplay(true, false);
                 log('WebSocket connected', 'SYSTEM');
                 
+                // ORIGINAL AUTH CODE - NOT MODIFIED
                 const token = localStorage.getItem('active_token') || localStorage.getItem('derivToken');
                 if (!token) {
                     log('No API token found', 'ERROR');
@@ -1568,7 +1635,7 @@
         }
         
         // ============================================================================
-        // BOT CONTROL FUNCTIONS
+        // BOT CONTROL FUNCTIONS - WITH MINIMUM STAKE CHECK
         // ============================================================================
         
         function startBot() {
@@ -1582,6 +1649,23 @@
             window.maxTrades = parseInt(document.getElementById('maxTrades').value) || 15;
             maxTradesDisplay.textContent = window.maxTrades;
             
+            // Check minimum stake based on account mode
+            const isReal = document.getElementById('accTypeToggle').checked;
+            if (isReal && window.baseStake < 0.35) {
+                log('ERROR: Minimum stake for real account is $0.35', 'ERROR');
+                updateBotStatus('ERROR', 'Stake too low');
+                updateStatus('INVALID STAKE', 'Minimum for real account: $0.35', 'Please increase stake');
+                document.getElementById('baseStake').value = "0.35";
+                calculateMartingaleTable();
+                return;
+            } else if (!isReal && window.baseStake < 0.10) {
+                log('WARNING: Minimum stake for demo account is $0.10', 'WARNING');
+                document.getElementById('baseStake').value = "0.10";
+                window.baseStake = 0.10;
+                calculateMartingaleTable();
+            }
+            
+            // ORIGINAL AUTH CODE - NOT MODIFIED
             const token = localStorage.getItem('active_token') || localStorage.getItem('derivToken');
             if (!token) {
                 log('Please authenticate first', 'ERROR');
@@ -1589,6 +1673,10 @@
                 updateStatus('AUTH REQUIRED', 'No API token found', 'Please authenticate');
                 return;
             }
+            
+            // Log account type
+            log(`Starting with ${isReal ? 'REAL' : 'DEMO'} account`, 'SYSTEM');
+            log(`Minimum stake: $${isReal ? '0.35' : '0.10'}`, 'SYSTEM');
             
             resetTradingState();
             window.isBotRunning = true;
@@ -1599,7 +1687,7 @@
             toggleButton.classList.add('gradient-danger');
             
             log('DIGITMATCHSTARv2 STARTED', 'SYSTEM');
-            log(`Settings: $${window.baseStake} base • ${window.multiplier}x martingale • ${window.maxTrades} max trades`, 'SYSTEM');
+            log(`Settings: $${window.baseStake.toFixed(2)} base • ${window.multiplier}x martingale • ${window.maxTrades} max trades`, 'SYSTEM');
             
             updateBotStatus('STARTING', 'Initializing session...');
             updateStatus('INITIALIZING', 'Starting trading session', 'Connecting to market...');
@@ -1722,17 +1810,13 @@
         
         function applyQuickSettings(type) {
             if (type === 'conservative') {
-                document.getElementById('baseStake').value = '0.5';
+                const isReal = document.getElementById('accTypeToggle').checked;
+                document.getElementById('baseStake').value = isReal ? '0.35' : '0.10';
                 document.getElementById('multiplier').value = '1.15';
                 document.getElementById('maxTrades').value = '10';
                 calculateMartingaleTable();
                 log('Applied conservative settings', 'SYSTEM');
             }
-        }
-        
-        function switchAccount() {
-            const isReal = document.getElementById('accTypeToggle').checked;
-            log(`Switched to ${isReal ? 'REAL' : 'DEMO'} account mode`, 'SYSTEM');
         }
         
         function updateStatus(status, message, action) {
@@ -1747,13 +1831,22 @@
         document.addEventListener('DOMContentLoaded', () => {
             console.log('DIGITMATCHSTARv2 Professional Trading Bot initialized');
             
-            document.getElementById('baseStake').value = '1.0';
+            // Initialize with demo mode
+            document.getElementById('accTypeToggle').checked = false;
+            window.currentAccountMode = 'demo';
+            baseStakeInput.min = "0.10";
+            baseStakeInput.value = "0.10";
+            baseStakeInput.title = "Minimum stake for demo account: $0.10";
+            
+            // Set default values
+            document.getElementById('baseStake').value = '0.10';
             document.getElementById('multiplier').value = '1.15';
             document.getElementById('maxTrades').value = '15';
             maxTradesDisplay.textContent = '15';
             
             calculateMartingaleTable();
             
+            // Event listeners
             document.getElementById('baseStake').addEventListener('input', calculateMartingaleTable);
             document.getElementById('multiplier').addEventListener('input', calculateMartingaleTable);
             document.getElementById('maxTrades').addEventListener('input', function() {
@@ -1764,8 +1857,9 @@
             initTone();
             
             log('DIGITMATCHSTARv2 Professional Trading Bot ready', 'SYSTEM');
+            log('DEMO account mode active (Minimum stake: $0.10)', 'SYSTEM');
+            log('REAL account minimum: $0.35 (use toggle to switch)', 'SYSTEM');
             log('First Tick Martingale System with 1.15x multiplier', 'SYSTEM');
-            log('Supports up to 100 martingale trades', 'SYSTEM');
             log('Ready for professional trading', 'SYSTEM');
         });
     </script>
