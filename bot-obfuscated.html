@@ -2,179 +2,149 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
     <title>DIGITMATCHSTARv2 | Professional Trading Bot</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
     <style>
-        /* Enhanced Professional Styles */
+        /* Mobile-First Professional Styles */
+        :root {
+            --safe-area-inset-top: env(safe-area-inset-top);
+            --safe-area-inset-bottom: env(safe-area-inset-bottom);
+            --safe-area-inset-left: env(safe-area-inset-left);
+            --safe-area-inset-right: env(safe-area-inset-right);
+        }
+        
         body { 
-            font-family: 'Inter', 'SF Pro Display', -apple-system, BlinkMacSystemFont, sans-serif; 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
             background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
             min-height: 100vh;
+            padding: max(12px, var(--safe-area-inset-top)) 
+                     max(12px, var(--safe-area-inset-right)) 
+                     max(12px, var(--safe-area-inset-bottom)) 
+                     max(12px, var(--safe-area-inset-left));
+            -webkit-tap-highlight-color: transparent;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
         }
         
-        .glass-effect {
-            background: rgba(30, 41, 59, 0.7);
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
+        /* Touch-friendly buttons */
+        .touch-button {
+            min-height: 44px;
+            min-width: 44px;
+            touch-action: manipulation;
         }
         
-        .professional-card {
-            background: linear-gradient(145deg, rgba(30, 41, 59, 0.9), rgba(15, 23, 42, 0.9));
-            border: 1px solid rgba(56, 189, 248, 0.2);
-            border-radius: 16px;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+        /* Mobile-optimized cards */
+        .mobile-card {
+            background: linear-gradient(145deg, rgba(30, 41, 59, 0.95), rgba(15, 23, 42, 0.95));
+            border: 1px solid rgba(56, 189, 248, 0.15);
+            border-radius: 20px;
+            box-shadow: 0 4px 24px rgba(0, 0, 0, 0.2);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
         }
         
-        .gradient-primary {
-            background: linear-gradient(135deg, #7c3aed 0%, #4f46e5 50%, #3b82f6 100%);
-        }
-        
+        /* Mobile-optimized gradients */
         .gradient-success {
-            background: linear-gradient(135deg, #10b981 0%, #059669 50%, #047857 100%);
-        }
-        
-        .gradient-warning {
-            background: linear-gradient(135deg, #f59e0b 0%, #d97706 50%, #b45309 100%);
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
         }
         
         .gradient-danger {
-            background: linear-gradient(135deg, #ef4444 0%, #dc2626 50%, #b91c1c 100%);
+            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
         }
         
-        .gradient-info {
-            background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 50%, #0369a1 100%);
+        .gradient-primary {
+            background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
         }
         
-        /* Enhanced Win Glow Effect */
-        @keyframes professional-win-glow {
-            0% { 
-                box-shadow: 0 0 10px #10B981, 
-                           0 0 20px rgba(16, 185, 129, 0.5),
-                           0 0 30px rgba(16, 185, 129, 0.3);
-                transform: scale(1);
-            }
-            50% { 
-                box-shadow: 0 0 40px #10B981, 
-                           0 0 80px rgba(16, 185, 129, 0.8),
-                           0 0 120px rgba(16, 185, 129, 0.5);
-                transform: scale(1.02);
-            }
-            100% { 
-                box-shadow: 0 0 10px #10B981, 
-                           0 0 20px rgba(16, 185, 129, 0.5),
-                           0 0 30px rgba(16, 185, 129, 0.3);
-                transform: scale(1);
-            }
+        .gradient-warning {
+            background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
         }
         
-        .win-glow-effect {
-            animation: professional-win-glow 1.5s infinite;
-            border-color: #10B981 !important;
+        /* Mobile typography */
+        .mobile-h1 {
+            font-size: clamp(1.5rem, 5vw, 2rem);
+            font-weight: 800;
+            line-height: 1.2;
         }
         
-        /* Digit Match Flash */
-        @keyframes digit-match-flash {
-            0% { background-color: #10B981; transform: scale(1); }
-            50% { background-color: #34d399; transform: scale(1.2); }
-            100% { background-color: #10B981; transform: scale(1); }
-        }
-        
-        .digit-match-flash {
-            animation: digit-match-flash 0.5s ease-out;
-        }
-        
-        /* Pulse Animation for Trading */
-        @keyframes trading-pulse {
-            0% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.7); }
-            70% { box-shadow: 0 0 0 10px rgba(59, 130, 246, 0); }
-            100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); }
-        }
-        
-        .trading-pulse {
-            animation: trading-pulse 2s infinite;
-        }
-        
-        /* Professional Badge */
-        .professional-badge {
-            background: linear-gradient(135deg, #8b5cf6, #7c3aed);
-            color: white;
-            padding: 4px 12px;
-            border-radius: 20px;
-            font-size: 11px;
+        .mobile-h2 {
+            font-size: clamp(1.125rem, 4vw, 1.5rem);
             font-weight: 700;
-            letter-spacing: 0.5px;
-            text-transform: uppercase;
-            border: 1px solid rgba(255, 255, 255, 0.2);
+            line-height: 1.3;
         }
         
-        /* Enhanced Stats Cards */
-        .stat-card {
-            background: rgba(30, 41, 59, 0.6);
+        .mobile-h3 {
+            font-size: clamp(1rem, 3.5vw, 1.25rem);
+            font-weight: 600;
+            line-height: 1.4;
+        }
+        
+        .mobile-body {
+            font-size: clamp(0.875rem, 3vw, 1rem);
+            line-height: 1.5;
+        }
+        
+        .mobile-small {
+            font-size: clamp(0.75rem, 2.5vw, 0.875rem);
+            line-height: 1.4;
+        }
+        
+        /* Mobile-optimized input fields */
+        .mobile-input {
+            height: 44px;
+            font-size: 16px; /* Prevents iOS zoom */
+            background: rgba(15, 23, 42, 0.8);
             border: 1px solid rgba(255, 255, 255, 0.1);
             border-radius: 12px;
-            transition: all 0.3s ease;
-        }
-        
-        .stat-card:hover {
-            transform: translateY(-2px);
-            border-color: rgba(56, 189, 248, 0.3);
-            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.2);
-        }
-        
-        /* Professional Inputs */
-        .pro-input {
-            background: rgba(15, 23, 42, 0.7);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 8px;
             color: white;
-            transition: all 0.3s ease;
+            transition: all 0.2s ease;
+            -webkit-appearance: none;
+            appearance: none;
         }
         
-        .pro-input:focus {
+        .mobile-input:focus {
             border-color: #3b82f6;
-            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
             outline: none;
         }
         
-        /* Enhanced Button */
-        .pro-button {
-            background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
-            color: white;
+        /* Mobile-optimized buttons */
+        .mobile-button {
+            height: 48px;
+            font-size: clamp(0.875rem, 3vw, 1rem);
             font-weight: 600;
-            padding: 10px 24px;
-            border-radius: 10px;
+            border-radius: 14px;
             border: none;
-            transition: all 0.3s ease;
+            transition: all 0.2s ease;
+            touch-action: manipulation;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
             position: relative;
             overflow: hidden;
         }
         
-        .pro-button:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 10px 25px rgba(59, 130, 246, 0.3);
+        .mobile-button:active {
+            transform: scale(0.98);
         }
         
-        .pro-button:active {
-            transform: translateY(0);
+        /* Mobile toggle switch */
+        .mobile-toggle {
+            width: 52px;
+            height: 28px;
+            flex-shrink: 0;
         }
         
-        /* Professional Toggle */
-        .pro-toggle {
-            position: relative;
-            display: inline-block;
-            width: 60px;
-            height: 30px;
-        }
-        
-        .pro-toggle input {
+        .mobile-toggle input {
             opacity: 0;
             width: 0;
             height: 0;
         }
         
-        .pro-toggle-slider {
+        .mobile-toggle-slider {
             position: absolute;
             cursor: pointer;
             top: 0;
@@ -183,566 +153,622 @@
             bottom: 0;
             background: linear-gradient(135deg, #475569, #334155);
             border-radius: 34px;
-            transition: .4s;
+            transition: .3s;
         }
         
-        .pro-toggle-slider:before {
+        .mobile-toggle-slider:before {
             position: absolute;
             content: "";
             height: 22px;
             width: 22px;
-            left: 4px;
-            bottom: 4px;
-            background: linear-gradient(135deg, #ffffff, #f1f5f9);
+            left: 3px;
+            bottom: 3px;
+            background: white;
             border-radius: 50%;
-            transition: .4s;
-            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+            transition: .3s;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
         }
         
-        input:checked + .pro-toggle-slider {
+        input:checked + .mobile-toggle-slider {
             background: linear-gradient(135deg, #10b981, #059669);
         }
         
-        input:checked + .pro-toggle-slider:before {
-            transform: translateX(30px);
+        input:checked + .mobile-toggle-slider:before {
+            transform: translateX(24px);
         }
         
-        /* Enhanced Progress Bar */
-        .pro-progress {
-            height: 8px;
-            border-radius: 4px;
+        /* Mobile stats cards */
+        .mobile-stat-card {
+            background: rgba(30, 41, 59, 0.7);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            border-radius: 16px;
+            padding: clamp(12px, 3vw, 16px);
+            transition: all 0.2s ease;
+        }
+        
+        /* Mobile progress bars */
+        .mobile-progress {
+            height: 6px;
+            border-radius: 3px;
             background: rgba(255, 255, 255, 0.1);
             overflow: hidden;
         }
         
-        .pro-progress-bar {
+        .mobile-progress-bar {
             height: 100%;
-            border-radius: 4px;
+            border-radius: 3px;
             background: linear-gradient(90deg, #3b82f6, #8b5cf6);
             transition: width 0.3s ease;
         }
         
-        /* Professional Table */
-        .pro-table {
-            background: rgba(15, 23, 42, 0.7);
-            border-radius: 12px;
-            overflow: hidden;
-            border: 1px solid rgba(255, 255, 255, 0.1);
+        /* Mobile table */
+        .mobile-table {
+            font-size: clamp(0.75rem, 2.5vw, 0.875rem);
         }
         
-        .pro-table th {
-            background: rgba(30, 41, 59, 0.9);
-            color: #94a3b8;
+        .mobile-table th {
+            padding: 10px 12px;
             font-weight: 600;
-            padding: 12px 16px;
-            text-transform: uppercase;
-            font-size: 11px;
-            letter-spacing: 0.5px;
         }
         
-        .pro-table td {
-            padding: 12px 16px;
-            border-top: 1px solid rgba(255, 255, 255, 0.05);
+        .mobile-table td {
+            padding: 10px 12px;
         }
         
-        /* Enhanced Log Area */
-        #log-area {
-            background: rgba(15, 23, 42, 0.8);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 12px;
-            font-family: 'JetBrains Mono', 'SF Mono', Monaco, monospace;
-            font-size: 11px;
-            line-height: 1.5;
-            max-height: 400px;
-            overflow-y: auto;
+        /* Mobile scrollable areas */
+        .mobile-scrollable {
+            -webkit-overflow-scrolling: touch;
+            scrollbar-width: thin;
+            scrollbar-color: #3b82f6 rgba(15, 23, 42, 0.5);
         }
         
-        /* Connection Status */
-        .connection-badge {
-            padding: 6px 16px;
-            border-radius: 20px;
-            font-weight: 600;
-            font-size: 12px;
-            letter-spacing: 0.5px;
-            text-transform: uppercase;
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            border: 1px solid transparent;
+        .mobile-scrollable::-webkit-scrollbar {
+            width: 4px;
+            height: 4px;
         }
         
-        .connection-connected {
-            background: linear-gradient(135deg, #10b981, #059669);
-            border-color: rgba(16, 185, 129, 0.3);
-            box-shadow: 0 4px 15px rgba(16, 185, 129, 0.2);
-        }
-        
-        .connection-disconnected {
-            background: linear-gradient(135deg, #ef4444, #dc2626);
-            border-color: rgba(239, 68, 68, 0.3);
-        }
-        
-        .connection-connecting {
-            background: linear-gradient(135deg, #f59e0b, #d97706);
-            border-color: rgba(245, 158, 11, 0.3);
-            animation: pulse-once 1s infinite;
-        }
-        
-        /* Profit/Loss Colors */
-        .profit-positive {
-            color: #10b981;
-            font-weight: 700;
-            text-shadow: 0 0 10px rgba(16, 185, 129, 0.3);
-        }
-        
-        .profit-negative {
-            color: #ef4444;
-            font-weight: 700;
-            text-shadow: 0 0 10px rgba(239, 68, 68, 0.3);
-        }
-        
-        /* Bold Green PnL */
-        .profit-bold-green {
-            color: #10b981;
-            font-weight: 900;
-            font-size: 3rem;
-            text-shadow: 0 0 20px rgba(16, 185, 129, 0.5),
-                         0 0 40px rgba(16, 185, 129, 0.3),
-                         0 0 60px rgba(16, 185, 129, 0.2);
-            letter-spacing: -0.5px;
-        }
-        
-        /* Martingale Level Indicator */
-        .martingale-level {
-            display: inline-block;
-            padding: 4px 12px;
-            border-radius: 20px;
-            font-size: 11px;
-            font-weight: 700;
-            background: rgba(59, 130, 246, 0.2);
-            color: #3b82f6;
-            border: 1px solid rgba(59, 130, 246, 0.3);
-        }
-        
-        /* Tick Digit Display */
-        .tick-digit {
-            width: 48px;
-            height: 48px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            border-radius: 12px;
-            font-size: 24px;
-            font-weight: 800;
-            background: linear-gradient(135deg, #1e40af, #1d4ed8);
-            color: white;
-            border: 2px solid rgba(255, 255, 255, 0.2);
-            box-shadow: 0 4px 15px rgba(30, 64, 175, 0.3);
-        }
-        
-        /* Win Celebration */
-        .win-celebration {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            pointer-events: none;
-            z-index: 1000;
-            opacity: 0;
-        }
-        
-        .confetti {
-            position: absolute;
-            width: 10px;
-            height: 20px;
-            background: linear-gradient(45deg, #10b981, #34d399, #a7f3d0);
-            opacity: 0.8;
-        }
-        
-        /* Collapsible calculator styles */
-        .collapsible-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            cursor: pointer;
-        }
-        
-        .collapsible-content {
-            overflow: hidden;
-            transition: max-height 0.3s ease-out;
-        }
-        
-        .collapsible-content.collapsed {
-            max-height: 0;
-        }
-        
-        .collapsible-content.expanded {
-            max-height: 1000px;
-        }
-        
-        .collapse-icon {
-            transition: transform 0.3s ease;
-        }
-        
-        .collapse-icon.rotated {
-            transform: rotate(180deg);
-        }
-        
-        /* Scrollable calculator table */
-        .calculator-table-container {
-            max-height: 400px;
-            overflow-y: auto;
-            border-radius: 8px;
-            margin-bottom: 1rem;
-        }
-        
-        /* Custom scrollbar */
-        .calculator-table-container::-webkit-scrollbar {
-            width: 6px;
-        }
-        
-        .calculator-table-container::-webkit-scrollbar-track {
+        .mobile-scrollable::-webkit-scrollbar-track {
             background: rgba(15, 23, 42, 0.5);
-            border-radius: 3px;
+            border-radius: 2px;
         }
         
-        .calculator-table-container::-webkit-scrollbar-thumb {
+        .mobile-scrollable::-webkit-scrollbar-thumb {
             background: linear-gradient(135deg, #3b82f6, #8b5cf6);
-            border-radius: 3px;
+            border-radius: 2px;
+        }
+        
+        /* Mobile log area */
+        #log-area {
+            font-family: 'Menlo', 'Monaco', 'Courier New', monospace;
+            font-size: clamp(0.75rem, 2.5vw, 0.875rem);
+            line-height: 1.4;
+            max-height: 300px;
+        }
+        
+        /* Mobile digit display */
+        .mobile-digit {
+            width: clamp(40px, 12vw, 48px);
+            height: clamp(40px, 12vw, 48px);
+            font-size: clamp(1.25rem, 4vw, 1.5rem);
+            font-weight: 800;
+            border-radius: 12px;
+        }
+        
+        /* Mobile connection badge */
+        .mobile-badge {
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: clamp(0.75rem, 2.5vw, 0.875rem);
+            font-weight: 600;
+            letter-spacing: 0.3px;
+        }
+        
+        /* Mobile martingale level */
+        .mobile-martingale-level {
+            padding: 4px 10px;
+            border-radius: 16px;
+            font-size: clamp(0.75rem, 2.5vw, 0.875rem);
+            font-weight: 700;
+        }
+        
+        /* Mobile grid layouts */
+        .mobile-grid-2 {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+        }
+        
+        .mobile-grid-4 {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+        }
+        
+        @media (min-width: 640px) {
+            .mobile-grid-4 {
+                grid-template-columns: repeat(4, 1fr);
+            }
+        }
+        
+        /* Mobile animations */
+        @keyframes mobile-pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.7; }
+            100% { opacity: 1; }
+        }
+        
+        @keyframes mobile-slide-up {
+            from { transform: translateY(10px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+        
+        .mobile-slide-up {
+            animation: mobile-slide-up 0.3s ease-out;
+        }
+        
+        /* Mobile touch feedback */
+        .touch-feedback:active {
+            background-color: rgba(255, 255, 255, 0.05);
+        }
+        
+        /* Mobile safe area padding */
+        .safe-top {
+            padding-top: var(--safe-area-inset-top);
+        }
+        
+        .safe-bottom {
+            padding-bottom: var(--safe-area-inset-bottom);
+        }
+        
+        /* Hide scrollbar but keep functionality */
+        .scrollbar-hide {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+        
+        .scrollbar-hide::-webkit-scrollbar {
+            display: none;
+        }
+        
+        /* Mobile loading skeleton */
+        .mobile-skeleton {
+            background: linear-gradient(90deg, rgba(30, 41, 59, 0.5) 25%, rgba(30, 41, 59, 0.8) 50%, rgba(30, 41, 59, 0.5) 75%);
+            background-size: 200% 100%;
+            animation: mobile-skeleton-loading 1.5s infinite;
+        }
+        
+        @keyframes mobile-skeleton-loading {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
+        
+        /* Mobile digit flash animation */
+        @keyframes mobile-digit-flash {
+            0% { transform: scale(1); background-color: #10B981; }
+            50% { transform: scale(1.1); background-color: #34d399; }
+            100% { transform: scale(1); background-color: #10B981; }
+        }
+        
+        .mobile-digit-flash {
+            animation: mobile-digit-flash 0.3s ease-out;
+        }
+        
+        /* Mobile notification */
+        .mobile-notification {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(30, 41, 59, 0.95);
+            border: 1px solid rgba(56, 189, 248, 0.3);
+            border-radius: 12px;
+            padding: 12px 16px;
+            z-index: 1000;
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            animation: mobile-slide-up 0.3s ease-out;
+            max-width: 90vw;
+            width: auto;
+        }
+        
+        /* Mobile bottom sheet */
+        .mobile-bottom-sheet {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: rgba(15, 23, 42, 0.98);
+            border-radius: 24px 24px 0 0;
+            padding: 20px;
+            padding-bottom: max(20px, var(--safe-area-inset-bottom));
+            z-index: 1000;
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            box-shadow: 0 -4px 32px rgba(0, 0, 0, 0.3);
+            transform: translateY(100%);
+            transition: transform 0.3s ease-out;
+        }
+        
+        .mobile-bottom-sheet.active {
+            transform: translateY(0);
+        }
+        
+        /* Mobile swipe handle */
+        .mobile-swipe-handle {
+            width: 40px;
+            height: 4px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 2px;
+            margin: 0 auto 16px;
+        }
+        
+        /* Mobile landscape optimizations */
+        @media (orientation: landscape) and (max-height: 600px) {
+            body {
+                padding: 8px;
+            }
+            
+            .mobile-card {
+                padding: 12px;
+            }
+            
+            .mobile-button {
+                height: 40px;
+                font-size: 0.875rem;
+            }
+            
+            .mobile-input {
+                height: 36px;
+                font-size: 14px;
+            }
+        }
+        
+        /* Mobile dark mode enhancements */
+        @media (prefers-color-scheme: dark) {
+            .mobile-card {
+                background: linear-gradient(145deg, rgba(20, 30, 48, 0.95), rgba(10, 18, 32, 0.95));
+            }
+            
+            .mobile-input {
+                background: rgba(10, 18, 32, 0.9);
+            }
         }
     </style>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght300;400;500;600;700;800&display=swap" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght300;400;500&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 </head>
-<body class="min-h-screen p-4 sm:p-8 flex items-start justify-center">
-
-    <!-- Win Celebration Overlay -->
-    <div id="winCelebration" class="win-celebration"></div>
-
-    <div class="w-full max-w-7xl">
-        <!-- Header -->
-        <div class="professional-card p-6 mb-6">
-            <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+<body class="text-white mobile-body p-4 safe-bottom">
+    <!-- Mobile Header -->
+    <div class="mobile-card p-4 mb-4">
+        <div class="flex flex-col gap-3">
+            <div class="flex justify-between items-center">
                 <div>
-                    <h1 class="text-3xl font-bold bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent">
-                        DIGITMATCHSTARv2
+                    <h1 class="mobile-h1 bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent">
+                        DIGITMATCHv2
                     </h1>
-                    <p class="text-gray-400 text-sm mt-1">First Tick Martingale System • Professional Trading Bot</p>
+                    <p class="mobile-small text-gray-400 mt-1">First Tick Martingale Bot</p>
                 </div>
                 
-                <div class="flex flex-wrap items-center gap-3">
-                    <div class="connection-badge connection-disconnected" id="status-badge">
-                        <span class="w-2 h-2 rounded-full bg-white"></span>
-                        DISCONNECTED
+                <div class="flex items-center gap-2">
+                    <div class="mobile-badge gradient-danger" id="status-badge">
+                        <i class="fas fa-wifi text-xs"></i>
+                        <span class="ml-1">OFF</span>
                     </div>
                     
-                    <div class="professional-badge gradient-primary">
-                        FIRST TICK
+                    <button id="mobileMenuButton" class="touch-button p-2 rounded-lg bg-gray-800/50">
+                        <i class="fas fa-ellipsis-v"></i>
+                    </button>
+                </div>
+            </div>
+            
+            <div class="flex items-center justify-between bg-gray-800/30 rounded-xl p-3">
+                <div class="flex items-center gap-2">
+                    <i class="fas fa-coins text-yellow-400"></i>
+                    <span class="mobile-small font-medium">Account</span>
+                </div>
+                
+                <div class="flex items-center gap-3">
+                    <span class="mobile-small">DEMO</span>
+                    <label class="relative inline-block mobile-toggle">
+                        <input type="checkbox" id="accTypeToggle" onchange="toggleAccountType()">
+                        <span class="mobile-toggle-slider"></span>
+                    </label>
+                    <span class="mobile-small">REAL</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Mobile Main Content -->
+    <div class="space-y-4">
+        <!-- Trading Control Card -->
+        <div class="mobile-card p-4">
+            <h2 class="mobile-h2 mb-4">Trading Control</h2>
+            
+            <div class="mobile-grid-2 mb-4">
+                <div class="mobile-stat-card text-center">
+                    <div class="mobile-small text-gray-400 mb-1">Bot Status</div>
+                    <div id="botStatus" class="mobile-h3 text-green-400">STOPPED</div>
+                </div>
+                
+                <div class="mobile-stat-card text-center">
+                    <div class="mobile-small text-gray-400 mb-1">Session Time</div>
+                    <div id="sessionTime" class="mobile-h3 text-blue-400">00:00</div>
+                </div>
+            </div>
+            
+            <div class="space-y-4">
+                <div>
+                    <label class="mobile-small font-medium text-gray-300 block mb-2">Base Stake ($)</label>
+                    <input type="number" id="baseStake" value="1.0" min="0.35" step="0.01" 
+                           class="mobile-input w-full px-4">
+                </div>
+                
+                <div class="mobile-grid-2 gap-3">
+                    <div>
+                        <label class="mobile-small font-medium text-gray-300 block mb-2">Multiplier</label>
+                        <input type="number" id="multiplier" value="1.15" min="1.0" step="0.01" 
+                               class="mobile-input w-full px-4">
                     </div>
                     
-                    <div class="flex items-center gap-3">
-                        <label class="flex items-center gap-2 text-sm text-gray-300">
-                            <span>DEMO</span>
-                            <label class="pro-toggle">
-                                <input type="checkbox" id="accTypeToggle" onchange="switchAccount()">
-                                <span class="pro-toggle-slider"></span>
-                            </label>
-                            <span>REAL</span>
-                        </label>
-                        
-                        <button id="soundToggle" onclick="toggleSound()" 
-                            class="px-4 py-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-300 text-sm font-medium transition">
-                            Sound
-                        </button>
+                    <div>
+                        <label class="mobile-small font-medium text-gray-300 block mb-2">Max Trades</label>
+                        <input type="number" id="maxTrades" value="15" min="1" max="100" 
+                               class="mobile-input w-full px-4">
+                    </div>
+                </div>
+                
+                <div>
+                    <label class="mobile-small font-medium text-gray-300 block mb-2">Symbol</label>
+                    <select id="symbol" class="mobile-input w-full px-4">
+                        <option value="R_10">V. 10 Index</option>
+                        <option value="R_100">V. 100 Index</option>
+                        <option value="R_25">V. 25 Index</option>
+                        <option value="R_50">V. 50 Index</option>
+                    </select>
+                </div>
+            </div>
+            
+            <button id="toggleButton" onclick="toggleBot()" 
+                    class="mobile-button w-full mt-6 gradient-success touch-button">
+                <i class="fas fa-play"></i>
+                <span>START TRADING BOT</span>
+            </button>
+        </div>
+
+        <!-- Live Dashboard Card -->
+        <div class="mobile-card p-4">
+            <h2 class="mobile-h2 mb-4">Live Dashboard</h2>
+            
+            <div class="mobile-grid-2 mb-4">
+                <div class="mobile-stat-card text-center">
+                    <div class="mobile-small text-gray-400 mb-1">Current Tick</div>
+                    <div id="metricLiveTick" class="mobile-h3">---</div>
+                    <div id="metricLastDigit" class="mobile-small text-gray-300 mt-1">Digit: ?</div>
+                </div>
+                
+                <div class="mobile-stat-card text-center">
+                    <div class="mobile-small text-gray-400 mb-1">Prediction</div>
+                    <div id="metricPredictedDigit" class="mobile-digit flex items-center justify-center mx-auto bg-gradient-to-br from-purple-600 to-blue-600">
+                        ?
+                    </div>
+                </div>
+            </div>
+            
+            <div class="mobile-grid-2 mb-4">
+                <div class="mobile-stat-card text-center">
+                    <div class="mobile-small text-gray-400 mb-1">Current Stake</div>
+                    <div id="metricCurrentStake" class="mobile-h3 text-green-400">$0.00</div>
+                    <div id="currentMartingaleLevel" class="mobile-martingale-level bg-blue-900/30 text-blue-400 mt-1">Level 0</div>
+                </div>
+                
+                <div class="mobile-stat-card text-center">
+                    <div class="mobile-small text-gray-400 mb-1">Trade Count</div>
+                    <div id="metricTradeCount" class="mobile-h3 text-yellow-400">0</div>
+                    <div class="mobile-small text-gray-300 mt-1">
+                        of <span id="maxTradesDisplay">15</span> max
+                    </div>
+                </div>
+            </div>
+            
+            <div class="space-y-3">
+                <div>
+                    <div class="flex justify-between mobile-small text-gray-300 mb-2">
+                        <span>Trading Progress</span>
+                        <span id="tradeProgressText">0/15</span>
+                    </div>
+                    <div class="mobile-progress">
+                        <div id="tradeProgressBar" class="mobile-progress-bar" style="width: 0%"></div>
+                    </div>
+                </div>
+                
+                <div>
+                    <div class="flex justify-between mobile-small text-gray-300 mb-2">
+                        <span>PnL Update</span>
+                        <span id="pnlTimer">--</span>
+                    </div>
+                    <div class="mobile-progress">
+                        <div id="pnlProgressBar" class="mobile-progress-bar bg-gradient-to-r from-green-500 to-emerald-500" style="width: 0%"></div>
                     </div>
                 </div>
             </div>
         </div>
 
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <!-- Left Column: Bot Status & Control Panel -->
-            <div class="lg:col-span-2 space-y-6">
-                <!-- Bot Status Panel -->
-                <div class="professional-card p-6">
-                    <h2 class="text-xl font-bold text-white mb-4 flex items-center gap-2">
-                        Bot Status & Control
-                    </h2>
-                    
-                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-                        <div class="stat-card p-4">
-                            <div class="text-gray-400 text-sm mb-1">Bot Status</div>
-                            <div id="botStatus" class="text-lg font-bold text-green-400">STOPPED</div>
-                            <div id="botSubStatus" class="text-xs text-gray-400 mt-1">Ready to start</div>
-                        </div>
-                        
-                        <div class="stat-card p-4">
-                            <div class="text-gray-400 text-sm mb-1">Strategy Mode</div>
-                            <div class="text-lg font-bold text-purple-400">First Tick</div>
-                            <div class="text-xs text-gray-400 mt-1">Digit Match System</div>
-                        </div>
-                        
-                        <div class="stat-card p-4">
-                            <div class="text-gray-400 text-sm mb-1">Martingale Level</div>
-                            <div id="martingaleLevel" class="text-lg font-bold text-yellow-400">0</div>
-                            <div class="text-xs text-gray-400 mt-1">Current step</div>
-                        </div>
-                        
-                        <div class="stat-card p-4">
-                            <div class="text-gray-400 text-sm mb-1">Session Time</div>
-                            <div id="sessionTime" class="text-lg font-bold text-blue-400">00:00</div>
-                            <div class="text-xs text-gray-400 mt-1">Duration</div>
-                        </div>
-                    </div>
-                    
-                    <div class="mb-6">
-                        <div class="flex items-center justify-between mb-3">
-                            <h3 class="text-lg font-semibold text-white">Quick Settings</h3>
-                            <button onclick="applyQuickSettings('conservative')" class="text-xs px-3 py-1 rounded bg-gray-800 hover:bg-gray-700 text-gray-300">
-                                Apply Conservative
-                            </button>
-                        </div>
-                        
-                        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-                            <div>
-                                <label class="block text-sm font-medium text-gray-300 mb-2">Base Stake</label>
-                                <input type="number" id="baseStake" value="1.0" min="0.1" step="0.1" 
-                                    class="w-full pro-input py-2 px-3">
-                            </div>
-                            
-                            <div>
-                                <label class="block text-sm font-medium text-gray-300 mb-2">Multiplier</label>
-                                <input type="number" id="multiplier" value="1.15" min="1.0" step="0.01" 
-                                    class="w-full pro-input py-2 px-3">
-                            </div>
-                            
-                            <div>
-                                <label class="block text-sm font-medium text-gray-300 mb-2">Max Trades</label>
-                                <input type="number" id="maxTrades" value="15" min="1" max="100" 
-                                    class="w-full pro-input py-2 px-3">
-                            </div>
-                            
-                            <div>
-                                <label class="block text-sm font-medium text-gray-300 mb-2">Symbol</label>
-                                <select id="symbol" class="w-full pro-input py-2 px-3">
-                                    <option value="R_10">V. 10 Index</option>
-                                    <option value="R_100">V. 100 Index</option>
-                                    <option value="R_25">V. 25 Index</option>
-                                    <option value="R_50">V. 50 Index</option>
-                                </select>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- Start/Stop Button -->
-                    <div class="mt-8">
-                        <button id="toggleButton" onclick="toggleBot()" 
-                            class="w-full pro-button text-lg py-4 rounded-xl gradient-success hover:shadow-xl transition-all duration-300">
-                            START TRADING BOT
-                        </button>
-                    </div>
-                </div>
-
-                <!-- Live Trading Dashboard -->
-                <div class="professional-card p-6">
-                    <h2 class="text-xl font-bold text-white mb-4 flex items-center gap-2">
-                        Live Trading Dashboard
-                    </h2>
-                    
-                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-                        <div class="stat-card p-4">
-                            <div class="text-gray-400 text-sm mb-1">Current Tick</div>
-                            <div id="metricLiveTick" class="text-2xl font-bold text-white">---</div>
-                            <div id="metricLastDigit" class="text-sm text-gray-300">Digit: ?</div>
-                        </div>
-                        
-                        <div class="stat-card p-4">
-                            <div class="text-gray-400 text-sm mb-1">Predicted Digit</div>
-                            <div id="metricPredictedDigit" class="text-3xl font-bold text-purple-400">?</div>
-                            <div class="text-sm text-gray-300">From first tick</div>
-                        </div>
-                        
-                        <div class="stat-card p-4">
-                            <div class="text-gray-400 text-sm mb-1">Current Stake</div>
-                            <div id="metricCurrentStake" class="text-2xl font-bold text-green-400">$0.00</div>
-                            <div id="currentMartingaleLevel" class="text-xs martingale-level mt-1">Level 0</div>
-                        </div>
-                        
-                        <div class="stat-card p-4">
-                            <div class="text-gray-400 text-sm mb-1">Trade Count</div>
-                            <div id="metricTradeCount" class="text-2xl font-bold text-yellow-400">0</div>
-                            <div class="text-sm text-gray-300">of <span id="maxTradesDisplay">15</span> max</div>
-                        </div>
-                    </div>
-                    
-                    <!-- Progress Bars -->
-                    <div class="space-y-4">
-                        <div>
-                            <div class="flex justify-between text-sm text-gray-300 mb-2">
-                                <span>Trading Progress</span>
-                                <span id="tradeProgressText">0/15</span>
-                            </div>
-                            <div class="pro-progress">
-                                <div id="tradeProgressBar" class="pro-progress-bar" style="width: 0%"></div>
-                            </div>
-                        </div>
-                        
-                        <div>
-                            <div class="flex justify-between text-sm text-gray-300 mb-2">
-                                <span>PnL Update</span>
-                                <span id="pnlTimer">--</span>
-                            </div>
-                            <div class="pro-progress">
-                                <div id="pnlProgressBar" class="pro-progress-bar bg-gradient-to-r from-green-500 to-emerald-500" style="width: 0%"></div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Right Column: Statistics & Info -->
-            <div class="space-y-6">
-                <!-- Profit & Loss -->
-                <div class="professional-card p-6">
-                    <h2 class="text-xl font-bold text-white mb-4 flex items-center gap-2">
-                        Profit & Loss
-                    </h2>
-                    
-                    <div class="text-center mb-6">
-                        <div class="text-gray-400 text-sm mb-2">Net Profit/Loss</div>
-                        <div id="metricTotalProfit" class="profit-bold-green">$0.00</div>
-                        <div class="text-sm text-gray-400 mt-2" id="pnlBreakdown">
-                            Investment: $0.00 • Payout: $0.00
-                        </div>
-                    </div>
-                    
-                    <div class="grid grid-cols-2 gap-4">
-                        <div class="text-center p-3 rounded-lg bg-gray-800/50">
-                            <div class="text-gray-400 text-sm">Starting Balance</div>
-                            <div id="startingBalance" class="text-lg font-bold text-white">$---</div>
-                        </div>
-                        
-                        <div class="text-center p-3 rounded-lg bg-gray-800/50">
-                            <div class="text-gray-400 text-sm">Current Balance</div>
-                            <div id="currentBalance" class="text-lg font-bold text-green-400">$---</div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Martingale Calculator (Expanded for 100 trades) -->
-                <div class="professional-card p-6" id="martingaleCalculator">
-                    <div class="collapsible-header" onclick="toggleCalculator()">
-                        <h2 class="text-xl font-bold text-white flex items-center gap-2">
-                            Martingale Calculator (Up to 100 Trades)
-                        </h2>
-                        <svg id="collapseIcon" class="collapse-icon w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-                        </svg>
-                    </div>
-                    
-                    <div id="calculatorContent" class="collapsible-content expanded space-y-4 mt-4">
-                        <div>
-                            <div class="flex justify-between items-center mb-2">
-                                <div class="text-sm text-gray-300">Stake Progression (1.15x)</div>
-                                <div class="text-xs text-gray-400">Showing first 20 of 100</div>
-                            </div>
-                            <div class="calculator-table-container">
-                                <div class="pro-table">
-                                    <table class="w-full">
-                                        <thead>
-                                            <tr>
-                                                <th class="text-left">Loss #</th>
-                                                <th class="text-right">Stake</th>
-                                                <th class="text-right">Total</th>
-                                                <th class="text-right">P/L at Win</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody id="martingaleTable">
-                                            <tr><td colspan="4" class="text-center text-gray-500 py-4">Enter stake to calculate</td></tr>
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <div class="text-center p-4 rounded-lg bg-gradient-to-r from-blue-900/30 to-purple-900/30">
-                            <div class="text-gray-300 text-sm mb-1">Payout on Win at Level 10</div>
-                            <div id="payoutAtLevel10" class="text-2xl font-bold text-green-400">$0.00</div>
-                            <div class="text-xs text-gray-400 mt-1">9x payout - total investment</div>
-                        </div>
-                        
-                        <div class="text-center p-4 rounded-lg bg-gradient-to-r from-purple-900/30 to-pink-900/30">
-                            <div class="text-gray-300 text-sm mb-1">Risk at Level 20</div>
-                            <div id="riskAtLevel20" class="text-2xl font-bold text-yellow-400">$0.00</div>
-                            <div class="text-xs text-gray-400 mt-1">Total exposure</div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Bot Status Information -->
-                <div class="professional-card p-6">
-                    <h2 class="text-xl font-bold text-white mb-4 flex items-center gap-2">
-                        Bot Information
-                    </h2>
-                    
-                    <div class="space-y-3">
-                        <div class="flex justify-between items-center">
-                            <span class="text-gray-400">Connection Status:</span>
-                            <span id="connectionStatus" class="px-3 py-1 rounded-full bg-red-900/30 text-red-400 text-sm">Offline</span>
-                        </div>
-                        
-                        <div class="flex justify-between items-center">
-                            <span class="text-gray-400">Ticks Received:</span>
-                            <span id="ticksReceived" class="text-white font-medium">0</span>
-                        </div>
-                        
-                        <div class="flex justify-between items-center">
-                            <span class="text-gray-400">First Tick Status:</span>
-                            <span id="firstTickStatus" class="px-3 py-1 rounded-full bg-yellow-900/30 text-yellow-400 text-sm">Waiting</span>
-                        </div>
-                        
-                        <div class="flex justify-between items-center">
-                            <span class="text-gray-400">Win Rate:</span>
-                            <span id="winRate" class="text-green-400 font-medium">0%</span>
-                        </div>
-                        
-                        <div class="mt-4 p-3 rounded-lg bg-gray-800/50">
-                            <div class="text-sm text-gray-300 mb-1">Status Message</div>
-                            <div id="statusMessage" class="text-white font-medium">Ready to start trading</div>
-                            <div id="nextAction" class="text-xs text-gray-400 mt-1">Click START to begin</div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Trading Log -->
-        <div class="professional-card p-6 mt-6">
-            <div class="flex justify-between items-center mb-4">
-                <h2 class="text-xl font-bold text-white flex items-center gap-2">
-                    Trading Log
-                </h2>
-                <button onclick="clearLog()" class="text-sm px-3 py-1 rounded bg-gray-800 hover:bg-gray-700 text-gray-300">
-                    Clear Log
+        <!-- PnL & Stats Card -->
+        <div class="mobile-card p-4">
+            <div class="flex items-center justify-between mb-4">
+                <h2 class="mobile-h2">Profit & Loss</h2>
+                <button onclick="showStatsSheet()" class="touch-button p-2 rounded-lg bg-gray-800/50">
+                    <i class="fas fa-chart-line"></i>
                 </button>
             </div>
             
-            <div id="log-area" class="h-64 bg-gray-900/50 rounded-lg p-4 overflow-y-auto text-sm">
-                <div class="text-gray-500 text-center py-8">
-                    <div class="text-lg mb-2">DIGITMATCHSTARv2 Initialized</div>
-                    <div class="text-sm">First Tick Martingale System ready</div>
-                    <div class="text-xs mt-2">Ready to start trading with 1.15x martingale strategy</div>
+            <div class="text-center mb-4">
+                <div id="metricTotalProfit" class="mobile-h1 text-green-400 font-bold">$0.00</div>
+                <div id="pnlBreakdown" class="mobile-small text-gray-400 mt-2">
+                    Investment: $0.00 • Payout: $0.00
                 </div>
+            </div>
+            
+            <div class="mobile-grid-2">
+                <div class="mobile-stat-card text-center">
+                    <div class="mobile-small text-gray-400 mb-1">Start Balance</div>
+                    <div id="startingBalance" class="mobile-h3">$---</div>
+                </div>
+                
+                <div class="mobile-stat-card text-center">
+                    <div class="mobile-small text-gray-400 mb-1">Current Balance</div>
+                    <div id="currentBalance" class="mobile-h3 text-green-400">$---</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Quick Actions Bar -->
+        <div class="mobile-card p-3">
+            <div class="flex justify-around">
+                <button onclick="toggleSound()" class="touch-button flex flex-col items-center gap-1 p-2">
+                    <i id="soundIcon" class="fas fa-volume-up text-lg"></i>
+                    <span class="mobile-small">Sound</span>
+                </button>
+                
+                <button onclick="clearLog()" class="touch-button flex flex-col items-center gap-1 p-2">
+                    <i class="fas fa-trash-alt text-lg"></i>
+                    <span class="mobile-small">Clear Log</span>
+                </button>
+                
+                <button onclick="showCalculator()" class="touch-button flex flex-col items-center gap-1 p-2">
+                    <i class="fas fa-calculator text-lg"></i>
+                    <span class="mobile-small">Calculator</span>
+                </button>
+                
+                <button onclick="showSettings()" class="touch-button flex flex-col items-center gap-1 p-2">
+                    <i class="fas fa-cog text-lg"></i>
+                    <span class="mobile-small">Settings</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Trading Log Card -->
+        <div class="mobile-card p-4">
+            <div class="flex justify-between items-center mb-3">
+                <h2 class="mobile-h2">Trading Log</h2>
+                <button onclick="toggleLog()" class="touch-button p-2 rounded-lg bg-gray-800/50">
+                    <i id="logToggleIcon" class="fas fa-chevron-down"></i>
+                </button>
+            </div>
+            
+            <div id="log-area" class="h-48 bg-gray-900/30 rounded-xl p-3 overflow-y-auto mobile-scrollable">
+                <div class="text-center text-gray-500 py-8">
+                    <i class="fas fa-robot text-2xl mb-3"></i>
+                    <div class="mobile-small">DIGITMATCHv2 Initialized</div>
+                    <div class="mobile-small text-gray-600 mt-1">Ready to start trading</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Mobile Bottom Sheets -->
+    <div id="calculatorSheet" class="mobile-bottom-sheet">
+        <div class="mobile-swipe-handle"></div>
+        <h2 class="mobile-h2 mb-4">Martingale Calculator</h2>
+        
+        <div class="space-y-4 mb-4">
+            <div class="mobile-grid-2 gap-3">
+                <div>
+                    <div class="mobile-small text-gray-400 mb-2">Payout at Level 10</div>
+                    <div id="payoutAtLevel10" class="mobile-h3 text-green-400">$0.00</div>
+                </div>
+                <div>
+                    <div class="mobile-small text-gray-400 mb-2">Risk at Level 20</div>
+                    <div id="riskAtLevel20" class="mobile-h3 text-yellow-400">$0.00</div>
+                </div>
+            </div>
+            
+            <div class="mobile-scrollable max-h-64">
+                <table class="w-full mobile-table">
+                    <thead>
+                        <tr class="border-b border-gray-800">
+                            <th class="text-left py-2">Loss #</th>
+                            <th class="text-right py-2">Stake</th>
+                            <th class="text-right py-2">Total</th>
+                            <th class="text-right py-2">P/L at Win</th>
+                        </tr>
+                    </thead>
+                    <tbody id="martingaleTable">
+                        <tr><td colspan="4" class="text-center py-4 text-gray-500">Calculating...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        
+        <button onclick="hideCalculator()" class="mobile-button w-full gradient-primary touch-button">
+            <i class="fas fa-times"></i>
+            <span>Close Calculator</span>
+        </button>
+    </div>
+
+    <!-- Stats Bottom Sheet -->
+    <div id="statsSheet" class="mobile-bottom-sheet">
+        <div class="mobile-swipe-handle"></div>
+        <h2 class="mobile-h2 mb-4">Trading Statistics</h2>
+        
+        <div class="space-y-4">
+            <div class="mobile-grid-2 gap-3">
+                <div class="mobile-stat-card">
+                    <div class="mobile-small text-gray-400 mb-1">Win Rate</div>
+                    <div id="winRate" class="mobile-h3 text-green-400">0%</div>
+                </div>
+                <div class="mobile-stat-card">
+                    <div class="mobile-small text-gray-400 mb-1">Ticks Received</div>
+                    <div id="ticksReceived" class="mobile-h3">0</div>
+                </div>
+            </div>
+            
+            <div class="mobile-stat-card">
+                <div class="mobile-small text-gray-400 mb-2">Connection Status</div>
+                <div id="connectionStatus" class="mobile-badge inline-block bg-red-900/30 text-red-400">
+                    Offline
+                </div>
+            </div>
+            
+            <div class="mobile-stat-card">
+                <div class="mobile-small text-gray-400 mb-2">First Tick Status</div>
+                <div id="firstTickStatus" class="mobile-badge inline-block bg-yellow-900/30 text-yellow-400">
+                    Waiting
+                </div>
+            </div>
+            
+            <div class="mobile-stat-card">
+                <div class="mobile-small text-gray-400 mb-2">Status Message</div>
+                <div id="statusMessage" class="font-medium">Ready to start trading</div>
+                <div id="nextAction" class="mobile-small text-gray-400 mt-1">Click START to begin</div>
+            </div>
+        </div>
+        
+        <button onclick="hideStatsSheet()" class="mobile-button w-full gradient-primary touch-button mt-6">
+            <i class="fas fa-times"></i>
+            <span>Close Statistics</span>
+        </button>
+    </div>
+
+    <!-- Mobile Notification -->
+    <div id="mobileNotification" class="mobile-notification hidden">
+        <div class="flex items-center gap-3">
+            <i id="notificationIcon" class="fas fa-info-circle"></i>
+            <div>
+                <div id="notificationTitle" class="font-medium"></div>
+                <div id="notificationMessage" class="mobile-small text-gray-300"></div>
             </div>
         </div>
     </div>
 
     <script>
         // ============================================================================
-        // DIGITMATCHSTARv2 | Professional Trading Bot
+        // DIGITMATCHSTARv2 | Mobile-Optimized Trading Bot
         // ============================================================================
         
-        // Global State - SIMPLIFIED
+        // Global State
         window.ws = null;
         window.req_id = 0;
         window.isBotRunning = false;
@@ -787,12 +813,18 @@
         // Performance Tracking
         window.totalTicksReceived = 0;
         
-        // Calculator State
-        window.calculatorCollapsed = false;
-        
         // Session Timer
         window.sessionTimer = null;
         window.sessionStartTime = null;
+        
+        // PnL Update State
+        window.pnlUpdateInterval = null;
+        window.pnlUpdateStartTime = null;
+        window.pnlUpdateActive = false;
+        
+        // Mobile State
+        window.logExpanded = true;
+        window.currentSheet = null;
         
         // DOM Elements
         const toggleButton = document.getElementById('toggleButton');
@@ -803,7 +835,6 @@
         const metricTradeCount = document.getElementById('metricTradeCount');
         const metricLiveTick = document.getElementById('metricLiveTick');
         const metricLastDigit = document.getElementById('metricLastDigit');
-        const martingaleLevel = document.getElementById('martingaleLevel');
         const currentMartingaleLevel = document.getElementById('currentMartingaleLevel');
         const maxTradesDisplay = document.getElementById('maxTradesDisplay');
         const tradeProgressBar = document.getElementById('tradeProgressBar');
@@ -817,7 +848,6 @@
         const payoutAtLevel10 = document.getElementById('payoutAtLevel10');
         const riskAtLevel20 = document.getElementById('riskAtLevel20');
         const botStatus = document.getElementById('botStatus');
-        const botSubStatus = document.getElementById('botSubStatus');
         const sessionTime = document.getElementById('sessionTime');
         const winRate = document.getElementById('winRate');
         const connectionStatus = document.getElementById('connectionStatus');
@@ -825,25 +855,150 @@
         const firstTickStatus = document.getElementById('firstTickStatus');
         const statusMessage = document.getElementById('statusMessage');
         const nextAction = document.getElementById('nextAction');
-        const calculatorContent = document.getElementById('calculatorContent');
-        const collapseIcon = document.getElementById('collapseIcon');
+        const logToggleIcon = document.getElementById('logToggleIcon');
+        const logArea = document.getElementById('log-area');
+        const soundIcon = document.getElementById('soundIcon');
+        const calculatorSheet = document.getElementById('calculatorSheet');
+        const statsSheet = document.getElementById('statsSheet');
+        const mobileNotification = document.getElementById('mobileNotification');
+        const notificationIcon = document.getElementById('notificationIcon');
+        const notificationTitle = document.getElementById('notificationTitle');
+        const notificationMessage = document.getElementById('notificationMessage');
         
         // ============================================================================
-        // CALCULATOR MINIMIZE FUNCTION
+        // MOBILE UI FUNCTIONS
         // ============================================================================
         
-        function toggleCalculator() {
-            window.calculatorCollapsed = !window.calculatorCollapsed;
+        function showNotification(title, message, type = 'info') {
+            notificationTitle.textContent = title;
+            notificationMessage.textContent = message;
             
-            if (window.calculatorCollapsed) {
-                calculatorContent.classList.remove('expanded');
-                calculatorContent.classList.add('collapsed');
-                collapseIcon.classList.add('rotated');
+            const iconMap = {
+                'info': 'fa-info-circle',
+                'success': 'fa-check-circle',
+                'warning': 'fa-exclamation-triangle',
+                'error': 'fa-times-circle'
+            };
+            
+            const colorMap = {
+                'info': 'text-blue-400',
+                'success': 'text-green-400',
+                'warning': 'text-yellow-400',
+                'error': 'text-red-400'
+            };
+            
+            notificationIcon.className = `fas ${iconMap[type]} ${colorMap[type]}`;
+            mobileNotification.classList.remove('hidden');
+            
+            setTimeout(() => {
+                mobileNotification.classList.add('hidden');
+            }, 3000);
+        }
+        
+        function showCalculator() {
+            hideAllSheets();
+            calculatorSheet.classList.add('active');
+            window.currentSheet = 'calculator';
+            calculateMartingaleTable();
+        }
+        
+        function hideCalculator() {
+            calculatorSheet.classList.remove('active');
+            window.currentSheet = null;
+        }
+        
+        function showStatsSheet() {
+            hideAllSheets();
+            statsSheet.classList.add('active');
+            window.currentSheet = 'stats';
+        }
+        
+        function hideStatsSheet() {
+            statsSheet.classList.remove('active');
+            window.currentSheet = null;
+        }
+        
+        function hideAllSheets() {
+            calculatorSheet.classList.remove('active');
+            statsSheet.classList.remove('active');
+            window.currentSheet = null;
+        }
+        
+        function toggleLog() {
+            window.logExpanded = !window.logExpanded;
+            if (window.logExpanded) {
+                logArea.style.height = '192px';
+                logToggleIcon.className = 'fas fa-chevron-down';
             } else {
-                calculatorContent.classList.remove('collapsed');
-                calculatorContent.classList.add('expanded');
-                collapseIcon.classList.remove('rotated');
-                calculateMartingaleTable();
+                logArea.style.height = '0';
+                logToggleIcon.className = 'fas fa-chevron-up';
+            }
+        }
+        
+        // Close sheets when clicking outside
+        document.addEventListener('click', (e) => {
+            if (window.currentSheet && !e.target.closest('.mobile-bottom-sheet') && 
+                !e.target.closest('[onclick*="show"]')) {
+                hideAllSheets();
+            }
+        });
+        
+        // Close sheets on escape key
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && window.currentSheet) {
+                hideAllSheets();
+            }
+        });
+        
+        // Swipe to close sheets
+        let startY = 0;
+        let currentY = 0;
+        
+        document.addEventListener('touchstart', (e) => {
+            if (window.currentSheet && e.target.closest('.mobile-bottom-sheet')) {
+                startY = e.touches[0].clientY;
+            }
+        }, { passive: true });
+        
+        document.addEventListener('touchmove', (e) => {
+            if (window.currentSheet && e.target.closest('.mobile-bottom-sheet')) {
+                currentY = e.touches[0].clientY;
+                const diff = currentY - startY;
+                if (diff > 50) { // Swipe down
+                    hideAllSheets();
+                }
+            }
+        }, { passive: true });
+        
+        // ============================================================================
+        // ACCOUNT TOGGLE
+        // ============================================================================
+        
+        function toggleAccountType() {
+            const isReal = document.getElementById('accTypeToggle').checked;
+            const baseStakeInput = document.getElementById('baseStake');
+            
+            if (isReal) {
+                baseStakeInput.min = "0.35";
+                if (parseFloat(baseStakeInput.value) < 0.35) {
+                    baseStakeInput.value = "0.35";
+                    showNotification('Real Account', 'Minimum stake set to $0.35', 'info');
+                }
+                showNotification('Account Switched', 'Now using REAL account', 'success');
+            } else {
+                baseStakeInput.min = "0.10";
+                if (parseFloat(baseStakeInput.value) < 0.10) {
+                    baseStakeInput.value = "0.10";
+                    showNotification('Demo Account', 'Minimum stake set to $0.10', 'info');
+                }
+                showNotification('Account Switched', 'Now using DEMO account', 'success');
+            }
+            
+            calculateMartingaleTable();
+            
+            if (window.isBotRunning) {
+                showNotification('Bot Stopped', 'Account mode changed', 'warning');
+                stopBot();
             }
         }
         
@@ -879,7 +1034,7 @@
         }
         
         // ============================================================================
-        // MARTINGALE CALCULATOR (UP TO 100 TRADES)
+        // MARTINGALE CALCULATOR
         // ============================================================================
         
         function calculateMartingaleTable() {
@@ -887,16 +1042,28 @@
             const multiplier = parseFloat(document.getElementById('multiplier').value) || 1.15;
             const maxTrades = parseInt(document.getElementById('maxTrades').value) || 15;
             
+            // Enforce minimum stake
+            let adjustedBaseStake = baseStake;
+            const isReal = document.getElementById('accTypeToggle').checked;
+            
+            if (isReal && baseStake < 0.35) {
+                adjustedBaseStake = 0.35;
+                document.getElementById('baseStake').value = "0.35";
+            } else if (!isReal && baseStake < 0.10) {
+                adjustedBaseStake = 0.10;
+                document.getElementById('baseStake').value = "0.10";
+            }
+            
             let html = '';
             let totalInvestment = 0;
-            let currentStake = baseStake;
+            let currentStake = adjustedBaseStake;
             
-            // Calculate up to 100 trades but display first 20
-            const displayTrades = Math.min(20, maxTrades);
+            // Calculate first 15 trades for mobile display
+            const displayTrades = Math.min(15, maxTrades);
             
-            for (let i = 0; i <= maxTrades; i++) {
+            for (let i = 0; i <= displayTrades; i++) {
                 if (i === 0) {
-                    currentStake = baseStake;
+                    currentStake = adjustedBaseStake;
                 } else {
                     currentStake *= multiplier;
                 }
@@ -905,32 +1072,35 @@
                 const payout = currentStake * 9;
                 const netProfit = payout - totalInvestment;
                 
-                // Only add to table for display trades
-                if (i <= displayTrades) {
-                    const rowClass = i % 2 === 0 ? 'bg-gray-800/20' : '';
-                    const stakeClass = i > 0 ? 'text-yellow-400' : 'text-white';
-                    const profitClass = netProfit >= 0 ? 'text-green-400' : 'text-red-400';
-                    
-                    html += `
-                        <tr class="${rowClass}">
-                            <td class="text-gray-300">${i}</td>
-                            <td class="text-right font-medium ${stakeClass}">$${currentStake.toFixed(2)}</td>
-                            <td class="text-right font-medium ${profitClass}">$${totalInvestment.toFixed(2)}</td>
-                            <td class="text-right font-medium ${netProfit >= 0 ? 'text-green-400' : 'text-red-400'}">
-                                ${netProfit >= 0 ? '+' : ''}$${netProfit.toFixed(2)}
-                            </td>
-                        </tr>
-                    `;
-                }
+                const rowClass = i % 2 === 0 ? 'bg-gray-800/20' : '';
+                const profitClass = netProfit >= 0 ? 'text-green-400' : 'text-red-400';
+                
+                html += `
+                    <tr class="${rowClass}">
+                        <td class="py-2">${i}</td>
+                        <td class="text-right py-2">$${currentStake.toFixed(2)}</td>
+                        <td class="text-right py-2">$${totalInvestment.toFixed(2)}</td>
+                        <td class="text-right py-2 ${profitClass}">
+                            ${netProfit >= 0 ? '+' : ''}$${Math.abs(netProfit).toFixed(2)}
+                        </td>
+                    </tr>
+                `;
                 
                 // Calculate payout at level 10
                 if (i === 10) {
                     payoutAtLevel10.textContent = `$${netProfit.toFixed(2)}`;
                 }
                 
-                // Calculate risk at level 20
-                if (i === 20) {
-                    riskAtLevel20.textContent = `$${totalInvestment.toFixed(2)}`;
+                // Calculate risk at level 20 (estimate)
+                if (i === 15) {
+                    // Extrapolate for level 20
+                    let extrapolatedStake = currentStake;
+                    let extrapolatedTotal = totalInvestment;
+                    for (let j = 16; j <= 20; j++) {
+                        extrapolatedStake *= multiplier;
+                        extrapolatedTotal += extrapolatedStake;
+                    }
+                    riskAtLevel20.textContent = `$${extrapolatedTotal.toFixed(2)}`;
                 }
             }
             
@@ -938,37 +1108,30 @@
         }
         
         // ============================================================================
-        // WIN EFFECTS
+        // SOUND FUNCTIONS
         // ============================================================================
         
-        function createWinCelebration() {
-            const celebration = document.getElementById('winCelebration');
-            celebration.innerHTML = '';
-            celebration.style.opacity = '1';
-            
-            for (let i = 0; i < 100; i++) {
-                const confetti = document.createElement('div');
-                confetti.className = 'confetti';
-                confetti.style.left = Math.random() * 100 + '%';
-                confetti.style.top = '-20px';
-                confetti.style.transform = `rotate(${Math.random() * 360}deg)`;
-                confetti.style.animation = `fall ${Math.random() * 3 + 2}s linear forwards`;
-                celebration.appendChild(confetti);
-                
-                const style = document.createElement('style');
-                style.textContent = `
-                    @keyframes fall {
-                        0% { transform: translateY(0) rotate(0deg); opacity: 1; }
-                        100% { transform: translateY(100vh) rotate(${Math.random() * 360}deg); opacity: 0; }
-                    }
-                `;
-                document.head.appendChild(style);
+        function toggleSound() {
+            window.soundEnabled = !window.soundEnabled;
+            if (window.soundEnabled) {
+                soundIcon.className = 'fas fa-volume-up text-lg';
+                showNotification('Sound', 'Sound enabled', 'success');
+            } else {
+                soundIcon.className = 'fas fa-volume-mute text-lg';
+                showNotification('Sound', 'Sound muted', 'info');
             }
+        }
+        
+        async function initTone() {
+            if (!window.soundEnabled) return;
             
-            setTimeout(() => {
-                celebration.style.opacity = '0';
-                setTimeout(() => celebration.innerHTML = '', 1000);
-            }, 3000);
+            try {
+                await Tone.start();
+                window.synth = new Tone.Synth().toDestination();
+                window.ToneInitialized = true;
+            } catch (e) {
+                console.error("Audio init error:", e);
+            }
         }
         
         function playVictorySound() {
@@ -997,14 +1160,11 @@
             window.pnlUpdateStartTime = Date.now();
             window.pnlUpdateActive = true;
             
-            // Clear any existing interval
             if (window.pnlUpdateInterval) {
                 clearInterval(window.pnlUpdateInterval);
             }
             
-            // Apply bold green style
-            metricTotalProfit.classList.remove('profit-positive', 'profit-negative', 'profit-neutral');
-            metricTotalProfit.classList.add('profit-bold-green');
+            metricTotalProfit.classList.add('mobile-digit-flash');
             
             updatePnL();
             
@@ -1024,7 +1184,7 @@
                     window.pnlUpdateActive = false;
                     
                     updatePnL();
-                    log('PnL update complete', 'PNL');
+                    metricTotalProfit.classList.remove('mobile-digit-flash');
                     
                     setTimeout(() => {
                         stopBot();
@@ -1038,15 +1198,6 @@
             const formattedProfit = Math.abs(netProfit).toFixed(2);
             
             metricTotalProfit.textContent = `${netProfit >= 0 ? '+' : '-'}$${formattedProfit}`;
-            
-            metricTotalProfit.classList.remove('profit-positive', 'profit-negative', 'profit-neutral');
-            if (netProfit > 0) {
-                metricTotalProfit.classList.add('profit-bold-green');
-            } else if (netProfit < 0) {
-                metricTotalProfit.classList.add('profit-negative');
-            } else {
-                metricTotalProfit.classList.add('profit-neutral');
-            }
             
             pnlBreakdown.textContent = `Investment: $${window.totalInvestment.toFixed(2)} • Payout: $${window.totalPayout.toFixed(2)}`;
             
@@ -1064,34 +1215,39 @@
         
         function updateBotStatus(status, subStatus) {
             botStatus.textContent = status;
-            botSubStatus.textContent = subStatus;
-            
             botStatus.classList.remove('text-green-400', 'text-red-400', 'text-yellow-400', 'text-blue-400');
             
             if (status === 'RUNNING' || status === 'TRADING') {
                 botStatus.classList.add('text-green-400');
+                statusBadge.className = 'mobile-badge gradient-success';
+                statusBadge.innerHTML = '<i class="fas fa-wifi text-xs"></i><span class="ml-1">LIVE</span>';
             } else if (status === 'STOPPED' || status === 'DISCONNECTED') {
                 botStatus.classList.add('text-red-400');
+                statusBadge.className = 'mobile-badge gradient-danger';
+                statusBadge.innerHTML = '<i class="fas fa-wifi text-xs"></i><span class="ml-1">OFF</span>';
             } else if (status === 'WAITING' || status === 'CONNECTING') {
                 botStatus.classList.add('text-yellow-400');
+                statusBadge.className = 'mobile-badge gradient-warning';
+                statusBadge.innerHTML = '<i class="fas fa-wifi text-xs"></i><span class="ml-1">CONN</span>';
             } else {
                 botStatus.classList.add('text-blue-400');
+                statusBadge.className = 'mobile-badge gradient-primary';
+                statusBadge.innerHTML = '<i class="fas fa-wifi text-xs"></i><span class="ml-1">----</span>';
             }
         }
         
         function updateStakeDisplay() {
             metricCurrentStake.textContent = `$${window.currentStake.toFixed(2)}`;
-            martingaleLevel.textContent = window.martingaleStep;
             currentMartingaleLevel.textContent = `Level ${window.martingaleStep}`;
             
-            if (window.martingaleStep >= 5) {
-                currentMartingaleLevel.classList.remove('bg-blue-900/30', 'text-blue-400');
-                currentMartingaleLevel.classList.add('bg-yellow-900/30', 'text-yellow-400');
-            } else if (window.martingaleStep >= 10) {
-                currentMartingaleLevel.classList.remove('bg-yellow-900/30', 'text-yellow-400');
+            currentMartingaleLevel.classList.remove('bg-blue-900/30', 'bg-yellow-900/30', 'bg-red-900/30');
+            currentMartingaleLevel.classList.remove('text-blue-400', 'text-yellow-400', 'text-red-400');
+            
+            if (window.martingaleStep >= 10) {
                 currentMartingaleLevel.classList.add('bg-red-900/30', 'text-red-400');
+            } else if (window.martingaleStep >= 5) {
+                currentMartingaleLevel.classList.add('bg-yellow-900/30', 'text-yellow-400');
             } else {
-                currentMartingaleLevel.classList.remove('bg-yellow-900/30', 'text-yellow-400', 'bg-red-900/30', 'text-red-400');
                 currentMartingaleLevel.classList.add('bg-blue-900/30', 'text-blue-400');
             }
         }
@@ -1104,20 +1260,14 @@
         
         function updateConnectionDisplay(isConnected, isConnecting) {
             if (isConnected) {
-                statusBadge.className = 'connection-badge connection-connected';
-                statusBadge.innerHTML = '<span class="w-2 h-2 rounded-full bg-white"></span> CONNECTED';
                 connectionStatus.textContent = 'Connected';
-                connectionStatus.className = 'px-3 py-1 rounded-full bg-green-900/30 text-green-400 text-sm';
+                connectionStatus.className = 'mobile-badge inline-block bg-green-900/30 text-green-400';
             } else if (isConnecting) {
-                statusBadge.className = 'connection-badge connection-connecting';
-                statusBadge.innerHTML = '<span class="w-2 h-2 rounded-full bg-white"></span> CONNECTING';
                 connectionStatus.textContent = 'Connecting';
-                connectionStatus.className = 'px-3 py-1 rounded-full bg-yellow-900/30 text-yellow-400 text-sm';
+                connectionStatus.className = 'mobile-badge inline-block bg-yellow-900/30 text-yellow-400';
             } else {
-                statusBadge.className = 'connection-badge connection-disconnected';
-                statusBadge.innerHTML = '<span class="w-2 h-2 rounded-full bg-white"></span> DISCONNECTED';
                 connectionStatus.textContent = 'Offline';
-                connectionStatus.className = 'px-3 py-1 rounded-full bg-red-900/30 text-red-400 text-sm';
+                connectionStatus.className = 'mobile-badge inline-block bg-red-900/30 text-red-400';
             }
         }
         
@@ -1152,12 +1302,11 @@
             metricTradeCount.textContent = '0';
             metricLiveTick.textContent = '---';
             metricLastDigit.textContent = 'Digit: ?';
-            martingaleLevel.textContent = '0';
             currentMartingaleLevel.textContent = 'Level 0';
             tradeProgressBar.style.width = '0%';
             tradeProgressText.textContent = '0/15';
             firstTickStatus.textContent = 'Waiting';
-            firstTickStatus.className = 'px-3 py-1 rounded-full bg-yellow-900/30 text-yellow-400 text-sm';
+            firstTickStatus.className = 'mobile-badge inline-block bg-yellow-900/30 text-yellow-400';
             
             updatePnL();
             updateBalanceDisplay();
@@ -1203,12 +1352,12 @@
             window.predictedDigit = tickData.digit;
             
             metricPredictedDigit.textContent = tickData.digit;
-            metricPredictedDigit.classList.add('digit-match-flash');
+            metricPredictedDigit.classList.add('mobile-digit-flash');
             firstTickStatus.textContent = 'Ready';
-            firstTickStatus.className = 'px-3 py-1 rounded-full bg-green-900/30 text-green-400 text-sm';
+            firstTickStatus.className = 'mobile-badge inline-block bg-green-900/30 text-green-400';
             
-            log(`FIRST TICK DETECTED: ${tickData.formattedPrice}`, 'SYSTEM');
-            log(`PREDICTION SET: Digit ${tickData.digit}`, 'SYSTEM');
+            log(`FIRST TICK: ${tickData.formattedPrice}`, 'SYSTEM');
+            log(`PREDICTION: Digit ${tickData.digit}`, 'SYSTEM');
             
             updateBotStatus('TRADING', `Digit ${tickData.digit} locked`);
             updateStatus('READY', `Digit ${tickData.digit} locked`, 'Trading active');
@@ -1222,7 +1371,7 @@
             }
             
             if (currentDigit === window.predictedDigit) {
-                log(`DIGIT MATCH! ${currentDigit} = ${window.predictedDigit}`, 'WIN');
+                log(`WIN! ${currentDigit} = ${window.predictedDigit}`, 'WIN');
                 
                 window.stopAfterWin = true;
                 window.nextTradeAllowed = false;
@@ -1235,12 +1384,12 @@
                 window.totalPayout += payout;
                 
                 playVictorySound();
-                createWinCelebration();
+                showNotification('VICTORY!', `Digit ${currentDigit} matched! Payout: $${payout.toFixed(2)}`, 'success');
                 
                 updateBotStatus('WIN', `Digit ${currentDigit} matched`);
                 updateStatus('VICTORY!', 
-                    `Digit ${currentDigit} matched! Payout: $${payout.toFixed(2)}`,
-                    'Bot stopping after PnL update');
+                    `Digit ${currentDigit} matched!`,
+                    'Payout: $' + payout.toFixed(2));
                 
                 startPnLUpdate(payout);
                 
@@ -1260,7 +1409,8 @@
             }
             
             if (window.tradeCount >= window.maxTrades) {
-                log(`MAX TRADES REACHED (${window.maxTrades})`, 'WARNING');
+                log(`MAX TRADES (${window.maxTrades})`, 'WARNING');
+                showNotification('Limit Reached', 'Maximum trades executed', 'warning');
                 updateBotStatus('LIMIT', 'Maximum trades reached');
                 updateStatus('LIMIT REACHED', 'Maximum trades executed', 'Bot stopping');
                 stopBot();
@@ -1277,17 +1427,17 @@
                 
                 updateTradeProgress();
                 
-                log(`Trade #${window.tradeCount}: $${window.currentStake.toFixed(2)} on digit ${window.predictedDigit}`, 'TRADE');
+                log(`Trade #${window.tradeCount}: $${window.currentStake.toFixed(2)}`, 'TRADE');
                 
                 updateBotStatus('TRADING', `Trade ${window.tradeCount} active`);
                 updateStatus('TRADING', 
-                    `Trade ${window.tradeCount}: $${window.currentStake.toFixed(2)} stake`,
-                    'Martingale Level: ' + window.martingaleStep);
+                    `Trade ${window.tradeCount}: $${window.currentStake.toFixed(2)}`,
+                    'Level: ' + window.martingaleStep);
                 
                 sendTradeRequest(tick);
                 
             } catch (error) {
-                log(`Trade error: ${error}`, 'ERROR');
+                log(`Error: ${error}`, 'ERROR');
                 window.executionLock = false;
                 window.nextTradeAllowed = true;
             }
@@ -1344,12 +1494,12 @@
                 window.currentStake = window.baseStake * Math.pow(window.multiplier, window.martingaleStep);
                 window.currentStake = parseFloat(window.currentStake.toFixed(2));
                 
-                log(`Loss #${window.martingaleStep}. Next stake: $${window.currentStake.toFixed(2)}`, 'MARTINGALE');
+                log(`Loss #${window.martingaleStep}: $${window.currentStake.toFixed(2)}`, 'MARTINGALE');
                 
                 updateBotStatus('MARTINGALE', `Level ${window.martingaleStep} active`);
-                updateStatus('MARTINGALE ACTIVE', 
+                updateStatus('MARTINGALE', 
                     `Loss streak: ${window.martingaleStep}`,
-                    `Next stake: $${window.currentStake.toFixed(2)}`);
+                    `Next: $${window.currentStake.toFixed(2)}`);
                 
                 updateStakeDisplay();
                 updatePnL();
@@ -1378,21 +1528,22 @@
             
             window.isConnecting = true;
             updateConnectionDisplay(false, true);
-            updateBotStatus('CONNECTING', 'Establishing connection...');
+            updateBotStatus('CONNECTING', 'Connecting...');
             
             const wsUrl = 'wss://ws.binaryws.com/websockets/v3?app_id=120389';
-            log('Connecting to Deriv API...', 'SYSTEM');
+            log('Connecting to API...', 'SYSTEM');
             
             window.ws = new WebSocket(wsUrl);
             
             window.ws.onopen = () => {
                 window.isConnecting = false;
                 updateConnectionDisplay(true, false);
-                log('WebSocket connected', 'SYSTEM');
+                log('Connected', 'SYSTEM');
                 
                 const token = localStorage.getItem('active_token') || localStorage.getItem('derivToken');
                 if (!token) {
-                    log('No API token found', 'ERROR');
+                    log('No API token', 'ERROR');
+                    showNotification('Authentication Error', 'No API token found', 'error');
                     updateBotStatus('ERROR', 'No API token');
                     stopBot();
                     return;
@@ -1409,7 +1560,7 @@
                     const data = JSON.parse(msg.data);
                     handleAPIResponse(data);
                 } catch (e) {
-                    console.error('WebSocket message error:', e);
+                    console.error('WebSocket error:', e);
                 }
             };
             
@@ -1420,7 +1571,7 @@
                 
                 if (window.isBotRunning) {
                     updateBotStatus('DISCONNECTED', 'Connection lost');
-                    updateStatus('DISCONNECTED', 'WebSocket connection lost', 'Attempting to reconnect...');
+                    updateStatus('DISCONNECTED', 'Connection lost', 'Reconnecting...');
                     setTimeout(() => {
                         if (window.isBotRunning) {
                             connectWebSocket();
@@ -1450,8 +1601,8 @@
             metricLiveTick.textContent = tickData.formattedPrice;
             metricLastDigit.textContent = `Digit: ${tickData.digit}`;
             
-            metricLiveTick.classList.add('tick-flash');
-            setTimeout(() => metricLiveTick.classList.remove('tick-flash'), 100);
+            metricLiveTick.classList.add('mobile-digit-flash');
+            setTimeout(() => metricLiveTick.classList.remove('mobile-digit-flash'), 300);
             
             window.lastTick = tickData;
             
@@ -1475,7 +1626,8 @@
             if (data.error) {
                 log(`API Error: ${data.error.message}`, 'ERROR');
                 if (data.error.code === 'InvalidToken') {
-                    log('Invalid token - please reauthenticate', 'CRITICAL');
+                    log('Invalid token', 'CRITICAL');
+                    showNotification('Auth Error', 'Invalid token - please reauthenticate', 'error');
                     updateBotStatus('ERROR', 'Invalid token');
                     stopBot();
                 }
@@ -1483,10 +1635,11 @@
             }
             
             if (data.msg_type === 'authorize') {
-                log(`Authorized as ${data.authorize.loginid}`, 'SYSTEM');
+                log(`Authorized: ${data.authorize.loginid}`, 'SYSTEM');
                 subscribeToTicks(document.getElementById('symbol').value);
                 subscribeToBalance();
                 updateBotStatus('CONNECTED', 'Market data streaming');
+                showNotification('Connected', 'Market data streaming started', 'success');
             } else if (data.msg_type === 'tick') {
                 handleTick(data.tick);
             } else if (data.msg_type === 'proposal') {
@@ -1505,7 +1658,7 @@
             window.pendingProposals.delete(data.req_id);
             
             if (window.stopAfterWin) {
-                log('Proposal cancelled - win condition met', 'SYSTEM');
+                log('Trade cancelled - win condition met', 'SYSTEM');
                 return;
             }
             
@@ -1558,8 +1711,8 @@
         
         function subscribeToTicks(symbol) {
             sendRequest({ ticks: symbol, subscribe: 1, req_id: getNextReqId() });
-            log(`Subscribed to ${symbol} ticks`, 'SYSTEM');
-            updateBotStatus('WAITING', 'Listening for first tick...');
+            log(`Subscribed to ${symbol}`, 'SYSTEM');
+            updateBotStatus('WAITING', 'Waiting for first tick...');
             updateStatus('CONNECTED', 'Market data streaming', 'Waiting for first tick...');
         }
         
@@ -1582,27 +1735,43 @@
             window.maxTrades = parseInt(document.getElementById('maxTrades').value) || 15;
             maxTradesDisplay.textContent = window.maxTrades;
             
+            // Check minimum stake
+            const isReal = document.getElementById('accTypeToggle').checked;
+            if (isReal && window.baseStake < 0.35) {
+                showNotification('Invalid Stake', 'Minimum for real account: $0.35', 'error');
+                updateBotStatus('ERROR', 'Stake too low');
+                updateStatus('INVALID', 'Minimum: $0.35', 'Please increase stake');
+                document.getElementById('baseStake').value = "0.35";
+                calculateMartingaleTable();
+                return;
+            } else if (!isReal && window.baseStake < 0.10) {
+                showNotification('Stake Adjusted', 'Minimum for demo: $0.10', 'warning');
+                document.getElementById('baseStake').value = "0.10";
+                window.baseStake = 0.10;
+                calculateMartingaleTable();
+            }
+            
             const token = localStorage.getItem('active_token') || localStorage.getItem('derivToken');
             if (!token) {
-                log('Please authenticate first', 'ERROR');
+                showNotification('Auth Required', 'No API token found', 'error');
                 updateBotStatus('ERROR', 'No API token');
-                updateStatus('AUTH REQUIRED', 'No API token found', 'Please authenticate');
+                updateStatus('AUTH REQUIRED', 'No API token', 'Please authenticate');
                 return;
             }
+            
+            const accountMode = isReal ? 'REAL' : 'DEMO';
+            log(`STARTING (${accountMode} mode)`, 'SYSTEM');
+            log(`Settings: $${window.baseStake.toFixed(2)} • ${window.multiplier}x • ${window.maxTrades} max`, 'SYSTEM');
             
             resetTradingState();
             window.isBotRunning = true;
             window.stopAfterWin = false;
             
-            toggleButton.innerHTML = 'STOP TRADING';
-            toggleButton.classList.remove('gradient-success');
-            toggleButton.classList.add('gradient-danger');
+            toggleButton.innerHTML = '<i class="fas fa-stop"></i><span>STOP BOT</span>';
+            toggleButton.className = 'mobile-button w-full mt-6 gradient-danger touch-button';
             
-            log('DIGITMATCHSTARv2 STARTED', 'SYSTEM');
-            log(`Settings: $${window.baseStake} base • ${window.multiplier}x martingale • ${window.maxTrades} max trades`, 'SYSTEM');
-            
-            updateBotStatus('STARTING', 'Initializing session...');
-            updateStatus('INITIALIZING', 'Starting trading session', 'Connecting to market...');
+            updateBotStatus('STARTING', 'Initializing...');
+            updateStatus('INITIALIZING', 'Starting trading session', 'Connecting...');
             
             calculateMartingaleTable();
             initTone();
@@ -1618,9 +1787,8 @@
             window.stopAfterWin = true;
             window.executionLock = false;
             
-            toggleButton.innerHTML = 'START TRADING BOT';
-            toggleButton.classList.remove('gradient-danger');
-            toggleButton.classList.add('gradient-success');
+            toggleButton.innerHTML = '<i class="fas fa-play"></i><span>START TRADING BOT</span>';
+            toggleButton.className = 'mobile-button w-full mt-6 gradient-success touch-button';
             
             if (window.ws) {
                 window.ws.close();
@@ -1636,11 +1804,13 @@
             }
             
             const finalPnL = window.totalPayout - window.totalInvestment;
-            log(`SESSION COMPLETE: PnL = $${finalPnL.toFixed(2)}`, 'SYSTEM');
-            log(`Stats: ${window.stats.wins} wins • ${window.stats.losses} losses • ${window.stats.totalTrades} total trades`, 'SYSTEM');
+            log(`SESSION END: PnL = $${finalPnL.toFixed(2)}`, 'SYSTEM');
+            log(`Stats: ${window.stats.wins} wins • ${window.stats.losses} losses`, 'SYSTEM');
+            
+            showNotification('Session Complete', `Final PnL: $${finalPnL.toFixed(2)}`, 'info');
             
             updateBotStatus('STOPPED', 'Session ended');
-            updateStatus('BOT STOPPED', 
+            updateStatus('COMPLETE', 
                 `Final PnL: $${finalPnL.toFixed(2)}`, 
                 'Click START to begin new session');
         }
@@ -1686,7 +1856,6 @@
             if (type === 'WIN') color = 'text-green-400 font-bold';
             if (type === 'MARTINGALE') color = 'text-purple-400';
             if (type === 'SYSTEM') color = 'text-cyan-400';
-            if (type === 'PNL') color = 'text-emerald-400';
             
             const entry = document.createElement('div');
             entry.className = 'mb-1';
@@ -1698,41 +1867,8 @@
         
         function clearLog() {
             const logArea = document.getElementById('log-area');
-            logArea.innerHTML = '<div class="text-gray-500 text-center py-8">Log cleared</div>';
-        }
-        
-        function toggleSound() {
-            window.soundEnabled = !window.soundEnabled;
-            const button = document.getElementById('soundToggle');
-            button.textContent = window.soundEnabled ? 'Sound' : 'Muted';
-            log(`Sound ${window.soundEnabled ? 'enabled' : 'disabled'}`, 'SYSTEM');
-        }
-        
-        async function initTone() {
-            if (!window.soundEnabled) return;
-            
-            try {
-                await Tone.start();
-                window.synth = new Tone.Synth().toDestination();
-                window.ToneInitialized = true;
-            } catch (e) {
-                console.error("Audio init error:", e);
-            }
-        }
-        
-        function applyQuickSettings(type) {
-            if (type === 'conservative') {
-                document.getElementById('baseStake').value = '0.5';
-                document.getElementById('multiplier').value = '1.15';
-                document.getElementById('maxTrades').value = '10';
-                calculateMartingaleTable();
-                log('Applied conservative settings', 'SYSTEM');
-            }
-        }
-        
-        function switchAccount() {
-            const isReal = document.getElementById('accTypeToggle').checked;
-            log(`Switched to ${isReal ? 'REAL' : 'DEMO'} account mode`, 'SYSTEM');
+            logArea.innerHTML = '<div class="text-center text-gray-500 py-8"><i class="fas fa-robot text-2xl mb-3"></i><div class="mobile-small">Log cleared</div></div>';
+            showNotification('Log Cleared', 'Trading log has been cleared', 'info');
         }
         
         function updateStatus(status, message, action) {
@@ -1740,20 +1876,25 @@
             nextAction.textContent = action;
         }
         
+        function showSettings() {
+            showNotification('Settings', 'Settings panel coming soon', 'info');
+        }
+        
         // ============================================================================
         // INITIALIZATION
         // ============================================================================
         
         document.addEventListener('DOMContentLoaded', () => {
-            console.log('DIGITMATCHSTARv2 Professional Trading Bot initialized');
+            console.log('DIGITMATCHv2 Mobile Trading Bot initialized');
             
+            // Set defaults
+            document.getElementById('accTypeToggle').checked = false;
             document.getElementById('baseStake').value = '1.0';
             document.getElementById('multiplier').value = '1.15';
             document.getElementById('maxTrades').value = '15';
             maxTradesDisplay.textContent = '15';
             
-            calculateMartingaleTable();
-            
+            // Event listeners
             document.getElementById('baseStake').addEventListener('input', calculateMartingaleTable);
             document.getElementById('multiplier').addEventListener('input', calculateMartingaleTable);
             document.getElementById('maxTrades').addEventListener('input', function() {
@@ -1761,13 +1902,40 @@
                 calculateMartingaleTable();
             });
             
-            initTone();
+            // Prevent zoom on input focus on iOS
+            document.addEventListener('touchstart', function(e) {
+                if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') {
+                    e.target.style.fontSize = '16px';
+                }
+            });
             
-            log('DIGITMATCHSTARv2 Professional Trading Bot ready', 'SYSTEM');
-            log('First Tick Martingale System with 1.15x multiplier', 'SYSTEM');
-            log('Supports up to 100 martingale trades', 'SYSTEM');
-            log('Ready for professional trading', 'SYSTEM');
+            document.addEventListener('blur', function(e) {
+                if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') {
+                    e.target.style.fontSize = '';
+                }
+            }, true);
+            
+            initTone();
+            calculateMartingaleTable();
+            
+            log('DIGITMATCHv2 Mobile Ready', 'SYSTEM');
+            log('DEMO mode active', 'SYSTEM');
+            log('Minimum: $0.10 DEMO, $0.35 REAL', 'SYSTEM');
+            log('First Tick Martingale System', 'SYSTEM');
+            log('Optimized for mobile trading', 'SYSTEM');
+            
+            showNotification('Ready', 'DIGITMATCHv2 initialized and ready', 'success');
         });
+        
+        // Prevent pull-to-refresh on mobile
+        document.addEventListener('touchmove', function(e) {
+            if (e.target.closest('.mobile-scrollable') || 
+                e.target.closest('#log-area') || 
+                e.target.closest('.mobile-bottom-sheet')) {
+                return;
+            }
+            e.preventDefault();
+        }, { passive: false });
     </script>
 </body>
 </html>
