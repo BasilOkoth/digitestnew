@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-    <title>Deriv DigitMatchStar Bot - Enhanced Analysis</title>
+    <title>Deriv DigitMatchStar Bot - OAuth Enhanced</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
     <style>
@@ -246,84 +246,139 @@
             left: 0;
             right: 0;
             bottom: 0;
-            background: rgba(0, 0, 0, 0.9);
+            background: rgba(0, 0, 0, 0.95);
             display: flex;
             justify-content: center;
             align-items: center;
             z-index: 1000;
         }
         .auth-box {
-            background: #1f2937;
-            padding: 2rem;
+            background: linear-gradient(135deg, #1e293b, #0f172a);
+            padding: 2.5rem;
             border-radius: 1rem;
             border: 2px solid #3b82f6;
             width: 90%;
             max-width: 500px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.7);
+        }
+        .oauth-btn {
+            background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-weight: bold;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            transition: all 0.3s;
+            width: 100%;
+            margin: 10px 0;
+        }
+        .oauth-btn:hover {
+            background: linear-gradient(135deg, #1d4ed8, #1e40af);
+            transform: translateY(-2px);
+        }
+        .oauth-btn.demo {
+            background: linear-gradient(135deg, #10b981, #059669);
+        }
+        .oauth-btn.demo:hover {
+            background: linear-gradient(135deg, #059669, #047857);
+        }
+        .oauth-btn.logout {
+            background: linear-gradient(135deg, #ef4444, #dc2626);
+        }
+        .oauth-btn.logout:hover {
+            background: linear-gradient(135deg, #dc2626, #b91c1c);
         }
     </style>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght400;600;700&display=swap" rel="stylesheet">
 </head>
 <body class="min-h-screen p-4 sm:p-8 flex items-start justify-center">
 
-    <!-- AUTH OVERLAY (Hidden by default) -->
-    <div id="authOverlay" class="auth-overlay">
+    <!-- AUTH OVERLAY -->
+    <div id="authOverlay" class="auth-overlay hidden">
         <div class="auth-box">
-            <h2 class="text-2xl font-bold text-blue-400 mb-4">🔑 API Token Required</h2>
-            <p class="text-gray-300 mb-4">Please enter your Deriv API token to connect:</p>
+            <h2 class="text-2xl font-bold text-blue-400 mb-2">🔐 Deriv Authentication</h2>
+            <p class="text-gray-300 mb-6">Connect your Deriv account to start trading</p>
             
-            <div class="mb-4">
-                <label class="block text-sm font-semibold text-gray-300 mb-2">API Token:</label>
-                <input type="text" id="apiTokenInput" 
-                    class="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded text-white"
-                    placeholder="Enter your Deriv API token">
-                <p class="text-xs text-gray-400 mt-1">
-                    Get your token from: Deriv.com > Settings > API Token
-                </p>
-            </div>
-            
-            <div class="mb-4">
-                <label class="block text-sm font-semibold text-gray-300 mb-2">Account Type:</label>
-                <div class="flex space-x-4">
-                    <label class="flex items-center">
-                        <input type="radio" name="accountType" value="demo" checked class="mr-2">
-                        <span class="text-gray-300">Demo Account</span>
-                    </label>
-                    <label class="flex items-center">
-                        <input type="radio" name="accountType" value="real" class="mr-2">
-                        <span class="text-gray-300">Real Account</span>
-                    </label>
+            <div id="loginSection">
+                <h3 class="text-lg font-semibold text-gray-200 mb-4">Choose Login Method:</h3>
+                
+                <button onclick="oauthLogin('demo')" class="oauth-btn demo">
+                    <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+                    </svg>
+                    Login with Demo Account
+                </button>
+                
+                <button onclick="oauthLogin('real')" class="oauth-btn">
+                    <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+                    </svg>
+                    Login with Real Account
+                </button>
+                
+                <div class="mt-6 p-3 bg-blue-900/20 rounded border border-blue-500/30">
+                    <h4 class="text-sm font-semibold text-blue-300 mb-2">💡 Quick Start:</h4>
+                    <p class="text-xs text-gray-400">
+                        • Demo Account: Practice with virtual funds<br>
+                        • Real Account: Trade with real money<br>
+                        • No password needed - secure OAuth login
+                    </p>
                 </div>
             </div>
             
-            <div class="flex space-x-2">
-                <button onclick="saveToken()" 
-                    class="flex-1 px-4 py-2 bg-green-600 text-white font-bold rounded hover:bg-green-700">
-                    Save & Connect
+            <div id="accountInfo" class="hidden">
+                <div class="flex items-center mb-4">
+                    <div class="w-12 h-12 rounded-full bg-blue-600 flex items-center justify-center mr-3">
+                        <span class="text-white font-bold text-lg" id="accountAvatar">D</span>
+                    </div>
+                    <div>
+                        <h3 class="text-lg font-bold text-white" id="accountName">Demo Account</h3>
+                        <p class="text-sm text-gray-300" id="accountId">VRTC123456</p>
+                    </div>
+                </div>
+                
+                <div class="grid grid-cols-2 gap-3 mb-4">
+                    <div class="bg-gray-800 rounded p-3">
+                        <p class="text-xs text-gray-400">Balance</p>
+                        <p class="text-lg font-bold text-green-400" id="accountBalance">$10,000.00</p>
+                    </div>
+                    <div class="bg-gray-800 rounded p-3">
+                        <p class="text-xs text-gray-400">Account Type</p>
+                        <p class="text-lg font-bold text-blue-400" id="accountType">DEMO</p>
+                    </div>
+                </div>
+                
+                <button onclick="logout()" class="oauth-btn logout mt-4">
+                    <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M10.09 15.59L11.5 17l5-5-5-5-1.41 1.41L12.67 11H3v2h9.67l-2.58 2.59zM19 3H5c-1.11 0-2 .9-2 2v4h2V5h14v14H5v-4H3v4c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2z"/>
+                    </svg>
+                    Logout
                 </button>
-                <button onclick="testConnection()" 
-                    class="flex-1 px-4 py-2 bg-blue-600 text-white font-bold rounded hover:bg-blue-700">
-                    Test Connection
-                </button>
-                <button onclick="closeAuth()" 
-                    class="flex-1 px-4 py-2 bg-gray-600 text-white font-bold rounded hover:bg-gray-700">
-                    Cancel
+                
+                <button onclick="switchAccountType()" class="oauth-btn mt-2">
+                    <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46C19.54 15.03 20 13.57 20 12c0-4.42-3.58-8-8-8zm0 14c-3.31 0-6-2.69-6-6 0-1.01.25-1.97.7-2.8L5.24 7.74C4.46 8.97 4 10.43 4 12c0 4.42 3.58 8 8 8v3l4-4-4-4v3z"/>
+                    </svg>
+                    Switch Account Type
                 </button>
             </div>
             
-            <div id="authStatus" class="mt-4 text-sm hidden"></div>
+            <div id="authStatus" class="mt-4 p-3 rounded text-sm hidden"></div>
             
-            <div class="mt-6 p-3 bg-gray-900 rounded text-xs text-gray-400">
-                <p class="font-bold mb-1">💡 How to get your API token:</p>
-                <ol class="list-decimal pl-4 space-y-1">
-                    <li>Login to your Deriv account</li>
-                    <li>Go to Settings > API Token</li>
-                    <li>Generate a new token or use existing one</li>
-                    <li>Copy and paste it here</li>
-                </ol>
+            <div class="mt-6 pt-4 border-t border-gray-700">
+                <p class="text-xs text-gray-500 text-center">
+                    Secure OAuth 2.0 authentication powered by Deriv API
+                </p>
             </div>
         </div>
     </div>
 
+    <!-- MAIN APP -->
     <div class="w-full max-w-6xl bg-gray-800 text-gray-100 shadow-2xl rounded-xl p-5 md:p-6">
         <div class="flex justify-between items-center mb-4">
             <h1 class="text-3xl font-extrabold text-green-400 border-b border-gray-700 pb-2">
@@ -355,8 +410,19 @@
                 </button>
                 <button onclick="showAuth()" 
                     class="px-4 py-2 bg-purple-600 text-white font-bold rounded-lg shadow hover:bg-purple-700 transition">
-                    🔑 API Token
+                    🔑 Account
                 </button>
+                <div id="userInfo" class="hidden ml-2">
+                    <div class="flex items-center space-x-2">
+                        <div class="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center">
+                            <span class="text-white font-bold text-sm" id="userAvatar">U</span>
+                        </div>
+                        <div>
+                            <p class="text-xs font-bold text-white" id="userName">User</p>
+                            <p class="text-xs text-gray-300" id="userBalance">$---</p>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
         
@@ -642,11 +708,11 @@
                         </div>
                         <div class="mb-2">
                             <p class="text-[10px] font-semibold text-gray-400 uppercase mb-1">Status:</p>
-                            <p id="metricPreviousResult" class="text-sm font-bold text-gray-300">Waiting for connection...</p>
+                            <p id="metricPreviousResult" class="text-sm font-bold text-gray-300">Please login to start</p>
                         </div>
                         <div>
                             <p class="text-[10px] font-semibold text-gray-400 uppercase mb-1">Action:</p>
-                            <p id="metricNextAction" class="text-sm font-bold text-yellow-400">Start bot to begin</p>
+                            <p id="metricNextAction" class="text-sm font-bold text-yellow-400">Click "Account" button to login</p>
                         </div>
                     </div>
                 </div>
@@ -670,121 +736,238 @@
 [00:00:00] 🧮 Martingale calculator ready
 [00:00:00] 🔄 Auto-recovery system ready
 [00:00:00] 🔍 Digit gap detection system active
-[00:00:00] ⚠️ No API token found. Click "API Token" button to connect.
+[00:00:00] 🔐 Please login with your Deriv account to start trading
             </div>
         </div>
     </div>
 
     <script>
         // ============================================================================
-        // AUTHENTICATION SYSTEM
+        // DERIV OAUTH AUTHENTICATION SYSTEM
         // ============================================================================
         
-        function showAuth() {
-            document.getElementById('authOverlay').style.display = 'flex';
-        }
+        // Deriv OAuth Configuration
+        const DERIV_CONFIG = {
+            app_id: 120389, // Deriv App ID
+            oauth_url: 'https://oauth.deriv.com/oauth2/authorize',
+            token_url: 'https://oauth.deriv.com/oauth2/token',
+            api_url: 'wss://ws.binaryws.com/websockets/v3',
+            redirect_uri: window.location.origin + window.location.pathname,
+            scopes: ['read', 'trade', 'trading_information']
+        };
         
-        function closeAuth() {
-            document.getElementById('authOverlay').style.display = 'none';
-        }
+        // OAuth State
+        window.oauthState = {
+            isAuthenticated: false,
+            currentToken: null,
+            currentAccount: null,
+            accounts: [],
+            tokenExpiry: null
+        };
         
-        function saveToken() {
-            const token = document.getElementById('apiTokenInput').value.trim();
-            const accountType = document.querySelector('input[name="accountType"]:checked').value;
+        // Check for OAuth callback
+        function checkOAuthCallback() {
+            const urlParams = new URLSearchParams(window.location.hash.substring(1));
+            const accessToken = urlParams.get('access_token');
+            const tokenType = urlParams.get('token_type');
+            const expiresIn = urlParams.get('expires_in');
+            const account = urlParams.get('account');
             
-            if (!token) {
-                showAuthStatus('❌ Please enter an API token', 'error');
-                return;
-            }
-            
-            // Store token
-            localStorage.setItem('derivToken', token);
-            localStorage.setItem('active_token', token);
-            
-            // Store account info
-            const accountInfo = {
-                token: token,
-                account: accountType === 'demo' ? 'VRTC123456' : 'CR1234567',
-                type: accountType,
-                savedAt: Date.now()
-            };
-            
-            let accounts = JSON.parse(localStorage.getItem('deriv_accounts')) || [];
-            accounts = accounts.filter(acc => acc.token !== token);
-            accounts.push(accountInfo);
-            localStorage.setItem('deriv_accounts', JSON.stringify(accounts));
-            
-            showAuthStatus('✅ Token saved successfully!', 'success');
-            
-            // Update account toggle
-            document.getElementById('accTypeToggle').checked = accountType === 'real';
-            
-            // Auto-connect if bot is running
-            if (window.isBotRunning) {
-                setTimeout(() => {
-                    stopBot();
-                    setTimeout(() => startBot(), 500);
-                }, 1000);
-            }
-            
-            log(`🔑 API token saved for ${accountType.toUpperCase()} account`, 'SYSTEM');
-        }
-        
-        function testConnection() {
-            const token = document.getElementById('apiTokenInput').value.trim();
-            
-            if (!token) {
-                showAuthStatus('❌ Please enter an API token to test', 'error');
-                return;
-            }
-            
-            showAuthStatus('🔄 Testing connection...', 'info');
-            
-            // Test WebSocket connection
-            const testWs = new WebSocket('wss://ws.binaryws.com/websockets/v3?app_id=120389');
-            
-            testWs.onopen = () => {
-                testWs.send(JSON.stringify({ authorize: token }));
-            };
-            
-            testWs.onmessage = (msg) => {
-                try {
-                    const data = JSON.parse(msg.data);
-                    if (data.error) {
-                        showAuthStatus(`❌ Connection failed: ${data.error.message}`, 'error');
-                    } else if (data.authorize) {
-                        showAuthStatus(`✅ Connected as ${data.authorize.loginid}`, 'success');
-                    }
-                    testWs.close();
-                } catch (e) {
-                    showAuthStatus('❌ Invalid response from server', 'error');
-                    testWs.close();
+            if (accessToken && tokenType) {
+                // Store token
+                window.oauthState.currentToken = accessToken;
+                window.oauthState.tokenExpiry = Date.now() + (parseInt(expiresIn) * 1000);
+                
+                // Store account info
+                const accountInfo = {
+                    token: accessToken,
+                    account: account || 'Unknown',
+                    type: account && account.startsWith('VR') ? 'demo' : 'real',
+                    loginTime: Date.now()
+                };
+                
+                // Add to accounts list
+                let accounts = JSON.parse(localStorage.getItem('deriv_accounts')) || [];
+                accounts = accounts.filter(acc => acc.token !== accessToken);
+                accounts.push(accountInfo);
+                localStorage.setItem('deriv_accounts', JSON.stringify(accounts));
+                window.oauthState.accounts = accounts;
+                
+                // Set current account
+                window.oauthState.currentAccount = accountInfo;
+                window.oauthState.isAuthenticated = true;
+                
+                // Clear URL hash
+                window.location.hash = '';
+                
+                // Update UI
+                updateAuthUI();
+                log('✅ Successfully authenticated with Deriv', 'AUTH');
+                
+                // Connect WebSocket
+                if (window.isBotRunning) {
+                    connectWebSocket();
                 }
-            };
-            
-            testWs.onerror = () => {
-                showAuthStatus('❌ WebSocket connection failed', 'error');
-            };
-            
-            testWs.onclose = () => {
-                // Clean up
-            };
-        }
-        
-        function showAuthStatus(message, type) {
-            const statusDiv = document.getElementById('authStatus');
-            statusDiv.textContent = message;
-            statusDiv.className = 'mt-4 text-sm';
-            
-            if (type === 'success') {
-                statusDiv.classList.add('text-green-400');
-            } else if (type === 'error') {
-                statusDiv.classList.add('text-red-400');
-            } else {
-                statusDiv.classList.add('text-yellow-400');
+                
+                return true;
             }
             
-            statusDiv.classList.remove('hidden');
+            // Check for stored tokens
+            const storedAccounts = JSON.parse(localStorage.getItem('deriv_accounts')) || [];
+            if (storedAccounts.length > 0) {
+                window.oauthState.accounts = storedAccounts;
+                // Try to use the last used account
+                const lastToken = localStorage.getItem('last_used_token');
+                if (lastToken) {
+                    const account = storedAccounts.find(acc => acc.token === lastToken);
+                    if (account) {
+                        window.oauthState.currentToken = account.token;
+                        window.oauthState.currentAccount = account;
+                        window.oauthState.isAuthenticated = true;
+                        updateAuthUI();
+                        log('✅ Restored previous session', 'AUTH');
+                        return true;
+                    }
+                }
+            }
+            
+            return false;
+        }
+        
+        // OAuth Login
+        function oauthLogin(accountType = 'demo') {
+            const state = generateRandomString(16);
+            localStorage.setItem('oauth_state', state);
+            
+            const params = {
+                app_id: DERIV_CONFIG.app_id,
+                response_type: 'token',
+                redirect_uri: DERIV_CONFIG.redirect_uri,
+                scope: DERIV_CONFIG.scopes.join(' '),
+                state: state,
+                brand: 'deriv',
+                account_type: accountType === 'demo' ? 'demo' : 'real',
+                language: 'EN'
+            };
+            
+            const queryString = Object.keys(params)
+                .map(key => `${encodeURIComponent(key)}=${encodeURIComponent(params[key])}`)
+                .join('&');
+            
+            const authUrl = `${DERIV_CONFIG.oauth_url}?${queryString}`;
+            
+            log(`🔐 Redirecting to Deriv OAuth for ${accountType.toUpperCase()} account...`, 'AUTH');
+            
+            // Open in same window
+            window.location.href = authUrl;
+        }
+        
+        // Logout
+        function logout() {
+            window.oauthState.isAuthenticated = false;
+            window.oauthState.currentToken = null;
+            window.oauthState.currentAccount = null;
+            
+            // Remove current token from storage
+            if (window.oauthState.currentToken) {
+                let accounts = JSON.parse(localStorage.getItem('deriv_accounts')) || [];
+                accounts = accounts.filter(acc => acc.token !== window.oauthState.currentToken);
+                localStorage.setItem('deriv_accounts', JSON.stringify(accounts));
+                localStorage.removeItem('last_used_token');
+            }
+            
+            // Stop bot if running
+            if (window.isBotRunning) {
+                stopBot();
+            }
+            
+            // Close WebSocket
+            if (window.ws) {
+                window.ws.close();
+                window.ws = null;
+            }
+            
+            // Update UI
+            updateAuthUI();
+            closeAuth();
+            
+            log('👋 Logged out successfully', 'AUTH');
+        }
+        
+        // Switch account type
+        function switchAccountType() {
+            if (!window.oauthState.currentAccount) return;
+            
+            const newType = window.oauthState.currentAccount.type === 'demo' ? 'real' : 'demo';
+            oauthLogin(newType);
+        }
+        
+        // Update authentication UI
+        function updateAuthUI() {
+            const authOverlay = document.getElementById('authOverlay');
+            const loginSection = document.getElementById('loginSection');
+            const accountInfo = document.getElementById('accountInfo');
+            const userInfo = document.getElementById('userInfo');
+            const userAvatar = document.getElementById('userAvatar');
+            const userName = document.getElementById('userName');
+            const userBalance = document.getElementById('userBalance');
+            
+            if (window.oauthState.isAuthenticated && window.oauthState.currentAccount) {
+                // Hide login, show account info
+                loginSection.classList.add('hidden');
+                accountInfo.classList.remove('hidden');
+                
+                // Update account info
+                document.getElementById('accountName').textContent = 
+                    window.oauthState.currentAccount.type === 'demo' ? 'Demo Account' : 'Real Account';
+                document.getElementById('accountId').textContent = window.oauthState.currentAccount.account;
+                document.getElementById('accountType').textContent = window.oauthState.currentAccount.type.toUpperCase();
+                document.getElementById('accountAvatar').textContent = window.oauthState.currentAccount.type === 'demo' ? 'D' : 'R';
+                
+                // Update user info in header
+                userInfo.classList.remove('hidden');
+                userAvatar.textContent = window.oauthState.currentAccount.type === 'demo' ? 'D' : 'R';
+                userName.textContent = window.oauthState.currentAccount.type === 'demo' ? 'Demo Account' : 'Real Account';
+                userBalance.textContent = window.currentBalance ? `$${window.currentBalance.toFixed(2)}` : '$---';
+                
+                // Update account toggle
+                document.getElementById('accTypeToggle').checked = window.oauthState.currentAccount.type === 'real';
+                
+                // Update trade status
+                updateTradeStatus('AUTHENTICATED', 'Account connected successfully', 'Ready to start trading', 'normal');
+                
+            } else {
+                // Show login, hide account info
+                loginSection.classList.remove('hidden');
+                accountInfo.classList.add('hidden');
+                userInfo.classList.add('hidden');
+                
+                // Update trade status
+                updateTradeStatus('LOGIN REQUIRED', 'Please login with your Deriv account', 'Click "Account" button to login', 'normal');
+            }
+        }
+        
+        // Show auth modal
+        function showAuth() {
+            const authOverlay = document.getElementById('authOverlay');
+            authOverlay.classList.remove('hidden');
+            updateAuthUI();
+        }
+        
+        // Close auth modal
+        function closeAuth() {
+            const authOverlay = document.getElementById('authOverlay');
+            authOverlay.classList.add('hidden');
+        }
+        
+        // Generate random string for state
+        function generateRandomString(length) {
+            const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+            let result = '';
+            for (let i = 0; i < length; i++) {
+                result += chars.charAt(Math.floor(Math.random() * chars.length));
+            }
+            return result;
         }
         
         // ============================================================================
@@ -1433,7 +1616,7 @@
         }
         
         // ============================================================================
-        // CORE BOT FUNCTIONS - FIXED CONNECTION ISSUES
+        // CORE BOT FUNCTIONS
         // ============================================================================
         
         window.ws = null;
@@ -1501,7 +1684,7 @@
         
         window.totalTicksReceived = 0;
         window.tickTimestamps = [];
-        window.tickSubscriptionSent = false; // ADDED THIS LINE
+        window.tickSubscriptionSent = false;
         
         const toggleButton = document.getElementById('toggleButton');
         const soundToggleButton = document.getElementById('soundToggle');
@@ -1711,50 +1894,16 @@
         // CORE BOT FUNCTIONS CONTINUED
         // ============================================================================
         
-        function checkAuthToken() {
-            const token = localStorage.getItem('active_token') || localStorage.getItem('derivToken');
-            if (!token) {
-                log('⚠️ No API token found. Click "API Token" button to connect.', 'WARNING');
-                showAuth();
-                return false;
-            }
-            return true;
-        }
-        
-        function initializeToggleState() {
-            const token = localStorage.getItem('active_token');
-            const allAccounts = JSON.parse(localStorage.getItem('deriv_accounts')) || [];
-            
-            if (token && allAccounts.length > 0) {
-                const currentAccount = allAccounts.find(acc => acc.token === token);
-                if (currentAccount) {
-                    const isReal = currentAccount.type === 'real';
-                    document.getElementById('accTypeToggle').checked = isReal;
-                    log(`Account: ${isReal ? 'REAL' : 'DEMO'} (${currentAccount.account})`, 'SYSTEM');
-                }
-            }
-        }
-        
         function switchAccount() {
             const isRealRequested = document.getElementById('accTypeToggle').checked;
-            const allAccounts = JSON.parse(localStorage.getItem('deriv_accounts')) || [];
             
-            const targetAccount = allAccounts.find(acc => 
-                isRealRequested ? acc.type === 'real' : acc.type === 'demo'
-            );
-        
-            if (targetAccount) {
-                localStorage.setItem('active_token', targetAccount.token);
-                log(`Switched to ${isRealRequested ? 'REAL' : 'DEMO'} account`, 'SYSTEM');
-                
-                if (window.isBotRunning) {
-                    stopBot();
-                    setTimeout(() => startBot(), 1000);
-                }
-            } else {
-                alert(`No ${isRealRequested ? 'Real' : 'Demo'} account found`);
-                document.getElementById('accTypeToggle').checked = !isRealRequested;
+            if (!window.oauthState.isAuthenticated) {
+                showAuth();
+                return;
             }
+            
+            // Switch to different account type
+            switchAccountType();
         }
         
         function updateTradeStatus(status, result, action, type = 'normal') {
@@ -1795,7 +1944,11 @@
         }
         
         function resetTradeStatus() {
-            updateTradeStatus('READY', 'Waiting for connection...', 'Start bot to begin', 'normal');
+            if (!window.oauthState.isAuthenticated) {
+                updateTradeStatus('LOGIN REQUIRED', 'Please login with your Deriv account', 'Click "Account" button to login', 'normal');
+            } else {
+                updateTradeStatus('READY', 'Waiting for connection...', 'Start bot to begin', 'normal');
+            }
         }
         
         function updateSessionDisplay() {
@@ -1912,6 +2065,12 @@
         }
         
         function updateExecutionLogic() {
+            if (!window.oauthState.isAuthenticated) {
+                updateTradeStatus('LOGIN REQUIRED', 'Please login with your Deriv account', 'Click "Account" button to login', 'normal');
+                window.nextTradeAllowed = false;
+                return;
+            }
+            
             if (sessionState.mode === 'analysis') {
                 if (!window.digitAnalysis.analysisComplete) {
                     log('🔍 Analysis mode: Collecting market data...', 'ANALYSIS');
@@ -1937,7 +2096,7 @@
         
         // DOM Ready
         document.addEventListener('DOMContentLoaded', () => {
-            console.log('🤖 Bot initialized with enhanced digit analysis');
+            console.log('🤖 Bot initialized with OAuth authentication');
             
             // Initialize digit grid display
             function updateDigitGridDisplay() {
@@ -1958,15 +2117,15 @@
                 digitGrid.innerHTML = gridHTML;
             }
             
-            // Check for existing token
-            const token = localStorage.getItem('derivToken');
-            if (!token) {
-                log('⚠️ No API token found. Click "API Token" button to connect.', 'WARNING');
-            } else {
-                log('✅ API token found in storage', 'SYSTEM');
+            // Check for OAuth callback
+            const hasToken = checkOAuthCallback();
+            
+            if (!hasToken) {
+                log('🔐 Please login with your Deriv account to start trading', 'AUTH');
+                // Auto-show auth modal if no token
+                setTimeout(() => showAuth(), 1000);
             }
             
-            initializeToggleState();
             updateNetworkRecoveryButton();
             
             window.digitAnalysis.init();
@@ -2032,10 +2191,18 @@
         });
         
         // ============================================================================
-        // FIXED WEBSOCKET CONNECTION
+        // WEBSOCKET CONNECTION WITH OAUTH
         // ============================================================================
         
         function connectWebSocket() {
+            // Check authentication first
+            if (!window.oauthState.isAuthenticated || !window.oauthState.currentToken) {
+                log('❌ Not authenticated. Please login first.', 'ERROR');
+                showAuth();
+                stopBot();
+                return;
+            }
+            
             // Close existing connection if any
             if (window.ws) {
                 try {
@@ -2049,20 +2216,12 @@
             window.isConnecting = true;
             updateConnectionStatus();
             
-            // Get token
-            const token = localStorage.getItem('active_token') || localStorage.getItem('derivToken');
-            if (!token) {
-                log('❌ No API token found. Please enter your API token.', 'ERROR');
-                showAuth();
-                window.isConnecting = false;
-                updateConnectionStatus();
-                stopBot();
-                return;
-            }
+            // Use OAuth token
+            const token = window.oauthState.currentToken;
             
-            // Use alternative WebSocket URL
-            const wsUrl = 'wss://ws.binaryws.com/websockets/v3?app_id=120389';
-            log('🔗 Connecting to Deriv API...', 'SYSTEM');
+            // WebSocket URL
+            const wsUrl = `${DERIV_CONFIG.api_url}?app_id=${DERIV_CONFIG.app_id}`;
+            log('🔗 Connecting to Deriv API with OAuth token...', 'SYSTEM');
             
             try {
                 window.ws = new WebSocket(wsUrl);
@@ -2073,7 +2232,7 @@
                     log('✅ WebSocket connected', 'SYSTEM');
                     updateConnectionStatus();
                     
-                    // Send authorization
+                    // Send authorization with OAuth token
                     sendRequest({ 
                         authorize: token, 
                         req_id: getNextReqId() 
@@ -2380,15 +2539,15 @@
         }
         
         function startBot() {
-            if (window.isBotRunning) {
-                stopBot();
+            // Check authentication first
+            if (!window.oauthState.isAuthenticated) {
+                log('❌ Please login with your Deriv account first', 'CRITICAL');
+                showAuth();
                 return;
             }
             
-            // Check for API token first
-            if (!checkAuthToken()) {
-                log('❌ Cannot start bot without API token', 'CRITICAL');
-                showAuth();
+            if (window.isBotRunning) {
+                stopBot();
                 return;
             }
             
@@ -2407,6 +2566,7 @@
             log(`📊 Mode: ${sessionState.mode}`, 'SYSTEM');
             log(`📊 Max Trades: ${window.maxTrades}`, 'SYSTEM');
             log(`🌐 Network auto-recovery: ${window.networkRecoveryEnabled ? 'ENABLED' : 'DISABLED'}`, 'SYSTEM');
+            log(`🔐 Account: ${window.oauthState.currentAccount.type.toUpperCase()}`, 'SYSTEM');
             
             updateTradeStatus('STARTING', 'Initializing bot...', 'Connecting to market', 'normal');
             updateStake('initial');
@@ -2555,6 +2715,7 @@
             if (type === 'CALCULATOR') color = 'text-purple-300 font-bold';
             if (type === 'NETWORK') color = 'text-yellow-300 font-bold';
             if (type === 'ANALYSIS') color = 'text-cyan-300 font-bold';
+            if (type === 'AUTH') color = 'text-blue-300 font-bold';
             
             logArea.innerHTML += `\n[${timestamp}] <span class="${color}">${message}</span>`;
             logArea.scrollTop = logArea.scrollHeight;
@@ -2603,12 +2764,10 @@
         function handleAPIResponse(data) {
             if (data.error) {
                 log(`API Error: ${data.error.message}`, 'ERROR');
-                if (data.error.code === 'InvalidToken') {
-                    log('❌ Invalid API Token. Please check your authentication.', 'CRITICAL');
-                    localStorage.removeItem('derivToken');
-                    localStorage.removeItem('active_token');
+                if (data.error.code === 'InvalidToken' || data.error.code === 'AuthorizationRequired') {
+                    log('❌ Invalid or expired OAuth token. Please login again.', 'AUTH');
+                    logout();
                     showAuth();
-                    stopBot();
                 }
                 return;
             }
@@ -2618,8 +2777,14 @@
                     log(`🔐 Authorized as ${data.authorize.loginid}`, 'SYSTEM');
                     log(`💰 Balance: $${data.authorize.balance || '0.00'}`, 'SYSTEM');
                     
+                    // Store last used token
+                    localStorage.setItem('last_used_token', window.oauthState.currentToken);
+                    
                     // Update balance display
                     document.getElementById('metricAccountBalance').textContent = `$${(data.authorize.balance || 0).toFixed(2)}`;
+                    document.getElementById('accountBalance').textContent = `$${(data.authorize.balance || 0).toFixed(2)}`;
+                    document.getElementById('userBalance').textContent = `$${(data.authorize.balance || 0).toFixed(2)}`;
+                    
                     window.startingBalance = parseFloat(data.authorize.balance || 0);
                     window.currentBalance = window.startingBalance;
                     
@@ -2756,7 +2921,7 @@
             window.waitingForTradeResult = false;
             window.nextTradeAllowed = true;
             window.stopAfterWin = false;
-            window.tickSubscriptionSent = false; // Reset this
+            window.tickSubscriptionSent = false;
             
             const logArea = document.getElementById('log-area');
             logArea.innerHTML = '[00:00:00] 🤖 Bot reset. Ready.';
