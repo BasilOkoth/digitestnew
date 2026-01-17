@@ -7,7 +7,294 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
     <style>
-        /* ... (keep all existing styles) ... */
+        /* Custom styles */
+        .balance-green {
+            color: #10B981;
+            font-weight: bold;
+        }
+        
+        .profit-positive {
+            color: #10B981;
+            font-weight: 900;
+            font-size: 1.125rem;
+            text-shadow: 0 0 10px rgba(16, 185, 129, 0.5);
+        }
+        
+        .profit-negative {
+            color: #EF4444;
+            font-weight: 900;
+            font-size: 1.125rem;
+            text-shadow: 0 0 10px rgba(239, 68, 68, 0.5);
+        }
+        
+        .profit-neutral {
+            color: #9CA3AF;
+            font-weight: 600;
+        }
+        
+        .status-win {
+            color: #10B981;
+            font-weight: bold;
+        }
+        
+        .status-loss {
+            color: #EF4444;
+            font-weight: bold;
+        }
+        
+        .status-trade {
+            color: #F59E0B;
+            font-weight: bold;
+        }
+        
+        .tick-flash {
+            animation: tickFlash 0.2s;
+        }
+        
+        @keyframes tickFlash {
+            0% { background-color: transparent; }
+            50% { background-color: rgba(59, 130, 246, 0.3); }
+            100% { background-color: transparent; }
+        }
+        
+        .connection-badge-connected {
+            background: linear-gradient(135deg, #10B981 0%, #059669 100%);
+        }
+        
+        .connection-badge-connecting {
+            background: linear-gradient(135deg, #F59E0B 0%, #D97706 100%);
+        }
+        
+        .connection-badge-disconnected {
+            background: linear-gradient(135deg, #EF4444 0%, #DC2626 100%);
+        }
+        
+        .phase-monitoring {
+            background: linear-gradient(135deg, #3B82F6 0%, #1D4ED8 100%);
+        }
+        
+        .phase-analysis {
+            background: linear-gradient(135deg, #8B5CF6 0%, #7C3AED 100%);
+        }
+        
+        .phase-trading {
+            background: linear-gradient(135deg, #10B981 0%, #059669 100%);
+        }
+        
+        .contract-type-badge {
+            background: linear-gradient(135deg, #8B5CF6 0%, #7C3AED 100%);
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: bold;
+            margin-left: 8px;
+            vertical-align: middle;
+        }
+        
+        .account-label {
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: #9CA3AF;
+            transition: color 0.3s;
+        }
+        
+        .account-label-demo {
+            color: #3B82F6;
+        }
+        
+        .account-label-real {
+            color: #10B981;
+        }
+        
+        .account-toggle {
+            position: relative;
+            display: inline-block;
+            width: 44px;
+            height: 24px;
+            margin: 0 8px;
+        }
+        
+        .account-toggle input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        
+        .account-toggle-slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(135deg, #3B82F6 0%, #1D4ED8 100%);
+            transition: .4s;
+            border-radius: 24px;
+        }
+        
+        .account-toggle-slider:before {
+            position: absolute;
+            content: "";
+            height: 18px;
+            width: 18px;
+            left: 3px;
+            bottom: 3px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+        
+        input:checked + .account-toggle-slider {
+            background: linear-gradient(135deg, #10B981 0%, #059669 100%);
+        }
+        
+        input:checked + .account-toggle-slider:before {
+            transform: translateX(20px);
+        }
+        
+        .calculator-highlight {
+            border-color: #8B5CF6;
+            background-color: rgba(139, 92, 246, 0.1);
+        }
+        
+        .calculator-pulse {
+            animation: calculatorPulse 0.5s;
+        }
+        
+        @keyframes calculatorPulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+        
+        .calculator-safe {
+            color: #10B981;
+        }
+        
+        .calculator-warning {
+            color: #F59E0B;
+        }
+        
+        .digit-cell {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 40px;
+            border-radius: 6px;
+            font-weight: bold;
+            transition: all 0.3s;
+            cursor: pointer;
+            font-size: 1.125rem;
+        }
+        
+        .digit-hot {
+            background: linear-gradient(135deg, #EF4444 0%, #DC2626 100%);
+            color: white;
+            transform: scale(1.05);
+        }
+        
+        .digit-warm {
+            background: linear-gradient(135deg, #F59E0B 0%, #D97706 100%);
+            color: white;
+        }
+        
+        .digit-cold {
+            background: linear-gradient(135deg, #3B82F6 0%, #1D4ED8 100%);
+            color: white;
+        }
+        
+        .digit-overdue {
+            background: linear-gradient(135deg, #10B981 0%, #059669 100%);
+            color: white;
+            transform: scale(1.1);
+            box-shadow: 0 0 10px rgba(16, 185, 129, 0.5);
+            animation: overduePulse 2s infinite;
+        }
+        
+        @keyframes overduePulse {
+            0% { box-shadow: 0 0 5px rgba(16, 185, 129, 0.5); }
+            50% { box-shadow: 0 0 20px rgba(16, 185, 129, 0.8); }
+            100% { box-shadow: 0 0 5px rgba(16, 185, 129, 0.5); }
+        }
+        
+        .digit-extreme-cold {
+            background: linear-gradient(135deg, #8B5CF6 0%, #7C3AED 100%);
+            color: white;
+            transform: scale(1.08);
+        }
+        
+        .digit-selected {
+            border: 3px solid #F59E0B;
+            box-shadow: 0 0 15px rgba(245, 158, 11, 0.5);
+        }
+        
+        .start-button-active {
+            background: linear-gradient(135deg, #10B981 0%, #059669 100%);
+            box-shadow: 0 4px 15px rgba(16, 185, 129, 0.4);
+        }
+        
+        .stop-button-active {
+            background: linear-gradient(135deg, #EF4444 0%, #DC2626 100%);
+            box-shadow: 0 4px 15px rgba(239, 68, 68, 0.4);
+        }
+        
+        .pnl-update-animation {
+            animation: pnlUpdate 0.5s;
+        }
+        
+        @keyframes pnlUpdate {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+            100% { transform: scale(1); }
+        }
+        
+        .win-glow {
+            animation: winGlow 1s infinite alternate;
+            border-color: #10B981;
+        }
+        
+        @keyframes winGlow {
+            from {
+                box-shadow: 0 0 5px rgba(16, 185, 129, 0.5),
+                            inset 0 0 5px rgba(16, 185, 129, 0.2);
+            }
+            to {
+                box-shadow: 0 0 20px rgba(16, 185, 129, 0.8),
+                            inset 0 0 10px rgba(16, 185, 129, 0.3);
+            }
+        }
+        
+        /* Enhanced overdue analysis styles */
+        .analysis-enhanced {
+            border: 2px solid #3B82F6;
+            background: linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(30, 64, 175, 0.1) 100%);
+        }
+        
+        .confidence-bar {
+            height: 6px;
+            border-radius: 3px;
+            overflow: hidden;
+            background: #374151;
+        }
+        
+        .confidence-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #EF4444, #F59E0B, #10B981);
+            transition: width 0.5s ease;
+        }
+        
+        .digit-stats-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 4px;
+        }
+        
+        .stat-item {
+            padding: 4px;
+            border-radius: 4px;
+            background: rgba(31, 41, 55, 0.5);
+            font-size: 0.75rem;
+        }
         
         /* Add calculator minimize styles */
         .calculator-minimized {
@@ -40,6 +327,33 @@
         .calculator-header {
             position: relative;
         }
+        
+        /* Enhanced trade status */
+        .trade-status-highlight {
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .trade-status-highlight::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: linear-gradient(
+                45deg,
+                transparent 30%,
+                rgba(255, 255, 255, 0.1) 50%,
+                transparent 70%
+            );
+            animation: shine 3s infinite linear;
+        }
+        
+        @keyframes shine {
+            0% { transform: translateX(-100%) translateY(-100%) rotate(45deg); }
+            100% { transform: translateX(100%) translateY(100%) rotate(45deg); }
+        }
     </style>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght400;600;700&display=swap" rel="stylesheet">
 </head>
@@ -70,15 +384,19 @@
                     class="px-4 py-2 bg-blue-600 text-white font-bold rounded-lg shadow hover:bg-blue-700 transition">
                     🔊 Sound ON
                 </button>
+                <button id="enhancedAnalysisToggle" onclick="toggleEnhancedAnalysis()" 
+                    class="px-4 py-2 bg-purple-600 text-white font-bold rounded-lg shadow hover:bg-purple-700 transition">
+                    🔍 Enhanced Analysis: ON
+                </button>
             </div>
         </div>
         
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
             <!-- LEFT COLUMN: OVERDUE DIGIT ANALYZER -->
             <div class="lg:col-span-1">
-                <div class="bg-gray-900 border border-gray-700 rounded-xl p-4 shadow-lg">
+                <div class="bg-gray-900 border border-gray-700 rounded-xl p-4 shadow-lg analysis-enhanced" id="analysisContainer">
                     <h2 class="text-lg font-bold text-cyan-400 mb-4 pb-2 border-b border-gray-700">
-                        🧠 OVERDUE DIGIT ANALYZER
+                        🧠 ENHANCED OVERDUE DIGIT ANALYZER
                     </h2>
                     
                     <!-- Analysis Status -->
@@ -115,6 +433,12 @@
                             <div class="text-xs text-gray-400 mb-1">Overdue Digit</div>
                             <div id="currentPrediction" class="text-3xl font-bold text-green-400">-</div>
                             <div id="predictionConfidence" class="text-xs text-gray-400 mt-1">Confidence: -</div>
+                            <div class="mt-2">
+                                <div class="text-xs text-gray-400 mb-1">Confidence Level</div>
+                                <div class="confidence-bar">
+                                    <div id="confidenceFill" class="confidence-fill" style="width: 0%"></div>
+                                </div>
+                            </div>
                         </div>
                         <div class="grid grid-cols-2 gap-2 text-xs">
                             <div class="text-center p-2 bg-gray-900 rounded">
@@ -124,6 +448,29 @@
                             <div class="text-center p-2 bg-gray-900 rounded">
                                 <div class="text-gray-400">Expected Avg</div>
                                 <div id="expectedAverage" class="font-bold text-blue-400">-</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Enhanced Digit Analysis -->
+                    <div class="mb-4 p-3 bg-gray-800 rounded-lg border border-green-500/30">
+                        <h3 class="text-sm font-bold text-green-300 mb-2">Enhanced Analysis</h3>
+                        <div class="digit-stats-grid">
+                            <div class="stat-item">
+                                <div class="text-gray-400">Current Streak</div>
+                                <div id="currentStreak" class="font-bold text-yellow-400">0</div>
+                            </div>
+                            <div class="stat-item">
+                                <div class="text-gray-400">Overdue Index</div>
+                                <div id="overdueIndex" class="font-bold text-red-400">0</div>
+                            </div>
+                            <div class="stat-item">
+                                <div class="text-gray-400">Statistical Bias</div>
+                                <div id="statisticalBias" class="font-bold text-blue-400">None</div>
+                            </div>
+                            <div class="stat-item">
+                                <div class="text-gray-400">Pattern Score</div>
+                                <div id="patternScore" class="font-bold text-purple-400">0</div>
                             </div>
                         </div>
                     </div>
@@ -147,6 +494,14 @@
                                 <div class="w-3 h-3 rounded-full bg-blue-500 mr-2"></div>
                                 <span>Cold (Monitor)</span>
                             </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Probability Distribution -->
+                    <div class="p-3 bg-gray-800 rounded-lg border border-blue-500/30">
+                        <h3 class="text-sm font-bold text-blue-300 mb-2">Probability Distribution</h3>
+                        <div class="space-y-1" id="probabilityBars">
+                            <!-- Probability bars will be populated here -->
                         </div>
                     </div>
                 </div>
@@ -321,7 +676,7 @@
                     </div>
                     
                     <!-- TRADE STATUS SECTION -->
-                    <div id="trade-result-container" class="bg-gray-900 rounded-lg p-3 shadow-inner border border-yellow-500/50 col-span-3">
+                    <div id="trade-result-container" class="bg-gray-900 rounded-lg p-3 shadow-inner border border-yellow-500/50 col-span-3 trade-status-highlight">
                         <div class="flex justify-between items-center mb-2">
                             <p class="text-[10px] font-semibold text-yellow-500 uppercase">TRADE STATUS</p>
                             <p id="metricTradeResult" class="text-xs font-bold text-gray-400">READY</p>
@@ -384,23 +739,26 @@
 
     <script>
         // ============================================================================
-        // SMART OVERDUE DIGIT ANALYZER - IMPROVED
+        // ENHANCED SMART OVERDUE DIGIT ANALYZER
         // ============================================================================
         
-        // Analysis Configuration
+        // Enhanced Analysis Configuration
         window.analysisConfig = {
-            windowSize: 30, // Reduced for faster analysis
-            confidenceThreshold: 65, // Lower threshold for more frequent trades
-            minTicksForAnalysis: 15, // Start analysis sooner
+            windowSize: 30,
+            confidenceThreshold: 65,
+            minTicksForAnalysis: 15,
             phases: {
                 MONITORING: 0,
                 ANALYSIS: 1,
                 CONFIRMATION: 2,
                 TRADING: 3
-            }
+            },
+            enhancedMode: true,
+            patternDetection: true,
+            statisticalAnalysis: true
         };
         
-        // Analysis State
+        // Enhanced Analysis State
         window.analysisState = {
             phase: 0,
             ticksAnalyzed: 0,
@@ -410,16 +768,24 @@
                 lastSeen: -1, 
                 streak: 0,
                 expectedAverage: 0,
-                overdueScore: 0
+                overdueScore: 0,
+                probability: 0.1,
+                patternScore: 0,
+                distributionScore: 0
             })),
+            patternHistory: [],
             currentPrediction: null,
             predictionConfidence: 0,
-            lockedDigit: null, // Digit to keep trading until win
+            lockedDigit: null,
             lockedDigitStartTime: 0,
-            lockedDigitTradeCount: 0
+            lockedDigitTradeCount: 0,
+            currentStreak: 0,
+            overdueIndex: 0,
+            statisticalBias: 'None',
+            patternScore: 0
         };
         
-        // Digit Heat Levels
+        // Enhanced Digit Heat Levels
         const DIGIT_HEAT = {
             HOT: 'hot',
             WARM: 'warm',
@@ -440,6 +806,490 @@
                 digitCell.textContent = i;
                 digitCell.title = `Digit ${i}`;
                 matrix.appendChild(digitCell);
+            }
+            
+            // Initialize probability bars
+            initializeProbabilityBars();
+        }
+        
+        // Initialize probability bars
+        function initializeProbabilityBars() {
+            const barsContainer = document.getElementById('probabilityBars');
+            barsContainer.innerHTML = '';
+            
+            for (let i = 0; i < 10; i++) {
+                const barContainer = document.createElement('div');
+                barContainer.className = 'flex items-center space-x-2';
+                
+                const digitLabel = document.createElement('div');
+                digitLabel.className = 'w-4 text-xs text-gray-300';
+                digitLabel.textContent = i;
+                
+                const barWrapper = document.createElement('div');
+                barWrapper.className = 'flex-1 bg-gray-700 rounded-full h-2 overflow-hidden';
+                
+                const bar = document.createElement('div');
+                bar.id = `prob-bar-${i}`;
+                bar.className = 'h-full bg-green-500';
+                bar.style.width = '10%';
+                
+                const percentLabel = document.createElement('div');
+                percentLabel.id = `prob-percent-${i}`;
+                percentLabel.className = 'w-8 text-xs text-gray-400';
+                percentLabel.textContent = '10%';
+                
+                barWrapper.appendChild(bar);
+                barContainer.appendChild(digitLabel);
+                barContainer.appendChild(barWrapper);
+                barContainer.appendChild(percentLabel);
+                barsContainer.appendChild(barContainer);
+            }
+        }
+        
+        // Update probability bars
+        function updateProbabilityBars() {
+            const totalTicks = window.analysisState.ticksAnalyzed;
+            if (totalTicks < 5) return;
+            
+            for (let i = 0; i < 10; i++) {
+                const stat = window.analysisState.digitStats[i];
+                const probability = totalTicks > 0 ? (stat.count / totalTicks) * 100 : 10;
+                const expectedProbability = 10; // Expected 10% for each digit
+                
+                const bar = document.getElementById(`prob-bar-${i}`);
+                const percentLabel = document.getElementById(`prob-percent-${i}`);
+                
+                // Color coding based on deviation from expected
+                let barColor = '#10B981'; // Green for normal
+                if (probability > expectedProbability * 1.5) {
+                    barColor = '#EF4444'; // Red for overrepresented
+                } else if (probability < expectedProbability * 0.5) {
+                    barColor = '#3B82F6'; // Blue for underrepresented
+                }
+                
+                bar.style.backgroundColor = barColor;
+                bar.style.width = `${Math.min(probability, 30)}%`; // Cap at 30% for visualization
+                percentLabel.textContent = `${probability.toFixed(1)}%`;
+            }
+        }
+        
+        // Enhanced heat level calculation
+        function calculateDigitHeatLevels() {
+            const heatLevels = Array(10).fill(DIGIT_HEAT.COLD);
+            const stats = window.analysisState.digitStats;
+            const totalTicks = window.analysisState.ticksAnalyzed;
+            
+            if (totalTicks < 15) return heatLevels;
+            
+            const expectedFrequency = totalTicks / 10;
+            
+            for (let i = 0; i < 10; i++) {
+                const stat = stats[i];
+                const ticksSinceLast = stat.lastSeen === -1 ? totalTicks : totalTicks - stat.lastSeen;
+                
+                // Enhanced overdue score calculation
+                let overdueScore = 0;
+                let patternScore = 0;
+                let distributionScore = 0;
+                
+                // Pattern detection: Check for repeating patterns
+                if (window.analysisConfig.patternDetection && window.analysisState.digitHistory.length > 10) {
+                    const recentHistory = window.analysisState.digitHistory.slice(-10);
+                    const patternFrequency = recentHistory.filter(d => d === i).length;
+                    patternScore = patternFrequency * 2;
+                }
+                
+                // Distribution analysis
+                if (window.analysisConfig.statisticalAnalysis) {
+                    const deviation = Math.abs(stat.count - expectedFrequency) / expectedFrequency;
+                    distributionScore = deviation * 10;
+                    
+                    // If digit is severely underrepresented
+                    if (stat.count < expectedFrequency * 0.3) {
+                        distributionScore += 15;
+                    }
+                }
+                
+                // Combined score
+                overdueScore = (ticksSinceLast / expectedFrequency) * 5 + patternScore + distributionScore;
+                
+                // If never appeared
+                if (stat.count === 0 && totalTicks >= 10) {
+                    overdueScore += 20;
+                }
+                
+                stat.overdueScore = overdueScore;
+                stat.patternScore = patternScore;
+                stat.distributionScore = distributionScore;
+                
+                // Enhanced heat level determination
+                if (ticksSinceLast <= 2) {
+                    heatLevels[i] = DIGIT_HEAT.HOT;
+                } else if (ticksSinceLast <= 5) {
+                    heatLevels[i] = DIGIT_HEAT.WARM;
+                } else if (overdueScore > 25) {
+                    heatLevels[i] = DIGIT_HEAT.EXTREME_COLD;
+                } else if (overdueScore > 15) {
+                    heatLevels[i] = DIGIT_HEAT.OVERDUE;
+                } else if (ticksSinceLast > expectedFrequency * 1.5) {
+                    heatLevels[i] = DIGIT_HEAT.COLD;
+                }
+                
+                // Update probability
+                stat.probability = totalTicks > 0 ? stat.count / totalTicks : 0.1;
+            }
+            
+            // Calculate overall statistical bias
+            calculateStatisticalBias();
+            
+            return heatLevels;
+        }
+        
+        // Calculate statistical bias
+        function calculateStatisticalBias() {
+            const stats = window.analysisState.digitStats;
+            const totalTicks = window.analysisState.ticksAnalyzed;
+            if (totalTicks < 20) return;
+            
+            let maxDeviation = 0;
+            let biasedDigit = -1;
+            
+            for (let i = 0; i < 10; i++) {
+                const expected = totalTicks / 10;
+                const deviation = Math.abs(stats[i].count - expected);
+                
+                if (deviation > maxDeviation) {
+                    maxDeviation = deviation;
+                    biasedDigit = i;
+                }
+            }
+            
+            const biasLevel = maxDeviation / (totalTicks / 10);
+            
+            if (biasLevel > 0.5) {
+                window.analysisState.statisticalBias = `Digit ${biasedDigit} (${(biasLevel * 100).toFixed(1)}% bias)`;
+            } else {
+                window.analysisState.statisticalBias = 'Balanced';
+            }
+            
+            document.getElementById('statisticalBias').textContent = window.analysisState.statisticalBias;
+        }
+        
+        // Enhanced overdue digit detection
+        function findMostOverdueDigit() {
+            const stats = window.analysisState.digitStats;
+            const totalTicks = window.analysisState.ticksAnalyzed;
+            const expectedFrequency = totalTicks / 10;
+            
+            let mostOverdue = null;
+            let maxOverdueScore = 0;
+            let currentStreak = 0;
+            
+            // Don't change prediction if we have a locked digit
+            if (window.analysisState.lockedDigit !== null) {
+                const lockedStat = stats[window.analysisState.lockedDigit];
+                const ticksSinceLast = lockedStat.lastSeen === -1 ? totalTicks : totalTicks - lockedStat.lastSeen;
+                let score = (ticksSinceLast / expectedFrequency) * 8;
+                
+                // Increase score based on trade count and time locked
+                const timeLocked = (Date.now() - window.analysisState.lockedDigitStartTime) / 1000;
+                score += window.analysisState.lockedDigitTradeCount * 5;
+                score += Math.min(timeLocked / 10, 10);
+                
+                // Calculate streak
+                const lastDigit = window.analysisState.digitHistory[window.analysisState.digitHistory.length - 1];
+                if (window.analysisState.lockedDigit === lastDigit) {
+                    currentStreak = 1;
+                }
+                
+                return { 
+                    digit: window.analysisState.lockedDigit, 
+                    score: score, 
+                    isLocked: true,
+                    streak: currentStreak 
+                };
+            }
+            
+            for (let i = 0; i < 10; i++) {
+                const stat = stats[i];
+                const ticksSinceLast = stat.lastSeen === -1 ? totalTicks : totalTicks - stat.lastSeen;
+                
+                let score = 0;
+                let streak = 0;
+                
+                // Base overdue score
+                const baseScore = (ticksSinceLast / expectedFrequency) * 10;
+                score += baseScore;
+                
+                // Pattern score bonus
+                score += stat.patternScore;
+                
+                // Distribution score bonus (severely underrepresented)
+                if (stat.count < expectedFrequency * 0.5) {
+                    score += (expectedFrequency - stat.count) * 2;
+                }
+                
+                // Consecutive miss bonus
+                const consecutiveMissBonus = Math.floor(ticksSinceLast / (expectedFrequency * 2)) * 5;
+                score += consecutiveMissBonus;
+                
+                // Hot streak detection
+                if (window.analysisState.digitHistory.length >= 3) {
+                    const recent = window.analysisState.digitHistory.slice(-3);
+                    if (recent.every(d => d === i)) {
+                        streak = 3;
+                        score -= 20; // Reduce score for hot digits
+                    } else if (recent.filter(d => d === i).length >= 2) {
+                        streak = 2;
+                        score -= 15;
+                    }
+                }
+                
+                // Update streak
+                if (streak > currentStreak) {
+                    currentStreak = streak;
+                }
+                
+                // Only consider if significantly overdue
+                if (score > maxOverdueScore && ticksSinceLast > expectedFrequency * 1.2) {
+                    maxOverdueScore = score;
+                    mostOverdue = i;
+                }
+            }
+            
+            window.analysisState.currentStreak = currentStreak;
+            document.getElementById('currentStreak').textContent = currentStreak;
+            
+            // Calculate overdue index (0-100)
+            const overdueIndex = Math.min(100, Math.round((maxOverdueScore / 50) * 100));
+            window.analysisState.overdueIndex = overdueIndex;
+            document.getElementById('overdueIndex').textContent = overdueIndex;
+            
+            return { 
+                digit: mostOverdue, 
+                score: maxOverdueScore, 
+                isLocked: false,
+                streak: currentStreak 
+            };
+        }
+        
+        // Enhanced confidence calculation
+        function calculateConfidence(digit) {
+            if (digit === null) return 0;
+            
+            const stats = window.analysisState.digitStats[digit];
+            const totalTicks = window.analysisState.ticksAnalyzed;
+            const expectedFrequency = totalTicks / 10;
+            const ticksSinceLast = stats.lastSeen === -1 ? totalTicks : totalTicks - stats.lastSeen;
+            
+            let confidence = 0;
+            
+            // Higher confidence for locked digits
+            if (window.analysisState.lockedDigit === digit) {
+                const baseConfidence = 75;
+                const tradeCountBonus = Math.min(20, window.analysisState.lockedDigitTradeCount * 8);
+                const timeLockedBonus = Math.min(10, ((Date.now() - window.analysisState.lockedDigitStartTime) / 10000));
+                confidence = baseConfidence + tradeCountBonus + timeLockedBonus;
+            } else {
+                // Enhanced confidence calculation
+                const overdueRatio = ticksSinceLast / expectedFrequency;
+                
+                // Base confidence from overdue ratio
+                if (overdueRatio > 4.0) {
+                    confidence = 90;
+                } else if (overdueRatio > 3.0) {
+                    confidence = 85;
+                } else if (overdueRatio > 2.5) {
+                    confidence = 80;
+                } else if (overdueRatio > 2.0) {
+                    confidence = 75;
+                } else if (overdueRatio > 1.5) {
+                    confidence = 65;
+                } else if (overdueRatio > 1.2) {
+                    confidence = 55;
+                }
+                
+                // Pattern confidence boost
+                if (stats.patternScore > 5) {
+                    confidence += 5;
+                }
+                
+                // Distribution confidence boost
+                if (stats.distributionScore > 10) {
+                    confidence += 5;
+                }
+                
+                // Sample size adjustment
+                const sampleSizeFactor = Math.min(1, totalTicks / 40);
+                confidence *= sampleSizeFactor;
+                
+                // Streak adjustment
+                if (window.analysisState.currentStreak >= 2) {
+                    confidence -= 10;
+                }
+            }
+            
+            // Calculate pattern score
+            const patternScore = Math.min(100, Math.round(stats.patternScore * 5));
+            window.analysisState.patternScore = patternScore;
+            document.getElementById('patternScore').textContent = patternScore;
+            
+            return Math.min(98, Math.max(2, Math.round(confidence)));
+        }
+        
+        // Process tick for enhanced analysis
+        function processTickForAnalysis(tick) {
+            const price = parseFloat(tick.quote);
+            const symbol = document.getElementById('symbol').value;
+            let decimalPlaces = 3;
+            if (symbol === 'R_100') decimalPlaces = 2;
+            const formattedPrice = price.toFixed(decimalPlaces);
+            const digit = parseInt(formattedPrice.charAt(formattedPrice.length - 1), 10);
+            
+            if (isNaN(digit) || digit < 0 || digit > 9) return;
+            
+            window.analysisState.ticksAnalyzed++;
+            window.analysisState.digitHistory.push(digit);
+            
+            if (window.analysisState.digitHistory.length > window.analysisConfig.windowSize) {
+                window.analysisState.digitHistory.shift();
+            }
+            
+            // Update pattern history
+            if (window.analysisState.digitHistory.length >= 2) {
+                const pattern = window.analysisState.digitHistory.slice(-2);
+                window.analysisState.patternHistory.push(pattern.join('-'));
+                if (window.analysisState.patternHistory.length > 50) {
+                    window.analysisState.patternHistory.shift();
+                }
+            }
+            
+            const stat = window.analysisState.digitStats[digit];
+            stat.count++;
+            stat.lastSeen = window.analysisState.ticksAnalyzed;
+            
+            // Update streaks
+            for (let i = 0; i < 10; i++) {
+                if (i !== digit) {
+                    window.analysisState.digitStats[i].streak = 0;
+                } else {
+                    window.analysisState.digitStats[i].streak++;
+                }
+            }
+            
+            // Check if locked digit appeared
+            if (window.analysisState.lockedDigit !== null && digit === window.analysisState.lockedDigit) {
+                log(`🎯 LOCKED DIGIT ${digit} APPEARED! Ending sequence.`, 'WIN');
+                window.analysisState.lockedDigit = null;
+                window.analysisState.lockedDigitTradeCount = 0;
+                
+                // Start PnL update sequence immediately
+                startExtendedPnlUpdate(window.currentStake * 9);
+            }
+            
+            document.getElementById('ticksAnalyzed').textContent = window.analysisState.ticksAnalyzed;
+            updateAnalysisProgress();
+            
+            if (window.analysisState.ticksAnalyzed >= window.analysisConfig.minTicksForAnalysis) {
+                performEnhancedOverdueAnalysis();
+            }
+            
+            updateDigitMatrix();
+            updateProbabilityBars();
+        }
+        
+        // Enhanced overdue analysis
+        function performEnhancedOverdueAnalysis() {
+            if (window.analysisState.ticksAnalyzed < window.analysisConfig.minTicksForAnalysis) {
+                return;
+            }
+            
+            const overdueResult = findMostOverdueDigit();
+            const confidence = calculateConfidence(overdueResult.digit);
+            
+            // Update confidence display
+            document.getElementById('confidenceFill').style.width = `${confidence}%`;
+            
+            // If we have a locked digit, keep using it
+            if (window.analysisState.lockedDigit !== null) {
+                window.analysisState.currentPrediction = window.analysisState.lockedDigit;
+            } else {
+                window.analysisState.currentPrediction = overdueResult.digit;
+                
+                // Enhanced locking logic
+                if (confidence >= window.analysisConfig.confidenceThreshold && 
+                    overdueResult.digit !== null && 
+                    !overdueResult.isLocked &&
+                    window.analysisState.overdueIndex > 60) {
+                    
+                    window.analysisState.lockedDigit = overdueResult.digit;
+                    window.analysisState.lockedDigitStartTime = Date.now();
+                    window.analysisState.lockedDigitTradeCount = 0;
+                    log(`🔒 ENHANCED LOCK: Digit ${overdueResult.digit} (${confidence}% confidence, ${window.analysisState.overdueIndex} overdue index)`, 'TRADE');
+                }
+            }
+            
+            window.analysisState.predictionConfidence = confidence;
+            
+            updatePredictionDisplay();
+            
+            if (confidence >= window.analysisConfig.confidenceThreshold && overdueResult.digit !== null) {
+                const stat = window.analysisState.digitStats[overdueResult.digit];
+                const ticksSinceLast = stat.lastSeen === -1 ? window.analysisState.ticksAnalyzed : window.analysisState.ticksAnalyzed - stat.lastSeen;
+                const expected = Math.floor(window.analysisState.ticksAnalyzed / 10);
+                
+                if (window.analysisState.enhancedMode) {
+                    log(`🎯 ENHANCED: Digit ${overdueResult.digit} - ${ticksSinceLast} ticks overdue (${confidence}% conf, ${window.analysisState.overdueIndex} index)`, 'ANALYSIS');
+                }
+            }
+        }
+        
+        // Enhanced prediction display
+        function updatePredictionDisplay() {
+            const predictionElem = document.getElementById('currentPrediction');
+            const confidenceElem = document.getElementById('predictionConfidence');
+            const lastSeenElem = document.getElementById('lastSeen');
+            const expectedElem = document.getElementById('expectedAverage');
+            
+            if (window.analysisState.currentPrediction !== null) {
+                const digit = window.analysisState.currentPrediction;
+                const stat = window.analysisState.digitStats[digit];
+                const ticksSinceLast = stat.lastSeen === -1 ? window.analysisState.ticksAnalyzed : window.analysisState.ticksAnalyzed - stat.lastSeen;
+                const expected = Math.floor(window.analysisState.ticksAnalyzed / 10);
+                
+                predictionElem.textContent = digit;
+                
+                if (window.analysisState.lockedDigit === digit) {
+                    confidenceElem.textContent = `LOCKED 🔒 (${window.analysisState.lockedDigitTradeCount} trades)`;
+                } else {
+                    confidenceElem.textContent = `Confidence: ${window.analysisState.predictionConfidence}%`;
+                }
+                
+                lastSeenElem.textContent = `${ticksSinceLast} ticks`;
+                expectedElem.textContent = `~${expected} ticks`;
+                
+                // Enhanced visual feedback
+                if (window.analysisState.lockedDigit === digit) {
+                    predictionElem.className = 'text-3xl font-bold text-green-400';
+                    predictionElem.textContent = `${digit} 🔒`;
+                    predictionElem.style.textShadow = '0 0 10px rgba(16, 185, 129, 0.7)';
+                } else if (window.analysisState.predictionConfidence >= window.analysisConfig.confidenceThreshold) {
+                    predictionElem.className = 'text-3xl font-bold text-green-400';
+                    predictionElem.style.textShadow = '0 0 5px rgba(16, 185, 129, 0.5)';
+                } else if (window.analysisState.predictionConfidence >= 50) {
+                    predictionElem.className = 'text-3xl font-bold text-yellow-400';
+                    predictionElem.style.textShadow = 'none';
+                } else {
+                    predictionElem.className = 'text-3xl font-bold text-gray-400';
+                    predictionElem.style.textShadow = 'none';
+                }
+            } else {
+                predictionElem.textContent = '-';
+                confidenceElem.textContent = 'Confidence: -';
+                lastSeenElem.textContent = '-';
+                expectedElem.textContent = '-';
+                predictionElem.className = 'text-3xl font-bold text-gray-400';
+                predictionElem.style.textShadow = 'none';
             }
         }
         
@@ -471,213 +1321,94 @@
                         break;
                 }
                 
-                // Highlight locked digit
+                // Enhanced highlighting
                 if (window.analysisState.lockedDigit === i) {
                     cell.classList.add('digit-selected');
-                    cell.style.boxShadow = '0 0 20px #10B981';
+                    cell.style.animation = 'overduePulse 1s infinite';
                 } else if (window.analysisState.currentPrediction === i) {
-                    cell.classList.add('digit-selected');
+                    cell.style.border = '2px solid #F59E0B';
                 }
                 
                 const lastSeen = stat.lastSeen === -1 ? 'Never' : `${window.analysisState.ticksAnalyzed - stat.lastSeen} ticks ago`;
-                cell.title = `Digit ${i}\nCount: ${stat.count}\nLast seen: ${lastSeen}\nOverdue Score: ${stat.overdueScore.toFixed(1)}`;
+                cell.title = `Digit ${i}\nCount: ${stat.count}\nLast seen: ${lastSeen}\nProbability: ${(stat.probability * 100).toFixed(1)}%\nOverdue Score: ${stat.overdueScore.toFixed(1)}`;
             }
         }
         
-        // Improved heat level calculation
-        function calculateDigitHeatLevels() {
-            const heatLevels = Array(10).fill(DIGIT_HEAT.COLD);
-            const stats = window.analysisState.digitStats;
-            const totalTicks = window.analysisState.ticksAnalyzed;
+        // Enhanced analysis initialization
+        function initializeAnalysis() {
+            window.analysisConfig.windowSize = parseInt(document.getElementById('analysisWindow').value) || 30;
+            window.analysisConfig.confidenceThreshold = parseInt(document.getElementById('confidenceThreshold').value) || 65;
             
-            if (totalTicks < 15) return heatLevels;
+            window.analysisState = {
+                phase: 0,
+                ticksAnalyzed: 0,
+                digitHistory: [],
+                digitStats: Array(10).fill().map(() => ({ 
+                    count: 0, 
+                    lastSeen: -1, 
+                    streak: 0,
+                    expectedAverage: 0,
+                    overdueScore: 0,
+                    probability: 0.1,
+                    patternScore: 0,
+                    distributionScore: 0
+                })),
+                patternHistory: [],
+                currentPrediction: null,
+                predictionConfidence: 0,
+                lockedDigit: null,
+                lockedDigitStartTime: 0,
+                lockedDigitTradeCount: 0,
+                currentStreak: 0,
+                overdueIndex: 0,
+                statisticalBias: 'None',
+                patternScore: 0,
+                enhancedMode: document.getElementById('enhancedAnalysisToggle').textContent.includes('ON')
+            };
             
-            const expectedFrequency = totalTicks / 10;
-            
-            for (let i = 0; i < 10; i++) {
-                const stat = stats[i];
-                const ticksSinceLast = stat.lastSeen === -1 ? totalTicks : totalTicks - stat.lastSeen;
-                
-                // Calculate overdue score
-                let overdueScore = 0;
-                
-                // If never appeared but should have
-                if (stat.count === 0) {
-                    const expectedAppearances = Math.floor(totalTicks / 10);
-                    if (expectedAppearances >= 1) {
-                        overdueScore = (ticksSinceLast / expectedFrequency) * 10;
-                    }
-                } 
-                // If appeared less than expected
-                else if (stat.count < expectedFrequency) {
-                    const missingAppearances = expectedFrequency - stat.count;
-                    overdueScore = (missingAppearances * 5) + (ticksSinceLast / expectedFrequency);
-                }
-                // If hasn't appeared in a while
-                else if (ticksSinceLast > expectedFrequency * 1.5) {
-                    overdueScore = (ticksSinceLast / expectedFrequency) * 3;
-                }
-                
-                stat.overdueScore = overdueScore;
-                
-                // Determine heat level
-                if (ticksSinceLast < 3) {
-                    heatLevels[i] = DIGIT_HEAT.HOT;
-                } else if (ticksSinceLast < 8) {
-                    heatLevels[i] = DIGIT_HEAT.WARM;
-                } else if (overdueScore > 15) {
-                    heatLevels[i] = DIGIT_HEAT.EXTREME_COLD;
-                } else if (overdueScore > 8) {
-                    heatLevels[i] = DIGIT_HEAT.OVERDUE;
-                } else if (ticksSinceLast > expectedFrequency * 1.2) {
-                    heatLevels[i] = DIGIT_HEAT.COLD;
-                }
-            }
-            
-            return heatLevels;
-        }
-        
-        // Improved overdue digit detection
-        function findMostOverdueDigit() {
-            const stats = window.analysisState.digitStats;
-            const totalTicks = window.analysisState.ticksAnalyzed;
-            const expectedFrequency = totalTicks / 10;
-            
-            let mostOverdue = null;
-            let maxOverdueScore = 0;
-            
-            // Don't change prediction if we have a locked digit
-            if (window.analysisState.lockedDigit !== null) {
-                const lockedStat = stats[window.analysisState.lockedDigit];
-                const ticksSinceLast = lockedStat.lastSeen === -1 ? totalTicks : totalTicks - lockedStat.lastSeen;
-                let score = (ticksSinceLast / expectedFrequency) * 5;
-                
-                // Increase score based on how long we've been trading it
-                if (window.analysisState.lockedDigitTradeCount > 0) {
-                    score += window.analysisState.lockedDigitTradeCount * 3;
-                }
-                
-                return { digit: window.analysisState.lockedDigit, score: score, isLocked: true };
-            }
-            
-            for (let i = 0; i < 10; i++) {
-                const stat = stats[i];
-                const ticksSinceLast = stat.lastSeen === -1 ? totalTicks : totalTicks - stat.lastSeen;
-                
-                let score = 0;
-                
-                // Digit never appeared
-                if (stat.count === 0) {
-                    const expectedAppearances = Math.floor(totalTicks / 10);
-                    if (expectedAppearances >= 1) {
-                        score = (ticksSinceLast / expectedFrequency) * 15;
-                    }
-                } 
-                // Digit appeared less than expected
-                else if (stat.count < expectedFrequency) {
-                    const missingAppearances = expectedFrequency - stat.count;
-                    score = (missingAppearances * 8) + (ticksSinceLast / expectedFrequency) * 5;
-                }
-                // Digit hasn't appeared in a while
-                else if (ticksSinceLast > expectedFrequency * 1.5) {
-                    score = (ticksSinceLast / expectedFrequency) * 8;
-                }
-                
-                // Bonus for consecutive misses
-                if (ticksSinceLast > expectedFrequency * 2) {
-                    score *= 1.5;
-                }
-                
-                if (score > maxOverdueScore && ticksSinceLast > expectedFrequency * 1.2) {
-                    maxOverdueScore = score;
-                    mostOverdue = i;
-                }
-            }
-            
-            return { digit: mostOverdue, score: maxOverdueScore, isLocked: false };
-        }
-        
-        // Calculate confidence level
-        function calculateConfidence(digit) {
-            if (digit === null) return 0;
-            
-            const stats = window.analysisState.digitStats[digit];
-            const totalTicks = window.analysisState.ticksAnalyzed;
-            const expectedFrequency = totalTicks / 10;
-            const ticksSinceLast = stats.lastSeen === -1 ? totalTicks : totalTicks - stats.lastSeen;
-            
-            let confidence = 0;
-            
-            // Higher confidence for locked digits
-            if (window.analysisState.lockedDigit === digit) {
-                confidence = 75 + Math.min(20, window.analysisState.lockedDigitTradeCount * 5);
-            } else {
-                const overdueRatio = ticksSinceLast / expectedFrequency;
-                
-                if (overdueRatio > 3.0) {
-                    confidence = 85;
-                } else if (overdueRatio > 2.5) {
-                    confidence = 80;
-                } else if (overdueRatio > 2.0) {
-                    confidence = 75;
-                } else if (overdueRatio > 1.5) {
-                    confidence = 65;
-                } else if (overdueRatio > 1.2) {
-                    confidence = 55;
-                }
-                
-                // Adjust based on sample size
-                const sampleSizeFactor = Math.min(1, totalTicks / 50);
-                confidence *= sampleSizeFactor;
-            }
-            
-            return Math.min(95, Math.max(0, Math.round(confidence)));
-        }
-        
-        // Process tick for analysis
-        function processTickForAnalysis(tick) {
-            const price = parseFloat(tick.quote);
-            const symbol = document.getElementById('symbol').value;
-            let decimalPlaces = 3;
-            if (symbol === 'R_100') decimalPlaces = 2;
-            const formattedPrice = price.toFixed(decimalPlaces);
-            const digit = parseInt(formattedPrice.charAt(formattedPrice.length - 1), 10);
-            
-            if (isNaN(digit) || digit < 0 || digit > 9) return;
-            
-            window.analysisState.ticksAnalyzed++;
-            window.analysisState.digitHistory.push(digit);
-            
-            if (window.analysisState.digitHistory.length > window.analysisConfig.windowSize) {
-                window.analysisState.digitHistory.shift();
-            }
-            
-            const stat = window.analysisState.digitStats[digit];
-            stat.count++;
-            stat.lastSeen = window.analysisState.ticksAnalyzed;
-            
-            // Reset streaks for other digits
-            for (let i = 0; i < 10; i++) {
-                if (i !== digit) {
-                    window.analysisState.digitStats[i].streak = 0;
-                }
-            }
-            
-            // Check if locked digit appeared
-            if (window.analysisState.lockedDigit !== null && digit === window.analysisState.lockedDigit) {
-                log(`🎯 LOCKED DIGIT ${digit} APPEARED! Ending sequence.`, 'WIN');
-                window.analysisState.lockedDigit = null;
-                window.analysisState.lockedDigitTradeCount = 0;
-            }
-            
-            document.getElementById('ticksAnalyzed').textContent = window.analysisState.ticksAnalyzed;
+            initializeDigitMatrix();
+            updatePredictionDisplay();
             updateAnalysisProgress();
             
-            if (window.analysisState.ticksAnalyzed >= window.analysisConfig.minTicksForAnalysis) {
-                performOverdueAnalysis();
+            log('🔄 Enhanced analysis system initialized', 'ANALYSIS');
+        }
+        
+        // Toggle enhanced analysis
+        function toggleEnhancedAnalysis() {
+            const toggleBtn = document.getElementById('enhancedAnalysisToggle');
+            const analysisContainer = document.getElementById('analysisContainer');
+            
+            window.analysisConfig.enhancedMode = !window.analysisConfig.enhancedMode;
+            
+            if (window.analysisConfig.enhancedMode) {
+                toggleBtn.textContent = '🔍 Enhanced Analysis: ON';
+                toggleBtn.className = 'px-4 py-2 bg-purple-600 text-white font-bold rounded-lg shadow hover:bg-purple-700 transition';
+                analysisContainer.classList.add('analysis-enhanced');
+                log('🔍 Enhanced analysis mode: ON', 'ANALYSIS');
+            } else {
+                toggleBtn.textContent = '🔍 Enhanced Analysis: OFF';
+                toggleBtn.className = 'px-4 py-2 bg-gray-600 text-white font-bold rounded-lg shadow hover:bg-gray-700 transition';
+                analysisContainer.classList.remove('analysis-enhanced');
+                log('🔍 Enhanced analysis mode: OFF', 'ANALYSIS');
+            }
+        }
+        
+        // Get predicted digit for trading
+        function getPredictedDigit() {
+            // Always use locked digit if available
+            if (window.analysisState.lockedDigit !== null) {
+                return window.analysisState.lockedDigit;
             }
             
-            updateDigitMatrix();
+            // Enhanced prediction logic
+            if (window.analysisState.currentPrediction !== null && 
+                window.analysisState.predictionConfidence >= window.analysisConfig.confidenceThreshold &&
+                window.analysisState.overdueIndex > 50) {
+                return window.analysisState.currentPrediction;
+            }
+            
+            // Default fallback
+            return 5;
         }
         
         // Update analysis progress
@@ -712,7 +1443,7 @@
                     phaseClass = 'phase-analysis';
                     if (totalTicks >= window.analysisConfig.windowSize) {
                         window.analysisState.phase = window.analysisConfig.phases.TRADING;
-                        log('✅ Analysis complete! Ready to trade overdue digits', 'ANALYSIS');
+                        log('✅ Enhanced analysis complete! Ready to trade overdue digits', 'ANALYSIS');
                     }
                     break;
                     
@@ -736,135 +1467,8 @@
             phaseBadge.textContent = `📊 ${phaseName}`;
         }
         
-        // Perform overdue analysis
-        function performOverdueAnalysis() {
-            if (window.analysisState.ticksAnalyzed < window.analysisConfig.minTicksForAnalysis) {
-                return;
-            }
-            
-            const overdueResult = findMostOverdueDigit();
-            const confidence = calculateConfidence(overdueResult.digit);
-            
-            // If we have a locked digit, keep using it
-            if (window.analysisState.lockedDigit !== null) {
-                window.analysisState.currentPrediction = window.analysisState.lockedDigit;
-            } else {
-                window.analysisState.currentPrediction = overdueResult.digit;
-                
-                // Lock this digit if confidence is high enough
-                if (confidence >= window.analysisConfig.confidenceThreshold && overdueResult.digit !== null && !overdueResult.isLocked) {
-                    window.analysisState.lockedDigit = overdueResult.digit;
-                    window.analysisState.lockedDigitStartTime = Date.now();
-                    window.analysisState.lockedDigitTradeCount = 0;
-                    log(`🔒 LOCKED DIGIT ${overdueResult.digit} for trading sequence`, 'TRADE');
-                }
-            }
-            
-            window.analysisState.predictionConfidence = confidence;
-            
-            updatePredictionDisplay();
-            
-            if (confidence >= window.analysisConfig.confidenceThreshold && overdueResult.digit !== null) {
-                const stat = window.analysisState.digitStats[overdueResult.digit];
-                const ticksSinceLast = stat.lastSeen === -1 ? window.analysisState.ticksAnalyzed : window.analysisState.ticksAnalyzed - stat.lastSeen;
-                const expected = Math.floor(window.analysisState.ticksAnalyzed / 10);
-                
-                log(`🎯 Digit ${overdueResult.digit} is ${ticksSinceLast} ticks overdue (expected every ${expected} ticks) - ${confidence}% confidence`, 'ANALYSIS');
-            }
-        }
-        
-        // Update prediction display
-        function updatePredictionDisplay() {
-            const predictionElem = document.getElementById('currentPrediction');
-            const confidenceElem = document.getElementById('predictionConfidence');
-            const lastSeenElem = document.getElementById('lastSeen');
-            const expectedElem = document.getElementById('expectedAverage');
-            
-            if (window.analysisState.currentPrediction !== null) {
-                const digit = window.analysisState.currentPrediction;
-                const stat = window.analysisState.digitStats[digit];
-                const ticksSinceLast = stat.lastSeen === -1 ? window.analysisState.ticksAnalyzed : window.analysisState.ticksAnalyzed - stat.lastSeen;
-                const expected = Math.floor(window.analysisState.ticksAnalyzed / 10);
-                
-                predictionElem.textContent = digit;
-                
-                if (window.analysisState.lockedDigit === digit) {
-                    confidenceElem.textContent = `LOCKED (${window.analysisState.lockedDigitTradeCount} trades)`;
-                } else {
-                    confidenceElem.textContent = `Confidence: ${window.analysisState.predictionConfidence}%`;
-                }
-                
-                lastSeenElem.textContent = `${ticksSinceLast} ticks`;
-                expectedElem.textContent = `~${expected} ticks`;
-                
-                if (window.analysisState.lockedDigit === digit) {
-                    predictionElem.className = 'text-3xl font-bold text-green-400';
-                    predictionElem.textContent = `${digit} 🔒`;
-                } else if (window.analysisState.predictionConfidence >= window.analysisConfig.confidenceThreshold) {
-                    predictionElem.className = 'text-3xl font-bold text-green-400';
-                } else if (window.analysisState.predictionConfidence >= 50) {
-                    predictionElem.className = 'text-3xl font-bold text-yellow-400';
-                } else {
-                    predictionElem.className = 'text-3xl font-bold text-gray-400';
-                }
-            } else {
-                predictionElem.textContent = '-';
-                confidenceElem.textContent = 'Confidence: -';
-                lastSeenElem.textContent = '-';
-                expectedElem.textContent = '-';
-                predictionElem.className = 'text-3xl font-bold text-gray-400';
-            }
-        }
-        
-        // Get predicted digit for trading
-        function getPredictedDigit() {
-            // Always use locked digit if available
-            if (window.analysisState.lockedDigit !== null) {
-                return window.analysisState.lockedDigit;
-            }
-            
-            // Otherwise use current prediction if confidence is high
-            if (window.analysisState.currentPrediction !== null && 
-                window.analysisState.predictionConfidence >= window.analysisConfig.confidenceThreshold) {
-                return window.analysisState.currentPrediction;
-            }
-            
-            // Default fallback
-            return 5;
-        }
-        
-        // Initialize analysis
-        function initializeAnalysis() {
-            window.analysisConfig.windowSize = parseInt(document.getElementById('analysisWindow').value) || 30;
-            window.analysisConfig.confidenceThreshold = parseInt(document.getElementById('confidenceThreshold').value) || 65;
-            
-            window.analysisState = {
-                phase: 0,
-                ticksAnalyzed: 0,
-                digitHistory: [],
-                digitStats: Array(10).fill().map(() => ({ 
-                    count: 0, 
-                    lastSeen: -1, 
-                    streak: 0,
-                    expectedAverage: 0,
-                    overdueScore: 0
-                })),
-                currentPrediction: null,
-                predictionConfidence: 0,
-                lockedDigit: null,
-                lockedDigitStartTime: 0,
-                lockedDigitTradeCount: 0
-            };
-            
-            initializeDigitMatrix();
-            updatePredictionDisplay();
-            updateAnalysisProgress();
-            
-            log('🔄 Analysis system initialized', 'ANALYSIS');
-        }
-        
         // ============================================================================
-        // CORE BOT FUNCTIONS
+        // CORE BOT FUNCTIONS WITH ENHANCED FEATURES
         // ============================================================================
         
         // Global State
@@ -880,7 +1484,7 @@
         // Trading State
         window.baseStake = 1.0;
         window.currentStake = 1.0;
-        window.multiplier = 1.15; // Changed to 1.15x
+        window.multiplier = 1.15;
         window.maxTrades = 10;
         window.tradeCount = 0;
         window.martingaleStep = 0;
@@ -889,7 +1493,7 @@
         window.currentBalance = 0.0;
         window.netProfit = 0.0;
         
-        // PnL Tracking
+        // Enhanced PnL Tracking
         window.pnlTracker = {
             totalInvestment: 0.0,
             totalPayout: 0.0,
@@ -897,10 +1501,10 @@
             trades: []
         };
         
-        // PnL Update Timer
+        // Enhanced PnL Update - Changed to 5 seconds
         window.pnlUpdateInterval = null;
         window.pnlUpdateStartTime = 0;
-        window.pnlUpdateDuration = 10000;
+        window.pnlUpdateDuration = 5000; // Changed from 10000 to 5000 (5 seconds)
         
         // Statistics
         window.stats = {
@@ -913,7 +1517,7 @@
         // Execution State
         window.lastTick = null;
         window.nextTradeAllowed = true;
-        window.stopAfterWin = false;
+        window.stopAfterWin = true; // Bot stops immediately on win
         window.pendingProposals = new Map();
         window.executionLock = false;
         
@@ -941,7 +1545,7 @@
         
         // Initialize on DOM ready
         document.addEventListener('DOMContentLoaded', () => {
-            console.log('🤖 Bot initialized');
+            console.log('🤖 Enhanced Bot initialized');
             initializeToggleState();
             
             initializeAnalysis();
@@ -980,9 +1584,10 @@
                 log(`🎯 Confidence threshold updated to ${window.analysisConfig.confidenceThreshold}%`, 'SETTINGS');
             });
             
-            log('🤖 Smart Overdue Digit Analyzer Ready', 'SYSTEM');
+            log('🤖 ENHANCED Smart Overdue Digit Analyzer Ready', 'SYSTEM');
             log('⚡ Using 1.15x incremental martingale strategy', 'SYSTEM');
             log('🔒 Bot will lock onto overdue digit and trade until win', 'SYSTEM');
+            log('⏹️ Bot stops immediately on win with 5s PnL update', 'SYSTEM');
             
             updatePnL();
             resetTradeStatus();
@@ -991,6 +1596,12 @@
             const calculatorToggle = document.getElementById('calculatorToggle');
             if (calculatorToggle) {
                 calculatorToggle.textContent = '−';
+            }
+            
+            // Initialize enhanced analysis toggle
+            const enhancedToggle = document.getElementById('enhancedAnalysisToggle');
+            if (enhancedToggle) {
+                enhancedToggle.textContent = '🔍 Enhanced Analysis: ON';
             }
         });
         
@@ -1071,34 +1682,36 @@
             }
         }
         
-        // TRADE STATUS UI FUNCTIONS
+        // ENHANCED TRADE STATUS UI FUNCTIONS
         function updateTradeStatus(status, result, action, type = 'normal') {
-            tradeResultContainer.classList.remove('win-glow');
+            tradeResultContainer.classList.remove('win-glow', 'trade-status-highlight');
             metricPreviousResult.textContent = result;
             metricNextAction.textContent = action;
             
             switch(type) {
                 case 'win':
                     metricTradeResult.textContent = 'WIN 🎯';
-                    metricTradeResult.className = 'text-xs font-bold status-win';
-                    metricPreviousResult.className = 'text-sm font-bold status-win';
-                    metricNextAction.className = 'text-sm font-bold text-green-400';
-                    tradeResultContainer.classList.add('win-glow');
-                    log(`🎯 Trade Status: ${result}`, 'WIN');
+                    metricTradeResult.className = 'text-xs font-bold text-green-400';
+                    metricPreviousResult.className = 'text-sm font-bold text-green-400';
+                    metricNextAction.className = 'text-sm font-bold text-green-300';
+                    tradeResultContainer.classList.add('win-glow', 'trade-status-highlight');
+                    metricTotalProfit.classList.add('profit-positive');
+                    log(`🎯 WIN: ${result}`, 'WIN');
                     break;
                 case 'loss':
                     metricTradeResult.textContent = 'LOSS ❌';
-                    metricTradeResult.className = 'text-xs font-bold status-loss';
-                    metricPreviousResult.className = 'text-sm font-bold status-loss';
-                    metricNextAction.className = 'text-sm font-bold text-red-400';
-                    log(`❌ Trade Status: ${result}`, 'LOSS');
+                    metricTradeResult.className = 'text-xs font-bold text-red-400';
+                    metricPreviousResult.className = 'text-sm font-bold text-red-400';
+                    metricNextAction.className = 'text-sm font-bold text-red-300';
+                    metricTotalProfit.classList.add('profit-negative');
+                    log(`❌ LOSS: ${result}`, 'LOSS');
                     break;
                 case 'trade':
                     metricTradeResult.textContent = 'TRADING ⚡';
-                    metricTradeResult.className = 'text-xs font-bold status-trade';
-                    metricPreviousResult.className = 'text-sm font-bold status-trade';
-                    metricNextAction.className = 'text-sm font-bold text-yellow-400';
-                    log(`⚡ Trade Status: ${result}`, 'TRADE');
+                    metricTradeResult.className = 'text-xs font-bold text-yellow-400';
+                    metricPreviousResult.className = 'text-sm font-bold text-yellow-400';
+                    metricNextAction.className = 'text-sm font-bold text-yellow-300';
+                    log(`⚡ TRADING: ${result}`, 'TRADE');
                     break;
                 default:
                     metricTradeResult.textContent = status || 'READY';
@@ -1124,7 +1737,7 @@
             document.getElementById('statWinRate').textContent = `${winRate}%`;
         }
         
-        // PnL UPDATE FUNCTIONS
+        // ENHANCED PnL UPDATE FUNCTIONS (5 seconds)
         function startExtendedPnlUpdate(payout) {
             window.pnlUpdateStartTime = Date.now();
             
@@ -1140,10 +1753,11 @@
                 if (elapsed >= window.pnlUpdateDuration) {
                     clearInterval(window.pnlUpdateInterval);
                     window.pnlUpdateInterval = null;
-                    log('💰 PnL update sequence completed (10 seconds)', 'PNL');
+                    log('💰 PnL update sequence completed (5 seconds)', 'PNL');
                     
                     updatePnL();
                     
+                    // Stop bot after 5 seconds
                     setTimeout(() => {
                         if (window.isBotRunning) {
                             stopBot();
@@ -1152,6 +1766,7 @@
                 } else {
                     updatePnL();
                     
+                    // Visual feedback every 500ms
                     if (elapsed % 500 < 50) {
                         metricTotalProfit.classList.add('pnl-update-animation');
                         setTimeout(() => {
@@ -1159,6 +1774,7 @@
                         }, 500);
                     }
                     
+                    // Log every second
                     if (elapsed % 1000 < 50) {
                         const secondsLeft = Math.ceil((window.pnlUpdateDuration - elapsed) / 1000);
                         log(`💰 PnL updating... ${secondsLeft}s`, 'PNL');
@@ -1167,21 +1783,24 @@
             }, 100);
         }
         
+        // ENHANCED PnL UPDATE with bold colors
         function updatePnL() {
             const pnlElem = document.getElementById('metricTotalProfit');
             
             if (window.startingBalance > 0 && window.currentBalance > 0) {
                 window.netProfit = window.currentBalance - window.startingBalance;
                 const formattedProfit = window.netProfit.toFixed(2);
-                const isPositive = window.netProfit > 0;
-                const isNegative = window.netProfit < 0;
                 
-                pnlElem.textContent = `${isPositive ? '+' : ''}$${formattedProfit}`;
+                pnlElem.textContent = `${window.netProfit >= 0 ? '+' : ''}$${formattedProfit}`;
                 pnlElem.classList.remove('profit-positive', 'profit-negative', 'profit-neutral');
                 
-                if (isPositive) pnlElem.classList.add('profit-positive');
-                else if (isNegative) pnlElem.classList.add('profit-negative');
-                else pnlElem.classList.add('profit-neutral');
+                if (window.netProfit > 0) {
+                    pnlElem.classList.add('profit-positive');
+                } else if (window.netProfit < 0) {
+                    pnlElem.classList.add('profit-negative');
+                } else {
+                    pnlElem.classList.add('profit-neutral');
+                }
                 
                 return window.netProfit;
             }
@@ -1189,15 +1808,17 @@
             if (window.pnlTracker.totalPayout > 0 || window.pnlTracker.totalInvestment > 0) {
                 window.netProfit = window.pnlTracker.totalPayout - window.pnlTracker.totalInvestment;
                 const formattedProfit = window.netProfit.toFixed(2);
-                const isPositive = window.netProfit > 0;
-                const isNegative = window.netProfit < 0;
                 
-                pnlElem.textContent = `${isPositive ? '+' : ''}$${formattedProfit}`;
+                pnlElem.textContent = `${window.netProfit >= 0 ? '+' : ''}$${formattedProfit}`;
                 pnlElem.classList.remove('profit-positive', 'profit-negative', 'profit-neutral');
                 
-                if (isPositive) pnlElem.classList.add('profit-positive');
-                else if (isNegative) pnlElem.classList.add('profit-negative');
-                else pnlElem.classList.add('profit-neutral');
+                if (window.netProfit > 0) {
+                    pnlElem.classList.add('profit-positive');
+                } else if (window.netProfit < 0) {
+                    pnlElem.classList.add('profit-negative');
+                } else {
+                    pnlElem.classList.add('profit-neutral');
+                }
                 
                 return window.netProfit;
             }
@@ -1500,7 +2121,7 @@
                 log(`🎯 IMMEDIATE WIN! Digit ${tickDigit} matches predicted ${predictedDigit} (${confidence}% confidence)`, 'WIN');
                 
                 window.lastTradeResult = 'win';
-                window.stopAfterWin = true;
+                window.stopAfterWin = true; // Stop immediately on win
                 window.stats.wins++;
                 window.tradeCount++;
                 
@@ -1515,12 +2136,13 @@
                 trackTradePayout(payout);
                 log(`💰 Payout: $${payout.toFixed(2)}`, 'PNL');
                 
+                // Start 5-second PnL update sequence
                 startExtendedPnlUpdate(payout);
                 
                 updateTradeStatus(
                     'IMMEDIATE WIN 🎯',
                     `Digit ${tickDigit} matched! Payout: $${payout.toFixed(2)}`,
-                    'PnL updating for 10 seconds...',
+                    'PnL updating for 5 seconds...',
                     'win'
                 );
                 
@@ -1552,11 +2174,14 @@
                 return;
             }
             
-            // Only trade if we have a locked digit OR high confidence prediction
+            // Enhanced trading logic
             const predictedDigit = getPredictedDigit();
             const confidence = window.analysisState.predictionConfidence;
+            const overdueIndex = window.analysisState.overdueIndex;
             
-            if (window.analysisState.lockedDigit === null && confidence < window.analysisConfig.confidenceThreshold) {
+            // Only trade if conditions are met
+            if (window.analysisState.lockedDigit === null && 
+                (confidence < window.analysisConfig.confidenceThreshold || overdueIndex < 50)) {
                 return;
             }
             
@@ -1574,7 +2199,7 @@
                 
                 document.getElementById('metricTradeCount').textContent = window.tradeCount;
                 
-                log(`⚡ Trade #${window.tradeCount}: $${window.currentStake.toFixed(2)} on digit ${predictedDigit} (${confidence}% confidence)`, 'TRADE');
+                log(`⚡ Trade #${window.tradeCount}: $${window.currentStake.toFixed(2)} on digit ${predictedDigit} (${confidence}% confidence, ${overdueIndex} index)`, 'TRADE');
                 
                 updateTradeStatus(
                     'TRADING',
@@ -1652,12 +2277,13 @@
                     window.analysisState.lockedDigitTradeCount = 0;
                 }
                 
+                // Start 5-second PnL update sequence
                 startExtendedPnlUpdate(payout);
                 
                 updateTradeStatus(
                     'WIN 🎯',
                     `WON! Digit matched - Payout: $${payout.toFixed(2)}`,
-                    'PnL updating for 10 seconds...',
+                    'PnL updating for 5 seconds...',
                     'win'
                 );
                 
@@ -1693,7 +2319,7 @@
             
             const stakeElem = document.getElementById('metricCurrentStake');
             stakeElem.textContent = `$${window.currentStake.toFixed(2)}`;
-            stakeElem.className = winOrLoss === 'win' ? 'text-lg font-bold text-green-400' : 'text-lg font-bold text-white';
+            stakeElem.className = 'text-lg font-bold text-white';
         }
         
         // ============================================================================
@@ -1721,13 +2347,14 @@
             window.isBotRunning = true;
             updateButtonState();
             
-            log('🚀 Starting Smart Overdue Digit Analyzer...', 'SYSTEM');
+            log('🚀 Starting ENHANCED Smart Overdue Digit Analyzer...', 'SYSTEM');
             log(`📊 Will analyze ${window.analysisConfig.windowSize} ticks before trading`, 'SYSTEM');
             log(`🎯 Trading only with ≥${window.analysisConfig.confidenceThreshold}% confidence`, 'SYSTEM');
             log(`⚡ Using 1.15x incremental martingale`, 'SYSTEM');
             log(`🔒 Will lock onto digit and trade until win or ${window.maxTrades} trades`, 'SYSTEM');
+            log(`⏹️ Bot stops immediately on win with 5s PnL update`, 'SYSTEM');
             
-            updateTradeStatus('STARTING', 'Initializing analysis engine...', 'Collecting market data', 'normal');
+            updateTradeStatus('STARTING', 'Initializing enhanced analysis engine...', 'Collecting market data', 'normal');
             updateStake('initial');
             initTone();
             connectWebSocket();
@@ -1852,10 +2479,13 @@
                     window.synth.triggerAttackRelease("C5", "8n");
                     setTimeout(() => window.synth.triggerAttackRelease("E5", "8n"), 100);
                     setTimeout(() => window.synth.triggerAttackRelease("G5", "8n"), 200);
+                    setTimeout(() => window.synth.triggerAttackRelease("C6", "8n"), 300);
                 } else if (type === 'TICK') {
                     window.synth.triggerAttackRelease("C4", "32n", Tone.now(), 0.3);
                 } else if (type === 'EXECUTION') {
                     window.synth.triggerAttackRelease("E5", "16n", Tone.now(), 0.5);
+                } else if (type === 'LOSS') {
+                    window.synth.triggerAttackRelease("C3", "8n", Tone.now(), 0.5);
                 }
             } catch (e) {
                 console.error("Audio error:", e);
@@ -2083,9 +2713,9 @@
             window.stopAfterWin = false;
             
             const logArea = document.getElementById('log-area');
-            logArea.innerHTML = '[00:00:00] 🤖 Bot reset. Ready.';
+            logArea.innerHTML = '[00:00:00] 🤖 Enhanced Bot reset. Ready.';
             
-            log('🔄 Bot reset', 'SYSTEM');
+            log('🔄 Enhanced bot reset', 'SYSTEM');
             updateStatistics();
         }
     </script>
