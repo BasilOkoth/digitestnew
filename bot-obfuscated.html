@@ -743,15 +743,16 @@
 
     <script>
         // ============================================================================
-        // DERIV OAUTH AUTHENTICATION SYSTEM
+        // DERIV OAUTH AUTHENTICATION SYSTEM - FIXED
         // ============================================================================
         
-        // Deriv OAuth Configuration
+        // Deriv OAuth Configuration - FIXED URL
         const DERIV_CONFIG = {
             app_id: 120389, // Deriv App ID
             oauth_url: 'https://oauth.deriv.com/oauth2/authorize',
             token_url: 'https://oauth.deriv.com/oauth2/token',
             api_url: 'wss://ws.binaryws.com/websockets/v3',
+            // FIX: Use full URL without hash for redirect
             redirect_uri: window.location.origin + window.location.pathname,
             scopes: ['read', 'trade', 'trading_information']
         };
@@ -765,51 +766,69 @@
             tokenExpiry: null
         };
         
-        // Check for OAuth callback
+        // Check for OAuth callback - FIXED
         function checkOAuthCallback() {
-            const urlParams = new URLSearchParams(window.location.hash.substring(1));
-            const accessToken = urlParams.get('access_token');
-            const tokenType = urlParams.get('token_type');
-            const expiresIn = urlParams.get('expires_in');
-            const account = urlParams.get('account');
-            
-            if (accessToken && tokenType) {
-                // Store token
-                window.oauthState.currentToken = accessToken;
-                window.oauthState.tokenExpiry = Date.now() + (parseInt(expiresIn) * 1000);
+            // Check URL hash for OAuth response
+            if (window.location.hash) {
+                const hashParams = new URLSearchParams(window.location.hash.substring(1));
+                const accessToken = hashParams.get('access_token');
+                const tokenType = hashParams.get('token_type');
+                const expiresIn = hashParams.get('expires_in');
+                const account = hashParams.get('account_id');
+                const state = hashParams.get('state');
                 
-                // Store account info
-                const accountInfo = {
-                    token: accessToken,
-                    account: account || 'Unknown',
-                    type: account && account.startsWith('VR') ? 'demo' : 'real',
-                    loginTime: Date.now()
-                };
-                
-                // Add to accounts list
-                let accounts = JSON.parse(localStorage.getItem('deriv_accounts')) || [];
-                accounts = accounts.filter(acc => acc.token !== accessToken);
-                accounts.push(accountInfo);
-                localStorage.setItem('deriv_accounts', JSON.stringify(accounts));
-                window.oauthState.accounts = accounts;
-                
-                // Set current account
-                window.oauthState.currentAccount = accountInfo;
-                window.oauthState.isAuthenticated = true;
-                
-                // Clear URL hash
-                window.location.hash = '';
-                
-                // Update UI
-                updateAuthUI();
-                log('✅ Successfully authenticated with Deriv', 'AUTH');
-                
-                // Connect WebSocket
-                if (window.isBotRunning) {
-                    connectWebSocket();
+                if (accessToken && tokenType) {
+                    // Validate state parameter
+                    const storedState = localStorage.getItem('oauth_state');
+                    if (state !== storedState) {
+                        console.warn('OAuth state mismatch - possible CSRF attack');
+                    }
+                    
+                    // Store token
+                    window.oauthState.currentToken = accessToken;
+                    window.oauthState.tokenExpiry = Date.now() + (parseInt(expiresIn || 3600) * 1000);
+                    
+                    // Store account info
+                    const accountInfo = {
+                        token: accessToken,
+                        account: account || 'Unknown',
+                        type: account && account.startsWith('VR') ? 'demo' : 'real',
+                        loginTime: Date.now(),
+                        token_type: tokenType,
+                        expires_in: expiresIn
+                    };
+                    
+                    // Add to accounts list
+                    let accounts = JSON.parse(localStorage.getItem('deriv_accounts')) || [];
+                    // Remove if exists
+                    accounts = accounts.filter(acc => acc.token !== accessToken);
+                    accounts.push(accountInfo);
+                    localStorage.setItem('deriv_accounts', JSON.stringify(accounts));
+                    window.oauthState.accounts = accounts;
+                    
+                    // Set current account
+                    window.oauthState.currentAccount = accountInfo;
+                    window.oauthState.isAuthenticated = true;
+                    
+                    // Store last used token
+                    localStorage.setItem('last_used_token', accessToken);
+                    
+                    // Clear URL hash without reloading
+                    const url = new URL(window.location);
+                    url.hash = '';
+                    window.history.replaceState({}, document.title, url.toString());
+                    
+                    // Update UI
+                    updateAuthUI();
+                    log('✅ Successfully authenticated with Deriv', 'AUTH');
+                    
+                    // Connect WebSocket if bot is running
+                    if (window.isBotRunning) {
+                        connectWebSocket();
+                    }
+                    
+                    return true;
                 }
-                
-                return true;
             }
             
             // Check for stored tokens
@@ -821,12 +840,22 @@
                 if (lastToken) {
                     const account = storedAccounts.find(acc => acc.token === lastToken);
                     if (account) {
-                        window.oauthState.currentToken = account.token;
-                        window.oauthState.currentAccount = account;
-                        window.oauthState.isAuthenticated = true;
-                        updateAuthUI();
-                        log('✅ Restored previous session', 'AUTH');
-                        return true;
+                        // Check if token is expired
+                        const isExpired = Date.now() > (account.loginTime + (account.expires_in * 1000));
+                        if (!isExpired) {
+                            window.oauthState.currentToken = account.token;
+                            window.oauthState.currentAccount = account;
+                            window.oauthState.isAuthenticated = true;
+                            updateAuthUI();
+                            log('✅ Restored previous session', 'AUTH');
+                            return true;
+                        } else {
+                            log('❌ Token expired. Please login again.', 'AUTH');
+                            // Remove expired token
+                            localStorage.removeItem('last_used_token');
+                            storedAccounts.splice(storedAccounts.indexOf(account), 1);
+                            localStorage.setItem('deriv_accounts', JSON.stringify(storedAccounts));
+                        }
                     }
                 }
             }
@@ -834,13 +863,18 @@
             return false;
         }
         
-        // OAuth Login
+        // OAuth Login - FIXED
         function oauthLogin(accountType = 'demo') {
-            const state = generateRandomString(16);
+            const state = generateRandomString(32);
             localStorage.setItem('oauth_state', state);
             
+            // Remove any existing token from URL
+            const cleanUrl = new URL(window.location);
+            cleanUrl.hash = '';
+            window.history.replaceState({}, document.title, cleanUrl.toString());
+            
             const params = {
-                app_id: DERIV_CONFIG.app_id,
+                app_id: DERIV_CONFIG.app_id.toString(),
                 response_type: 'token',
                 redirect_uri: DERIV_CONFIG.redirect_uri,
                 scope: DERIV_CONFIG.scopes.join(' '),
@@ -858,11 +892,11 @@
             
             log(`🔐 Redirecting to Deriv OAuth for ${accountType.toUpperCase()} account...`, 'AUTH');
             
-            // Open in same window
+            // Redirect to OAuth page
             window.location.href = authUrl;
         }
         
-        // Logout
+        // Logout - FIXED
         function logout() {
             window.oauthState.isAuthenticated = false;
             window.oauthState.currentToken = null;
@@ -874,6 +908,7 @@
                 accounts = accounts.filter(acc => acc.token !== window.oauthState.currentToken);
                 localStorage.setItem('deriv_accounts', JSON.stringify(accounts));
                 localStorage.removeItem('last_used_token');
+                localStorage.removeItem('oauth_state');
             }
             
             // Stop bot if running
@@ -892,6 +927,11 @@
             closeAuth();
             
             log('👋 Logged out successfully', 'AUTH');
+            
+            // Clear URL
+            const url = new URL(window.location);
+            url.hash = '';
+            window.history.replaceState({}, document.title, url.toString());
         }
         
         // Switch account type
@@ -931,7 +971,10 @@
                 userBalance.textContent = window.currentBalance ? `$${window.currentBalance.toFixed(2)}` : '$---';
                 
                 // Update account toggle
-                document.getElementById('accTypeToggle').checked = window.oauthState.currentAccount.type === 'real';
+                const toggle = document.getElementById('accTypeToggle');
+                if (toggle) {
+                    toggle.checked = window.oauthState.currentAccount.type === 'real';
+                }
                 
                 // Update trade status
                 updateTradeStatus('AUTHENTICATED', 'Account connected successfully', 'Ready to start trading', 'normal');
@@ -1690,7 +1733,6 @@
         const soundToggleButton = document.getElementById('soundToggle');
         const networkRecoveryToggle = document.getElementById('networkRecoveryToggle');
         const networkRecoveryBadge = document.getElementById('network-recovery-badge');
-        const sessionDisplay = document.getElementById('session_display');
         const tradeResultContainer = document.getElementById('trade-result-container');
         const metricPreviousResult = document.getElementById('metricPreviousResult');
         const metricNextAction = document.getElementById('metricNextAction');
@@ -1952,13 +1994,8 @@
         }
         
         function updateSessionDisplay() {
-            if (sessionState.sessionStarted && sessionState.sessionDigit !== null) {
-                document.getElementById('session_digit').textContent = sessionState.sessionDigit;
-                document.getElementById('session_trades').textContent = `${window.tradeCount}/${window.maxTrades}`;
-                sessionDisplay.classList.remove('hidden');
-            } else {
-                sessionDisplay.classList.add('hidden');
-            }
+            // This function is referenced but the element doesn't exist
+            // Removed the problematic code
         }
         
         function lockSessionDigit(digit) {
@@ -1971,7 +2008,6 @@
             sessionState.sessionStarted = true;
             sessionState.manualOverride = false;
             document.getElementById('predictedDigit').value = digit;
-            updateSessionDisplay();
             log(`🔒 Digit ${digit} locked for current session`, 'SESSION');
             return digit;
         }
@@ -1983,32 +2019,22 @@
             if (isConnected) {
                 document.getElementById('status-badge').textContent = '🟢 CONNECTED';
                 document.getElementById('status-badge').className = 'ml-3 inline-flex items-center px-3 py-1 text-sm font-medium rounded-full connection-badge-connected text-white shadow-md';
-                document.getElementById('market_status').textContent = 'Live';
-                document.getElementById('market_status').className = 'ml-2 font-bold text-green-400';
                 updateTradeStatus('CONNECTED', 'Market live - Ready to trade', 'Set parameters and start trading', 'normal');
             } else if (isConnecting) {
                 document.getElementById('status-badge').textContent = '🟡 CONNECTING';
                 document.getElementById('status-badge').className = 'ml-3 inline-flex items-center px-3 py-1 text-sm font-medium rounded-full connection-badge-connecting text-white shadow-md';
-                document.getElementById('market_status').textContent = 'Connecting...';
-                document.getElementById('market_status').className = 'ml-2 font-bold text-yellow-400';
                 updateTradeStatus('CONNECTING', 'Connecting to market...', 'Please wait', 'normal');
             } else {
                 document.getElementById('status-badge').textContent = '🔴 DISCONNECTED';
                 document.getElementById('status-badge').className = 'ml-3 inline-flex items-center px-3 py-1 text-sm font-medium rounded-full connection-badge-disconnected text-white shadow-md';
-                document.getElementById('market_status').textContent = 'Offline';
-                document.getElementById('market_status').className = 'ml-2 font-bold text-red-400';
                 updateTradeStatus('DISCONNECTED', 'Market offline', 'Start bot to connect', 'normal');
             }
-            
-            document.getElementById('current_symbol').textContent = 
-                document.getElementById('symbol').options[document.getElementById('symbol').selectedIndex].text;
             
             document.getElementById('ticks_received').textContent = window.totalTicksReceived;
             
             const now = Date.now();
             const recentTicks = window.tickTimestamps.filter(ts => now - ts < 5000);
             const tickRate = recentTicks.length / 5;
-            document.getElementById('current_tick_rate').textContent = tickRate.toFixed(1) + '/s';
         }
         
         function switchMode(mode) {
@@ -2034,7 +2060,6 @@
                         sessionState.sessionDigit = manualDigit;
                         sessionState.sessionStarted = true;
                         sessionState.manualOverride = true;
-                        updateSessionDisplay();
                         log(`🔒 Digit ${manualDigit} set manually for instant mode`, 'SESSION');
                     }
                 }
@@ -2094,7 +2119,7 @@
             }
         }
         
-        // DOM Ready
+        // DOM Ready - FIXED
         document.addEventListener('DOMContentLoaded', () => {
             console.log('🤖 Bot initialized with OAuth authentication');
             
@@ -2117,13 +2142,15 @@
                 digitGrid.innerHTML = gridHTML;
             }
             
-            // Check for OAuth callback
+            // Check for OAuth callback FIRST
             const hasToken = checkOAuthCallback();
             
             if (!hasToken) {
                 log('🔐 Please login with your Deriv account to start trading', 'AUTH');
-                // Auto-show auth modal if no token
-                setTimeout(() => showAuth(), 1000);
+                // Don't auto-show auth modal - let user click manually
+            } else {
+                // If we have a token, we're already authenticated
+                log('✅ Automatically logged in with saved credentials', 'AUTH');
             }
             
             updateNetworkRecoveryButton();
@@ -2177,7 +2204,6 @@
                     sessionState.sessionDigit = newDigit;
                     sessionState.sessionStarted = true;
                     sessionState.manualOverride = true;
-                    updateSessionDisplay();
                     log(`🔢 Digit manually set to ${newDigit}`, 'SESSION');
                     
                     if (window.digitAnalysis.coldDigits.includes(newDigit)) {
@@ -2191,7 +2217,7 @@
         });
         
         // ============================================================================
-        // WEBSOCKET CONNECTION WITH OAUTH
+        // WEBSOCKET CONNECTION WITH OAUTH - FIXED
         // ============================================================================
         
         function connectWebSocket() {
@@ -2389,7 +2415,6 @@
                 window.tradeCount++;
                 document.getElementById('metricTradeCount').textContent = window.tradeCount;
                 
-                updateSessionDisplay();
                 log(`⚡ Trade #${window.tradeCount}: ${tick.price.toFixed(3)} (Digit ${tick.digit})`, 'TRADE');
                 
                 updateTradeStatus(
@@ -2624,7 +2649,6 @@
             );
             
             sessionState.sessionStarted = false;
-            sessionDisplay.classList.add('hidden');
         }
         
         function toggleBot() {
@@ -2874,7 +2898,6 @@
         function onTradeComplete(isSuccess = true) {
             window.executionLock = false;
             window.nextTradeAllowed = true;
-            updateSessionDisplay();
             
             if (!isSuccess) {
                 updateStake('loss');
