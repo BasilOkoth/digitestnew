@@ -158,7 +158,7 @@
                 <div class="mb-6 p-4 bg-gray-900 rounded-xl border border-purple-500/50 shadow-lg" id="calculatorContainer">
                     <div class="calculator-header">
                         <h2 class="text-lg font-bold text-purple-400 mb-3 pb-2 border-b border-gray-700 flex items-center">
-                            🧮 MARTINGALE CALCULATOR
+                            🧮 MARTINGALE CALCULATOR (1.15x)
                             <button id="calculatorToggle" class="calculator-toggle-btn" onclick="toggleCalculator()">
                                 −
                             </button>
@@ -176,13 +176,13 @@
                                 
                                 <div>
                                     <label class="block text-xs font-semibold text-gray-300 mb-1">Multiplier</label>
-                                    <input type="number" id="calc_multiplier" value="2.0" min="1.0" step="0.01" 
+                                    <input type="number" id="calc_multiplier" value="1.15" min="1.0" step="0.01" 
                                         class="w-full rounded-md bg-gray-700 border border-gray-600 text-white shadow-sm focus:border-purple-500 focus:ring-purple-500 py-1.5 px-2 text-sm">
                                 </div>
                                 
                                 <div>
                                     <label class="block text-xs font-semibold text-gray-300 mb-1">Max Trades</label>
-                                    <input type="number" id="calc_max_trades" value="5" min="1" max="100" 
+                                    <input type="number" id="calc_max_trades" value="10" min="1" max="100" 
                                         class="w-full rounded-md bg-gray-700 border border-gray-600 text-white shadow-sm focus:border-purple-500 focus:ring-purple-500 py-1.5 px-2 text-sm">
                                 </div>
                                 
@@ -224,6 +224,14 @@
                                 </div>
                             </div>
                         </div>
+                        
+                        <!-- Trade Sequence Display -->
+                        <div class="mt-4 p-3 bg-gray-800 rounded-lg border border-purple-500/30">
+                            <h3 class="text-sm font-bold text-purple-300 mb-2">Trade Sequence (1.15x Martingale)</h3>
+                            <div id="tradeSequence" class="text-xs space-y-1 max-h-40 overflow-y-auto">
+                                <!-- Trade sequence will be populated here -->
+                            </div>
+                        </div>
                     </div>
                 </div>
                 
@@ -255,7 +263,13 @@
 
                     <div>
                         <label for="maxTrades" class="block text-xs font-semibold text-gray-300 mb-1">Max Trades</label>
-                        <input type="number" id="maxTrades" value="5" min="1" max="100" 
+                        <input type="number" id="maxTrades" value="10" min="1" max="100" 
+                            class="block w-full rounded-md bg-gray-700 border border-gray-600 text-white shadow-sm focus:border-green-500 focus:ring-green-500 py-1.5 px-2 text-sm">
+                    </div>
+                    
+                    <div>
+                        <label for="multiplier" class="block text-xs font-semibold text-gray-300 mb-1">Multiplier</label>
+                        <input type="number" id="multiplier" value="1.15" min="1.0" step="0.01" 
                             class="block w-full rounded-md bg-gray-700 border border-gray-600 text-white shadow-sm focus:border-green-500 focus:ring-green-500 py-1.5 px-2 text-sm">
                     </div>
                     
@@ -264,12 +278,12 @@
                         <div class="grid grid-cols-2 gap-3">
                             <div>
                                 <label class="block text-xs font-semibold text-gray-300 mb-1">Analysis Window</label>
-                                <input type="number" id="analysisWindow" value="50" min="20" max="200" 
+                                <input type="number" id="analysisWindow" value="30" min="20" max="200" 
                                     class="w-full rounded-md bg-gray-700 border border-gray-600 text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 py-1.5 px-2 text-sm">
                             </div>
                             <div>
                                 <label class="block text-xs font-semibold text-gray-300 mb-1">Confidence Threshold</label>
-                                <input type="number" id="confidenceThreshold" value="75" min="50" max="95" 
+                                <input type="number" id="confidenceThreshold" value="65" min="50" max="95" 
                                     class="w-full rounded-md bg-gray-700 border border-gray-600 text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 py-1.5 px-2 text-sm">
                                 <div class="text-xs text-gray-400 mt-1">% confidence to trade</div>
                             </div>
@@ -370,15 +384,14 @@
 
     <script>
         // ============================================================================
-        // SMART OVERDUE DIGIT ANALYZER
+        // SMART OVERDUE DIGIT ANALYZER - IMPROVED
         // ============================================================================
         
         // Analysis Configuration
         window.analysisConfig = {
-            windowSize: 50,
-            confidenceThreshold: 75,
-            minTicksForAnalysis: 20,
-            maxOverdueThreshold: 2.5,
+            windowSize: 30, // Reduced for faster analysis
+            confidenceThreshold: 65, // Lower threshold for more frequent trades
+            minTicksForAnalysis: 15, // Start analysis sooner
             phases: {
                 MONITORING: 0,
                 ANALYSIS: 1,
@@ -396,13 +409,14 @@
                 count: 0, 
                 lastSeen: -1, 
                 streak: 0,
-                expectedAverage: 0
+                expectedAverage: 0,
+                overdueScore: 0
             })),
             currentPrediction: null,
             predictionConfidence: 0,
-            lastAnalysisTime: 0,
-            analysisComplete: false,
-            tradingEnabled: false
+            lockedDigit: null, // Digit to keep trading until win
+            lockedDigitStartTime: 0,
+            lockedDigitTradeCount: 0
         };
         
         // Digit Heat Levels
@@ -410,7 +424,8 @@
             HOT: 'hot',
             WARM: 'warm',
             COLD: 'cold',
-            OVERDUE: 'overdue'
+            OVERDUE: 'overdue',
+            EXTREME_COLD: 'extreme-cold'
         };
         
         // Initialize digit matrix
@@ -451,52 +466,78 @@
                     case DIGIT_HEAT.OVERDUE:
                         cell.classList.add('digit-overdue');
                         break;
+                    case DIGIT_HEAT.EXTREME_COLD:
+                        cell.classList.add('digit-extreme-cold');
+                        break;
                 }
                 
-                if (window.analysisState.currentPrediction === i) {
+                // Highlight locked digit
+                if (window.analysisState.lockedDigit === i) {
+                    cell.classList.add('digit-selected');
+                    cell.style.boxShadow = '0 0 20px #10B981';
+                } else if (window.analysisState.currentPrediction === i) {
                     cell.classList.add('digit-selected');
                 }
                 
                 const lastSeen = stat.lastSeen === -1 ? 'Never' : `${window.analysisState.ticksAnalyzed - stat.lastSeen} ticks ago`;
-                cell.title = `Digit ${i}\nCount: ${stat.count}\nLast seen: ${lastSeen}\nExpected: ${stat.expectedAverage.toFixed(1)}`;
+                cell.title = `Digit ${i}\nCount: ${stat.count}\nLast seen: ${lastSeen}\nOverdue Score: ${stat.overdueScore.toFixed(1)}`;
             }
         }
         
-        // Calculate heat levels for digits
+        // Improved heat level calculation
         function calculateDigitHeatLevels() {
             const heatLevels = Array(10).fill(DIGIT_HEAT.COLD);
             const stats = window.analysisState.digitStats;
             const totalTicks = window.analysisState.ticksAnalyzed;
             
-            if (totalTicks < 10) return heatLevels;
+            if (totalTicks < 15) return heatLevels;
             
             const expectedFrequency = totalTicks / 10;
             
             for (let i = 0; i < 10; i++) {
                 const stat = stats[i];
-                const frequencyRatio = stat.count / expectedFrequency;
-                const ticksSinceLast = totalTicks - stat.lastSeen;
+                const ticksSinceLast = stat.lastSeen === -1 ? totalTicks : totalTicks - stat.lastSeen;
                 
+                // Calculate overdue score
+                let overdueScore = 0;
+                
+                // If never appeared but should have
                 if (stat.count === 0) {
                     const expectedAppearances = Math.floor(totalTicks / 10);
-                    if (expectedAppearances >= 3) {
-                        heatLevels[i] = DIGIT_HEAT.OVERDUE;
+                    if (expectedAppearances >= 1) {
+                        overdueScore = (ticksSinceLast / expectedFrequency) * 10;
                     }
-                } else if (frequencyRatio < 0.5 && ticksSinceLast > expectedFrequency * 2) {
-                    heatLevels[i] = DIGIT_HEAT.OVERDUE;
-                } else if (ticksSinceLast < 5) {
+                } 
+                // If appeared less than expected
+                else if (stat.count < expectedFrequency) {
+                    const missingAppearances = expectedFrequency - stat.count;
+                    overdueScore = (missingAppearances * 5) + (ticksSinceLast / expectedFrequency);
+                }
+                // If hasn't appeared in a while
+                else if (ticksSinceLast > expectedFrequency * 1.5) {
+                    overdueScore = (ticksSinceLast / expectedFrequency) * 3;
+                }
+                
+                stat.overdueScore = overdueScore;
+                
+                // Determine heat level
+                if (ticksSinceLast < 3) {
                     heatLevels[i] = DIGIT_HEAT.HOT;
-                } else if (ticksSinceLast < 15) {
+                } else if (ticksSinceLast < 8) {
                     heatLevels[i] = DIGIT_HEAT.WARM;
-                } else if (frequencyRatio < 0.8 && ticksSinceLast > expectedFrequency * 1.5) {
+                } else if (overdueScore > 15) {
+                    heatLevels[i] = DIGIT_HEAT.EXTREME_COLD;
+                } else if (overdueScore > 8) {
                     heatLevels[i] = DIGIT_HEAT.OVERDUE;
+                } else if (ticksSinceLast > expectedFrequency * 1.2) {
+                    heatLevels[i] = DIGIT_HEAT.COLD;
                 }
             }
             
             return heatLevels;
         }
         
-        // Find the most overdue digit
+        // Improved overdue digit detection
         function findMostOverdueDigit() {
             const stats = window.analysisState.digitStats;
             const totalTicks = window.analysisState.ticksAnalyzed;
@@ -505,18 +546,46 @@
             let mostOverdue = null;
             let maxOverdueScore = 0;
             
+            // Don't change prediction if we have a locked digit
+            if (window.analysisState.lockedDigit !== null) {
+                const lockedStat = stats[window.analysisState.lockedDigit];
+                const ticksSinceLast = lockedStat.lastSeen === -1 ? totalTicks : totalTicks - lockedStat.lastSeen;
+                let score = (ticksSinceLast / expectedFrequency) * 5;
+                
+                // Increase score based on how long we've been trading it
+                if (window.analysisState.lockedDigitTradeCount > 0) {
+                    score += window.analysisState.lockedDigitTradeCount * 3;
+                }
+                
+                return { digit: window.analysisState.lockedDigit, score: score, isLocked: true };
+            }
+            
             for (let i = 0; i < 10; i++) {
                 const stat = stats[i];
                 const ticksSinceLast = stat.lastSeen === -1 ? totalTicks : totalTicks - stat.lastSeen;
-                const expectedAppearances = Math.floor(totalTicks / 10);
                 
                 let score = 0;
                 
-                if (stat.count === 0 && expectedAppearances >= 2) {
-                    score = (expectedAppearances * 10) + (ticksSinceLast / expectedFrequency);
-                } else if (stat.count < expectedAppearances) {
-                    const missingAppearances = expectedAppearances - stat.count;
-                    score = (missingAppearances * 5) + (ticksSinceLast / expectedFrequency);
+                // Digit never appeared
+                if (stat.count === 0) {
+                    const expectedAppearances = Math.floor(totalTicks / 10);
+                    if (expectedAppearances >= 1) {
+                        score = (ticksSinceLast / expectedFrequency) * 15;
+                    }
+                } 
+                // Digit appeared less than expected
+                else if (stat.count < expectedFrequency) {
+                    const missingAppearances = expectedFrequency - stat.count;
+                    score = (missingAppearances * 8) + (ticksSinceLast / expectedFrequency) * 5;
+                }
+                // Digit hasn't appeared in a while
+                else if (ticksSinceLast > expectedFrequency * 1.5) {
+                    score = (ticksSinceLast / expectedFrequency) * 8;
+                }
+                
+                // Bonus for consecutive misses
+                if (ticksSinceLast > expectedFrequency * 2) {
+                    score *= 1.5;
                 }
                 
                 if (score > maxOverdueScore && ticksSinceLast > expectedFrequency * 1.2) {
@@ -525,10 +594,10 @@
                 }
             }
             
-            return { digit: mostOverdue, score: maxOverdueScore };
+            return { digit: mostOverdue, score: maxOverdueScore, isLocked: false };
         }
         
-        // Calculate confidence level for a prediction
+        // Calculate confidence level
         function calculateConfidence(digit) {
             if (digit === null) return 0;
             
@@ -539,19 +608,28 @@
             
             let confidence = 0;
             
-            const overdueRatio = ticksSinceLast / expectedFrequency;
-            if (overdueRatio > 2.5) {
-                confidence = 85 + Math.min(15, (overdueRatio - 2.5) * 10);
-            } else if (overdueRatio > 2.0) {
-                confidence = 70 + (overdueRatio - 2.0) * 30;
-            } else if (overdueRatio > 1.5) {
-                confidence = 50 + (overdueRatio - 1.5) * 40;
+            // Higher confidence for locked digits
+            if (window.analysisState.lockedDigit === digit) {
+                confidence = 75 + Math.min(20, window.analysisState.lockedDigitTradeCount * 5);
             } else {
-                confidence = Math.min(50, overdueRatio * 33);
+                const overdueRatio = ticksSinceLast / expectedFrequency;
+                
+                if (overdueRatio > 3.0) {
+                    confidence = 85;
+                } else if (overdueRatio > 2.5) {
+                    confidence = 80;
+                } else if (overdueRatio > 2.0) {
+                    confidence = 75;
+                } else if (overdueRatio > 1.5) {
+                    confidence = 65;
+                } else if (overdueRatio > 1.2) {
+                    confidence = 55;
+                }
+                
+                // Adjust based on sample size
+                const sampleSizeFactor = Math.min(1, totalTicks / 50);
+                confidence *= sampleSizeFactor;
             }
-            
-            const sampleSizeFactor = Math.min(1, totalTicks / 100);
-            confidence *= sampleSizeFactor;
             
             return Math.min(95, Math.max(0, Math.round(confidence)));
         }
@@ -577,17 +655,19 @@
             const stat = window.analysisState.digitStats[digit];
             stat.count++;
             stat.lastSeen = window.analysisState.ticksAnalyzed;
-            stat.streak = (stat.streak > 0) ? stat.streak + 1 : 1;
             
-            const totalTicks = window.analysisState.ticksAnalyzed;
-            for (let i = 0; i < 10; i++) {
-                window.analysisState.digitStats[i].expectedAverage = totalTicks / 10;
-            }
-            
+            // Reset streaks for other digits
             for (let i = 0; i < 10; i++) {
                 if (i !== digit) {
                     window.analysisState.digitStats[i].streak = 0;
                 }
+            }
+            
+            // Check if locked digit appeared
+            if (window.analysisState.lockedDigit !== null && digit === window.analysisState.lockedDigit) {
+                log(`🎯 LOCKED DIGIT ${digit} APPEARED! Ending sequence.`, 'WIN');
+                window.analysisState.lockedDigit = null;
+                window.analysisState.lockedDigitTradeCount = 0;
             }
             
             document.getElementById('ticksAnalyzed').textContent = window.analysisState.ticksAnalyzed;
@@ -617,7 +697,7 @@
             switch(window.analysisState.phase) {
                 case window.analysisConfig.phases.MONITORING:
                     progress = Math.min(100, (totalTicks / window.analysisConfig.minTicksForAnalysis) * 100);
-                    phaseDescription = `Collecting initial data (${totalTicks}/${window.analysisConfig.minTicksForAnalysis} ticks)`;
+                    phaseDescription = `Collecting data (${totalTicks}/${window.analysisConfig.minTicksForAnalysis} ticks)`;
                     phaseName = 'MONITORING';
                     phaseClass = 'phase-monitoring';
                     if (totalTicks >= window.analysisConfig.minTicksForAnalysis) {
@@ -626,30 +706,23 @@
                     break;
                     
                 case window.analysisConfig.phases.ANALYSIS:
-                    progress = Math.min(100, 50 + (totalTicks / (window.analysisConfig.windowSize * 2)) * 50);
-                    phaseDescription = `Analyzing patterns (${totalTicks} ticks analyzed)`;
+                    progress = Math.min(100, 50 + (totalTicks / (window.analysisConfig.windowSize * 1.5)) * 50);
+                    phaseDescription = `Analyzing patterns (${totalTicks} ticks)`;
                     phaseName = 'ANALYSIS';
                     phaseClass = 'phase-analysis';
                     if (totalTicks >= window.analysisConfig.windowSize) {
-                        window.analysisState.phase = window.analysisConfig.phases.CONFIRMATION;
-                    }
-                    break;
-                    
-                case window.analysisConfig.phases.CONFIRMATION:
-                    progress = Math.min(100, 75 + (Math.min(totalTicks, window.analysisConfig.windowSize * 1.5) / (window.analysisConfig.windowSize * 1.5)) * 25);
-                    phaseDescription = `Confirming statistical patterns`;
-                    phaseName = 'CONFIRMATION';
-                    phaseClass = 'phase-confirmed';
-                    if (totalTicks >= window.analysisConfig.windowSize * 1.5) {
                         window.analysisState.phase = window.analysisConfig.phases.TRADING;
-                        window.analysisState.tradingEnabled = true;
-                        log('✅ Analysis complete! Trading enabled with statistically confirmed overdue digits', 'ANALYSIS');
+                        log('✅ Analysis complete! Ready to trade overdue digits', 'ANALYSIS');
                     }
                     break;
                     
                 case window.analysisConfig.phases.TRADING:
                     progress = 100;
-                    phaseDescription = `Trading with ${window.analysisState.predictionConfidence}% confidence`;
+                    if (window.analysisState.lockedDigit !== null) {
+                        phaseDescription = `Trading digit ${window.analysisState.lockedDigit} (${window.analysisState.lockedDigitTradeCount} trades)`;
+                    } else {
+                        phaseDescription = `Ready to trade overdue digits`;
+                    }
                     phaseName = 'TRADING';
                     phaseClass = 'phase-trading';
                     break;
@@ -672,9 +745,22 @@
             const overdueResult = findMostOverdueDigit();
             const confidence = calculateConfidence(overdueResult.digit);
             
-            window.analysisState.currentPrediction = overdueResult.digit;
+            // If we have a locked digit, keep using it
+            if (window.analysisState.lockedDigit !== null) {
+                window.analysisState.currentPrediction = window.analysisState.lockedDigit;
+            } else {
+                window.analysisState.currentPrediction = overdueResult.digit;
+                
+                // Lock this digit if confidence is high enough
+                if (confidence >= window.analysisConfig.confidenceThreshold && overdueResult.digit !== null && !overdueResult.isLocked) {
+                    window.analysisState.lockedDigit = overdueResult.digit;
+                    window.analysisState.lockedDigitStartTime = Date.now();
+                    window.analysisState.lockedDigitTradeCount = 0;
+                    log(`🔒 LOCKED DIGIT ${overdueResult.digit} for trading sequence`, 'TRADE');
+                }
+            }
+            
             window.analysisState.predictionConfidence = confidence;
-            window.analysisState.lastAnalysisTime = Date.now();
             
             updatePredictionDisplay();
             
@@ -701,11 +787,20 @@
                 const expected = Math.floor(window.analysisState.ticksAnalyzed / 10);
                 
                 predictionElem.textContent = digit;
-                confidenceElem.textContent = `Confidence: ${window.analysisState.predictionConfidence}%`;
+                
+                if (window.analysisState.lockedDigit === digit) {
+                    confidenceElem.textContent = `LOCKED (${window.analysisState.lockedDigitTradeCount} trades)`;
+                } else {
+                    confidenceElem.textContent = `Confidence: ${window.analysisState.predictionConfidence}%`;
+                }
+                
                 lastSeenElem.textContent = `${ticksSinceLast} ticks`;
                 expectedElem.textContent = `~${expected} ticks`;
                 
-                if (window.analysisState.predictionConfidence >= window.analysisConfig.confidenceThreshold) {
+                if (window.analysisState.lockedDigit === digit) {
+                    predictionElem.className = 'text-3xl font-bold text-green-400';
+                    predictionElem.textContent = `${digit} 🔒`;
+                } else if (window.analysisState.predictionConfidence >= window.analysisConfig.confidenceThreshold) {
                     predictionElem.className = 'text-3xl font-bold text-green-400';
                 } else if (window.analysisState.predictionConfidence >= 50) {
                     predictionElem.className = 'text-3xl font-bold text-yellow-400';
@@ -723,18 +818,25 @@
         
         // Get predicted digit for trading
         function getPredictedDigit() {
-            if (window.analysisState.tradingEnabled && 
-                window.analysisState.currentPrediction !== null && 
+            // Always use locked digit if available
+            if (window.analysisState.lockedDigit !== null) {
+                return window.analysisState.lockedDigit;
+            }
+            
+            // Otherwise use current prediction if confidence is high
+            if (window.analysisState.currentPrediction !== null && 
                 window.analysisState.predictionConfidence >= window.analysisConfig.confidenceThreshold) {
                 return window.analysisState.currentPrediction;
             }
+            
+            // Default fallback
             return 5;
         }
         
         // Initialize analysis
         function initializeAnalysis() {
-            window.analysisConfig.windowSize = parseInt(document.getElementById('analysisWindow').value) || 50;
-            window.analysisConfig.confidenceThreshold = parseInt(document.getElementById('confidenceThreshold').value) || 70;
+            window.analysisConfig.windowSize = parseInt(document.getElementById('analysisWindow').value) || 30;
+            window.analysisConfig.confidenceThreshold = parseInt(document.getElementById('confidenceThreshold').value) || 65;
             
             window.analysisState = {
                 phase: 0,
@@ -744,13 +846,14 @@
                     count: 0, 
                     lastSeen: -1, 
                     streak: 0,
-                    expectedAverage: 0
+                    expectedAverage: 0,
+                    overdueScore: 0
                 })),
                 currentPrediction: null,
                 predictionConfidence: 0,
-                lastAnalysisTime: 0,
-                analysisComplete: false,
-                tradingEnabled: false
+                lockedDigit: null,
+                lockedDigitStartTime: 0,
+                lockedDigitTradeCount: 0
             };
             
             initializeDigitMatrix();
@@ -777,8 +880,8 @@
         // Trading State
         window.baseStake = 1.0;
         window.currentStake = 1.0;
-        window.multiplier = 2.0;
-        window.maxTrades = 5;
+        window.multiplier = 1.15; // Changed to 1.15x
+        window.maxTrades = 10;
         window.tradeCount = 0;
         window.martingaleStep = 0;
         window.accountBalance = 0.0;
@@ -851,6 +954,9 @@
             
             // Set up event listeners
             document.getElementById('baseStake').addEventListener('change', syncCalculatorWithMain);
+            document.getElementById('multiplier').addEventListener('change', syncCalculatorWithMain);
+            document.getElementById('maxTrades').addEventListener('change', syncCalculatorWithMain);
+            
             document.getElementById('calc_base_stake').addEventListener('change', () => {
                 document.getElementById('baseStake').value = document.getElementById('calc_base_stake').value;
                 syncCalculatorWithMain();
@@ -865,16 +971,19 @@
             });
             
             document.getElementById('analysisWindow').addEventListener('change', function() {
-                window.analysisConfig.windowSize = parseInt(this.value) || 50;
+                window.analysisConfig.windowSize = parseInt(this.value) || 30;
                 log(`📊 Analysis window updated to ${window.analysisConfig.windowSize} ticks`, 'SETTINGS');
             });
             
             document.getElementById('confidenceThreshold').addEventListener('change', function() {
-                window.analysisConfig.confidenceThreshold = parseInt(this.value) || 70;
+                window.analysisConfig.confidenceThreshold = parseInt(this.value) || 65;
                 log(`🎯 Confidence threshold updated to ${window.analysisConfig.confidenceThreshold}%`, 'SETTINGS');
             });
             
             log('🤖 Smart Overdue Digit Analyzer Ready', 'SYSTEM');
+            log('⚡ Using 1.15x incremental martingale strategy', 'SYSTEM');
+            log('🔒 Bot will lock onto overdue digit and trade until win', 'SYSTEM');
+            
             updatePnL();
             resetTradeStatus();
             
@@ -1107,7 +1216,6 @@
                 timestamp: Date.now()
             });
             updatePnL();
-            log(`💰 Investment tracked: $${amount.toFixed(2)}`, 'PNL');
         }
         
         function trackTradePayout(amount) {
@@ -1118,7 +1226,6 @@
                 timestamp: Date.now()
             });
             updatePnL();
-            log(`💰 Payout tracked: $${amount.toFixed(2)}`, 'PNL');
         }
         
         function resetPnL() {
@@ -1137,14 +1244,14 @@
         }
         
         // ============================================================================
-        // MARTINGALE CALCULATOR
+        // MARTINGALE CALCULATOR (1.15x)
         // ============================================================================
         
         function calculateMartingale() {
             try {
                 const baseStake = parseFloat(document.getElementById('calc_base_stake').value) || 1.0;
-                const multiplier = parseFloat(document.getElementById('calc_multiplier').value) || 2.0;
-                const maxTrades = parseInt(document.getElementById('calc_max_trades').value) || 5;
+                const multiplier = parseFloat(document.getElementById('calc_multiplier').value) || 1.15;
+                const maxTrades = parseInt(document.getElementById('calc_max_trades').value) || 10;
                 const bankrollLimit = parseFloat(document.getElementById('calc_bankroll_limit').value) || 50.0;
                 
                 if (baseStake <= 0 || multiplier <= 1.0 || maxTrades <= 0) {
@@ -1155,6 +1262,7 @@
                 let currentStake = baseStake;
                 let totalRequired = 0;
                 let finalStake = baseStake;
+                let tradeSequence = [];
                 
                 for (let i = 1; i <= maxTrades; i++) {
                     if (i === 1) {
@@ -1166,6 +1274,12 @@
                     currentStake = Math.round(currentStake * 100) / 100;
                     totalRequired += currentStake;
                     finalStake = currentStake;
+                    
+                    tradeSequence.push({
+                        trade: i,
+                        stake: currentStake.toFixed(2),
+                        cumulative: Math.round(totalRequired * 100) / 100
+                    });
                 }
                 
                 totalRequired = Math.round(totalRequired * 100) / 100;
@@ -1173,6 +1287,8 @@
                 
                 // Update main inputs
                 document.getElementById('baseStake').value = baseStake.toFixed(2);
+                document.getElementById('multiplier').value = multiplier.toFixed(2);
+                document.getElementById('maxTrades').value = maxTrades;
                 
                 // Update display elements
                 document.getElementById('calc_total_required').textContent = `$${totalRequired.toFixed(2)}`;
@@ -1186,7 +1302,7 @@
                 if (totalRequired <= bankrollLimit) {
                     bankrollStatusElem.textContent = '✅ Within Limit';
                     bankrollStatusElem.classList.add('calculator-safe');
-                } else if (totalRequired <= bankrollLimit * 1.5) {
+                } else if (totalRequired <= bankrollLimit * 1.2) {
                     bankrollStatusElem.textContent = '⚠️ Close to Limit';
                     bankrollStatusElem.classList.add('calculator-warning');
                 } else {
@@ -1194,13 +1310,30 @@
                     bankrollStatusElem.classList.add('calculator-warning');
                 }
                 
+                // Display trade sequence
+                const tradeSequenceElem = document.getElementById('tradeSequence');
+                tradeSequenceElem.innerHTML = '';
+                
+                tradeSequence.forEach(item => {
+                    const status = item.cumulative <= bankrollLimit ? '✅' : '❌';
+                    const row = document.createElement('div');
+                    row.className = `grid grid-cols-4 gap-1 text-xs py-1 ${item.trade % 2 === 0 ? 'bg-gray-900/30' : ''}`;
+                    row.innerHTML = `
+                        <div class="text-gray-300">Trade ${item.trade}</div>
+                        <div class="text-green-400">$${item.stake}</div>
+                        <div class="text-blue-400">$${item.cumulative.toFixed(2)}</div>
+                        <div class="${status === '✅' ? 'text-green-400' : 'text-red-400'} font-bold">${status}</div>
+                    `;
+                    tradeSequenceElem.appendChild(row);
+                });
+                
                 // Add animation
                 document.getElementById('calc_total_required').classList.add('calculator-pulse');
                 setTimeout(() => {
                     document.getElementById('calc_total_required').classList.remove('calculator-pulse');
                 }, 500);
                 
-                log(`🧮 Calculator: Total required: $${totalRequired.toFixed(2)} for ${maxTrades} trades`, 'CALCULATOR');
+                log(`🧮 1.15x Martingale: Total required: $${totalRequired.toFixed(2)} for ${maxTrades} trades`, 'CALCULATOR');
                 
             } catch (error) {
                 console.error('Calculator error:', error);
@@ -1210,8 +1343,8 @@
         
         function syncCalculatorWithMain() {
             const baseStake = parseFloat(document.getElementById('baseStake').value) || 1.0;
-            const multiplier = parseFloat(document.getElementById('multiplier').value) || 2.0;
-            const maxTrades = parseInt(document.getElementById('maxTrades').value) || 5;
+            const multiplier = parseFloat(document.getElementById('multiplier').value) || 1.15;
+            const maxTrades = parseInt(document.getElementById('maxTrades').value) || 10;
             
             document.getElementById('calc_base_stake').value = baseStake.toFixed(2);
             document.getElementById('calc_multiplier').value = multiplier.toFixed(2);
@@ -1234,7 +1367,7 @@
             window.isConnecting = true;
             updateConnectionStatus();
             
-            const wsUrl = 'wss://ws.binaryws.com/websockets/v3?app_id=120389';
+            const wsUrl = 'wss://ws.binaryws.com/websockets/v3?app_id=120839';
             log('🔗 Connecting to Deriv API...', 'SYSTEM');
             
             window.ws = new WebSocket(wsUrl);
@@ -1371,6 +1504,11 @@
                 window.stats.wins++;
                 window.tradeCount++;
                 
+                // Increment locked digit trade count if applicable
+                if (window.analysisState.lockedDigit === predictedDigit) {
+                    window.analysisState.lockedDigitTradeCount++;
+                }
+                
                 playAudioFeedback('WIN');
                 
                 const payout = window.currentStake * 9;
@@ -1398,8 +1536,8 @@
         function processTickImmediately(tick) {
             if (window.stopAfterWin) return;
             
-            if (!window.analysisState.tradingEnabled || 
-                window.analysisState.predictionConfidence < window.analysisConfig.confidenceThreshold) {
+            // Don't trade if analysis isn't ready yet
+            if (window.analysisState.phase < window.analysisConfig.phases.TRADING) {
                 return;
             }
             
@@ -1414,16 +1552,27 @@
                 return;
             }
             
+            // Only trade if we have a locked digit OR high confidence prediction
+            const predictedDigit = getPredictedDigit();
+            const confidence = window.analysisState.predictionConfidence;
+            
+            if (window.analysisState.lockedDigit === null && confidence < window.analysisConfig.confidenceThreshold) {
+                return;
+            }
+            
             window.executionLock = true;
             window.nextTradeAllowed = false;
             
             try {
                 window.stats.tradesExecuted++;
                 window.tradeCount++;
-                document.getElementById('metricTradeCount').textContent = window.tradeCount;
                 
-                const predictedDigit = getPredictedDigit();
-                const confidence = window.analysisState.predictionConfidence;
+                // Increment locked digit trade count
+                if (window.analysisState.lockedDigit === predictedDigit) {
+                    window.analysisState.lockedDigitTradeCount++;
+                }
+                
+                document.getElementById('metricTradeCount').textContent = window.tradeCount;
                 
                 log(`⚡ Trade #${window.tradeCount}: $${window.currentStake.toFixed(2)} on digit ${predictedDigit} (${confidence}% confidence)`, 'TRADE');
                 
@@ -1474,16 +1623,18 @@
                 predictedDigit: predictedDigit,
                 startTime: Date.now(),
                 tradeNumber: window.tradeCount,
-                martingaleStep: window.martingaleStep
+                martingaleStep: window.martingaleStep,
+                isLockedDigit: window.analysisState.lockedDigit === predictedDigit
             });
             
             sendRequest(proposalRequest);
         }
         
-        // Update stake function
+        // Update stake function with 1.15x multiplier
         function updateStake(winOrLoss) {
             window.baseStake = parseFloat(document.getElementById('baseStake').value) || 1.0;
-            window.maxTrades = parseInt(document.getElementById('maxTrades').value) || 5;
+            window.multiplier = parseFloat(document.getElementById('multiplier').value) || 1.15;
+            window.maxTrades = parseInt(document.getElementById('maxTrades').value) || 10;
             
             if (winOrLoss === 'win') {
                 window.martingaleStep = 0;
@@ -1493,6 +1644,13 @@
                 const payout = window.currentStake * 9;
                 trackTradePayout(payout);
                 log(`💰 Payout: $${payout.toFixed(2)}`, 'PNL');
+                
+                // Unlock digit after win
+                if (window.analysisState.lockedDigit !== null) {
+                    log(`🔓 Unlocking digit ${window.analysisState.lockedDigit} after win`, 'TRADE');
+                    window.analysisState.lockedDigit = null;
+                    window.analysisState.lockedDigitTradeCount = 0;
+                }
                 
                 startExtendedPnlUpdate(payout);
                 
@@ -1520,7 +1678,7 @@
                 updateTradeStatus(
                     'LOSS ❌',
                     `Lost - Next: $${window.currentStake.toFixed(2)}`,
-                    'Increasing stake',
+                    'Increasing stake (1.15x)',
                     'loss'
                 );
                 
@@ -1554,7 +1712,8 @@
                 return;
             }
             
-            window.maxTrades = parseInt(document.getElementById('maxTrades').value) || 5;
+            window.maxTrades = parseInt(document.getElementById('maxTrades').value) || 10;
+            window.multiplier = parseFloat(document.getElementById('multiplier').value) || 1.15;
             
             resetAllState();
             initializeAnalysis();
@@ -1565,6 +1724,8 @@
             log('🚀 Starting Smart Overdue Digit Analyzer...', 'SYSTEM');
             log(`📊 Will analyze ${window.analysisConfig.windowSize} ticks before trading`, 'SYSTEM');
             log(`🎯 Trading only with ≥${window.analysisConfig.confidenceThreshold}% confidence`, 'SYSTEM');
+            log(`⚡ Using 1.15x incremental martingale`, 'SYSTEM');
+            log(`🔒 Will lock onto digit and trade until win or ${window.maxTrades} trades`, 'SYSTEM');
             
             updateTradeStatus('STARTING', 'Initializing analysis engine...', 'Collecting market data', 'normal');
             updateStake('initial');
@@ -1572,7 +1733,7 @@
             connectWebSocket();
             
             // Disable controls while bot is running
-            document.querySelectorAll('#symbol, #contractType, #baseStake, #maxTrades, #analysisWindow, #confidenceThreshold').forEach(control => {
+            document.querySelectorAll('#symbol, #contractType, #baseStake, #maxTrades, #multiplier, #analysisWindow, #confidenceThreshold').forEach(control => {
                 control.disabled = true;
                 control.classList.add('opacity-50', 'cursor-not-allowed');
             });
@@ -1602,8 +1763,15 @@
             window.pendingProposals.clear();
             window.executionLock = false;
             
+            // Unlock any locked digit
+            if (window.analysisState.lockedDigit !== null) {
+                log(`🔓 Unlocking digit ${window.analysisState.lockedDigit}`, 'SYSTEM');
+                window.analysisState.lockedDigit = null;
+                window.analysisState.lockedDigitTradeCount = 0;
+            }
+            
             // Re-enable controls
-            document.querySelectorAll('#symbol, #contractType, #baseStake, #maxTrades, #analysisWindow, #confidenceThreshold').forEach(control => {
+            document.querySelectorAll('#symbol, #contractType, #baseStake, #maxTrades, #multiplier, #analysisWindow, #confidenceThreshold').forEach(control => {
                 control.disabled = false;
                 control.classList.remove('opacity-50', 'cursor-not-allowed');
             });
@@ -1884,7 +2052,8 @@
         
         // Reset all state
         function resetAllState() {
-            window.maxTrades = parseInt(document.getElementById('maxTrades').value) || 5;
+            window.maxTrades = parseInt(document.getElementById('maxTrades').value) || 10;
+            window.multiplier = parseFloat(document.getElementById('multiplier').value) || 1.15;
             
             updateStake('initial');
             resetPnL();
