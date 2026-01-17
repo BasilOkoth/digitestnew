@@ -364,12 +364,30 @@
             from { box-shadow: 0 0 10px rgba(16, 185, 129, 0.5); }
             to { box-shadow: 0 0 30px rgba(16, 185, 129, 0.8); }
         }
+        
+        /* Start button position */
+        .start-button-container {
+            position: sticky;
+            top: 20px;
+            z-index: 100;
+            margin-bottom: 20px;
+        }
     </style>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght400;600;700&display=swap" rel="stylesheet">
 </head>
 <body class="min-h-screen p-4 sm:p-8 flex items-start justify-center">
 
     <div class="w-full max-w-6xl bg-gray-800 text-gray-100 shadow-2xl rounded-xl p-5 md:p-6">
+        <!-- START BUTTON AT TOP -->
+        <div class="start-button-container">
+            <div class="flex justify-center mb-4">
+                <button id="toggleButton" onclick="toggleBot()" 
+                    class="w-full md:w-1/2 px-6 py-4 bg-green-600 text-white font-bold text-lg rounded-lg shadow-xl hover:bg-green-700 transition duration-150 start-button-active">
+                    🚀 START BOT
+                </button>
+            </div>
+        </div>
+        
         <div class="flex justify-between items-center mb-4">
             <h1 class="text-3xl font-extrabold text-green-400 border-b border-gray-700 pb-2">
                 DigitMatchStar Bot 
@@ -725,14 +743,6 @@
                     </div>
                 </div>
             </div>
-        </div>
-        
-        <!-- START/STOP BUTTON -->
-        <div class="flex justify-center mb-5">
-            <button id="toggleButton" onclick="toggleBot()" 
-                class="w-full md:w-1/2 px-6 py-3 bg-green-600 text-white font-bold text-lg rounded-lg shadow-xl hover:bg-green-700 transition duration-150">
-                🚀 START BOT
-            </button>
         </div>
 
         <!-- LOG AREA -->
@@ -2321,6 +2331,215 @@
             log('🔄 Real trading bot reset', 'SYSTEM');
             updateStatistics();
         }
+        
+        // ============================================================================
+        // ENHANCED ANALYSIS FUNCTIONS
+        // ============================================================================
+        
+        function initializeAnalysis() {
+            window.analysisState = {
+                phase: 0,
+                ticksAnalyzed: 0,
+                digitHistory: [],
+                digitStats: Array(10).fill().map(() => ({ 
+                    count: 0, 
+                    lastSeen: -1, 
+                    streak: 0,
+                    expectedAverage: 0,
+                    overdueScore: 0,
+                    probability: 0.1,
+                    patternScore: 0,
+                    distributionScore: 0
+                })),
+                patternHistory: [],
+                currentPrediction: null,
+                predictionConfidence: 0,
+                lockedDigit: null,
+                lockedDigitStartTime: 0,
+                lockedDigitTradeCount: 0,
+                currentStreak: 0,
+                overdueIndex: 0,
+                statisticalBias: 'None',
+                patternScore: 0
+            };
+            
+            document.getElementById('ticksAnalyzed').textContent = '0';
+            document.getElementById('analysisProgress').style.width = '0%';
+            document.getElementById('phaseDescription').textContent = 'Collecting initial data...';
+            document.getElementById('phaseProgress').textContent = '0%';
+            document.getElementById('currentPrediction').textContent = '-';
+            document.getElementById('predictionConfidence').textContent = 'Confidence: -';
+            document.getElementById('lastSeen').textContent = '-';
+            document.getElementById('expectedAverage').textContent = '-';
+            document.getElementById('confidenceFill').style.width = '0%';
+            document.getElementById('currentStreak').textContent = '0';
+            document.getElementById('overdueIndex').textContent = '0';
+            document.getElementById('statisticalBias').textContent = 'None';
+            document.getElementById('patternScore').textContent = '0';
+            
+            updateDigitMatrix();
+            updateProbabilityBars();
+        }
+        
+        function updateAnalysisProgress() {
+            const progress = Math.min(100, (window.analysisState.ticksAnalyzed / window.analysisConfig.windowSize) * 100);
+            document.getElementById('analysisProgress').style.width = `${progress}%`;
+            document.getElementById('phaseProgress').textContent = `${Math.round(progress)}%`;
+            
+            if (window.analysisState.ticksAnalyzed < window.analysisConfig.minTicksForAnalysis) {
+                document.getElementById('phaseDescription').textContent = `Collecting data... (${window.analysisState.ticksAnalyzed}/${window.analysisConfig.minTicksForAnalysis})`;
+                document.getElementById('analysisPhase').textContent = 'Monitoring';
+                document.getElementById('analysisPhase').className = 'text-lg font-bold text-green-400';
+                window.analysisState.phase = window.analysisConfig.phases.MONITORING;
+            } else if (window.analysisState.ticksAnalyzed < window.analysisConfig.windowSize) {
+                document.getElementById('phaseDescription').textContent = `Analyzing patterns... (${window.analysisState.ticksAnalyzed}/${window.analysisConfig.windowSize})`;
+                document.getElementById('analysisPhase').textContent = 'Analysis';
+                document.getElementById('analysisPhase').className = 'text-lg font-bold text-yellow-400';
+                window.analysisState.phase = window.analysisConfig.phases.ANALYSIS;
+            } else {
+                document.getElementById('phaseDescription').textContent = 'Ready to trade';
+                document.getElementById('analysisPhase').textContent = 'Trading';
+                document.getElementById('analysisPhase').className = 'text-lg font-bold text-red-400';
+                window.analysisState.phase = window.analysisConfig.phases.TRADING;
+            }
+        }
+        
+        function toggleEnhancedAnalysis() {
+            window.analysisConfig.enhancedMode = !window.analysisConfig.enhancedMode;
+            document.getElementById('enhancedAnalysisToggle').textContent = 
+                `🔍 Enhanced Analysis: ${window.analysisConfig.enhancedMode ? 'ON' : 'OFF'}`;
+            log(`Enhanced Analysis ${window.analysisConfig.enhancedMode ? 'enabled' : 'disabled'}`, 'SETTINGS');
+        }
+        
+        // ============================================================================
+        // CALCULATOR FUNCTIONS
+        // ============================================================================
+        
+        function toggleCalculator() {
+            const calculatorContent = document.getElementById('calculatorContent');
+            const calculatorToggle = document.getElementById('calculatorToggle');
+            const calculatorContainer = document.getElementById('calculatorContainer');
+            
+            window.calculatorMinimized = !window.calculatorMinimized;
+            
+            if (window.calculatorMinimized) {
+                calculatorContent.classList.add('hidden');
+                calculatorToggle.textContent = '+';
+                calculatorContainer.classList.add('calculator-minimized');
+                calculatorContainer.style.maxHeight = '60px';
+            } else {
+                calculatorContent.classList.remove('hidden');
+                calculatorToggle.textContent = '−';
+                calculatorContainer.classList.remove('calculator-minimized');
+                calculatorContainer.style.maxHeight = 'none';
+            }
+        }
+        
+        function calculateMartingale() {
+            const baseStake = parseFloat(document.getElementById('calc_base_stake').value) || 1.0;
+            const multiplier = parseFloat(document.getElementById('calc_multiplier').value) || 1.15;
+            const maxTrades = parseInt(document.getElementById('calc_max_trades').value) || 10;
+            const bankrollLimit = parseFloat(document.getElementById('calc_bankroll_limit').value) || 50.0;
+            
+            let totalRequired = 0;
+            let currentStake = baseStake;
+            let tradeSequenceHTML = '';
+            
+            for (let i = 1; i <= maxTrades; i++) {
+                totalRequired += currentStake;
+                const profitOnWin = currentStake * 9 - totalRequired;
+                
+                tradeSequenceHTML += `
+                    <div class="flex justify-between items-center p-2 ${i % 2 === 0 ? 'bg-gray-800' : 'bg-gray-900'} rounded">
+                        <span class="font-bold">Trade #${i}:</span>
+                        <span class="text-green-400">$${currentStake.toFixed(2)}</span>
+                        <span class="text-gray-400">Total: $${totalRequired.toFixed(2)}</span>
+                        <span class="${profitOnWin >= 0 ? 'text-green-400' : 'text-red-400'}">
+                            P/L: $${profitOnWin.toFixed(2)}
+                        </span>
+                    </div>
+                `;
+                
+                currentStake = currentStake * multiplier;
+            }
+            
+            const finalStake = (baseStake * Math.pow(multiplier, maxTrades - 1)).toFixed(2);
+            const profitOnWin = parseFloat(finalStake) * 9 - totalRequired;
+            
+            document.getElementById('calc_total_required').textContent = `$${totalRequired.toFixed(2)}`;
+            document.getElementById('calc_final_stake').textContent = `$${finalStake}`;
+            document.getElementById('calc_profit_on_win').textContent = `$${profitOnWin.toFixed(2)}`;
+            
+            // Bankroll status
+            if (totalRequired <= bankrollLimit * 0.5) {
+                document.getElementById('calc_bankroll_status').textContent = 'SAFE';
+                document.getElementById('calc_bankroll_status').className = 'text-lg font-bold calculator-safe';
+            } else if (totalRequired <= bankrollLimit) {
+                document.getElementById('calc_bankroll_status').textContent = 'WARNING';
+                document.getElementById('calc_bankroll_status').className = 'text-lg font-bold calculator-warning';
+            } else {
+                document.getElementById('calc_bankroll_status').textContent = 'EXCEEDED';
+                document.getElementById('calc_bankroll_status').className = 'text-lg font-bold text-red-400';
+            }
+            
+            document.getElementById('tradeSequence').innerHTML = tradeSequenceHTML;
+            
+            // Highlight calculator
+            const calculatorContainer = document.getElementById('calculatorContainer');
+            calculatorContainer.classList.add('calculator-pulse');
+            setTimeout(() => calculatorContainer.classList.remove('calculator-pulse'), 500);
+            
+            log(`🧮 Martingale calculated: $${totalRequired.toFixed(2)} required for ${maxTrades} trades`, 'CALCULATOR');
+        }
+        
+        function syncCalculatorWithMain() {
+            document.getElementById('calc_base_stake').value = document.getElementById('baseStake').value;
+            document.getElementById('calc_multiplier').value = document.getElementById('multiplier').value;
+            document.getElementById('calc_max_trades').value = document.getElementById('maxTrades').value;
+            calculateMartingale();
+        }
+        
+        // ============================================================================
+        // ACCOUNT FUNCTIONS
+        // ============================================================================
+        
+        function switchAccount() {
+            const toggle = document.getElementById('accTypeToggle');
+            const demoLabel = document.querySelector('.account-label-demo');
+            const realLabel = document.querySelector('.account-label-real');
+            
+            if (toggle.checked) {
+                demoLabel.classList.remove('account-label-demo');
+                realLabel.classList.add('account-label-real');
+                log('Switched to REAL account', 'SYSTEM');
+            } else {
+                demoLabel.classList.add('account-label-demo');
+                realLabel.classList.remove('account-label-real');
+                log('Switched to DEMO account', 'SYSTEM');
+            }
+        }
+        
+        function checkAuthToken() {
+            const token = localStorage.getItem('active_token') || localStorage.getItem('derivToken');
+            if (!token) {
+                alert('❌ No API token found. Please authorize with Deriv API first.');
+                log('❌ No API token found in storage', 'ERROR');
+                return false;
+            }
+            return true;
+        }
+        
+        function initializeToggleState() {
+            const soundEnabled = localStorage.getItem('soundEnabled');
+            if (soundEnabled !== null) {
+                window.soundEnabled = soundEnabled === 'true';
+            }
+            updateSoundButton();
+        }
+        
+        // ============================================================================
+        // INITIALIZATION
+        // ============================================================================
         
         // Initialize on DOM ready
         document.addEventListener('DOMContentLoaded', () => {
