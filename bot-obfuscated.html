@@ -7,7 +7,7 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
     <style>
-        /* Keep all existing styles from previous code */
+        /* Custom styles */
         .balance-green {
             color: #10B981;
             font-weight: bold;
@@ -1189,8 +1189,13 @@
             
             // Check if predicted digit appeared - DETECT WIN
             if (window.analysisState.currentPrediction !== null && 
-                digit === window.analysisState.currentPrediction) {
-                handleWinDetection(digit);
+                digit === window.analysisState.currentPrediction &&
+                !window.stopAllTrading) {
+                log(`🎯 WIN DETECTED! Digit ${digit} matches predicted digit`, 'WIN');
+                
+                // Stop all further trades
+                window.stopAllTrading = true;
+                log(`⏹️ All further trades stopped. Current trade can complete.`, 'SYSTEM');
             }
             
             document.getElementById('ticksAnalyzed').textContent = window.analysisState.ticksAnalyzed;
@@ -1202,70 +1207,6 @@
             
             updateDigitMatrix();
             updateProbabilityBars();
-        }
-        
-        // Handle win detection (NO TRADE EXECUTION)
-        function handleWinDetection(digit) {
-            if (window.winDetected || !window.isBotRunning) return;
-            
-            window.winDetected = true;
-            window.stopAllTrading = true; // Stop ALL trading immediately
-            
-            const confidence = window.analysisState.predictionConfidence;
-            const predictionContainer = document.getElementById('predictionContainer');
-            
-            log(`🎯 WIN DETECTED! Digit ${digit} matches predicted digit (${confidence}% confidence)`, 'WIN');
-            
-            // Visual feedback for win detection
-            predictionContainer.classList.add('win-detection');
-            
-            // Highlight the winning digit in matrix
-            const winningDigitCell = document.getElementById(`digit-${digit}`);
-            winningDigitCell.classList.add('digit-selected');
-            winningDigitCell.style.animation = 'overduePulse 0.5s infinite';
-            
-            // Update statistics
-            window.stats.wins++;
-            
-            // Calculate theoretical payout (but don't execute trade)
-            const theoreticalPayout = window.currentStake * 9;
-            const theoreticalProfit = theoreticalPayout - window.currentStake;
-            
-            // Track theoretical PnL
-            window.pnlTracker.totalInvestment += window.currentStake;
-            window.pnlTracker.totalPayout += theoreticalPayout;
-            window.netProfit = window.pnlTracker.totalPayout - window.pnlTracker.totalInvestment;
-            
-            // Update display
-            updateTradeStatus(
-                'WIN DETECTED 🎯',
-                `Digit ${digit} matched predicted digit!`,
-                'Theoretical profit: $' + theoreticalProfit.toFixed(2),
-                'win'
-            );
-            
-            // Play win sound
-            playAudioFeedback('WIN');
-            
-            // Start 5-second PnL update sequence
-            startExtendedPnlUpdate(theoreticalPayout);
-            
-            // Update statistics display
-            updateStatistics();
-            
-            log(`💰 Theoretical Payout: $${theoreticalPayout.toFixed(2)} (No trade executed)`, 'PNL');
-            log(`⏹️ ALL trading stopped - Only PnL will update for 5 seconds`, 'SYSTEM');
-            
-            // Unlock any locked digit
-            if (window.analysisState.lockedDigit !== null) {
-                log(`🔓 Unlocking digit ${window.analysisState.lockedDigit}`, 'TRADE');
-                window.analysisState.lockedDigit = null;
-                window.analysisState.lockedDigitTradeCount = 0;
-            }
-            
-            // Reset stake for next session
-            window.martingaleStep = 0;
-            window.currentStake = window.baseStake;
         }
         
         // Enhanced overdue analysis
@@ -1404,141 +1345,8 @@
             }
         }
         
-        // Enhanced analysis initialization
-        function initializeAnalysis() {
-            window.analysisConfig.windowSize = parseInt(document.getElementById('analysisWindow').value) || 30;
-            window.analysisConfig.confidenceThreshold = parseInt(document.getElementById('confidenceThreshold').value) || 65;
-            
-            window.analysisState = {
-                phase: 0,
-                ticksAnalyzed: 0,
-                digitHistory: [],
-                digitStats: Array(10).fill().map(() => ({ 
-                    count: 0, 
-                    lastSeen: -1, 
-                    streak: 0,
-                    expectedAverage: 0,
-                    overdueScore: 0,
-                    probability: 0.1,
-                    patternScore: 0,
-                    distributionScore: 0
-                })),
-                patternHistory: [],
-                currentPrediction: null,
-                predictionConfidence: 0,
-                lockedDigit: null,
-                lockedDigitStartTime: 0,
-                lockedDigitTradeCount: 0,
-                currentStreak: 0,
-                overdueIndex: 0,
-                statisticalBias: 'None',
-                patternScore: 0,
-                enhancedMode: document.getElementById('enhancedAnalysisToggle').textContent.includes('ON')
-            };
-            
-            initializeDigitMatrix();
-            updatePredictionDisplay();
-            updateAnalysisProgress();
-            
-            log('🔄 Enhanced analysis system initialized', 'ANALYSIS');
-        }
-        
-        // Toggle enhanced analysis
-        function toggleEnhancedAnalysis() {
-            const toggleBtn = document.getElementById('enhancedAnalysisToggle');
-            const analysisContainer = document.getElementById('analysisContainer');
-            
-            window.analysisConfig.enhancedMode = !window.analysisConfig.enhancedMode;
-            
-            if (window.analysisConfig.enhancedMode) {
-                toggleBtn.textContent = '🔍 Enhanced Analysis: ON';
-                toggleBtn.className = 'px-4 py-2 bg-purple-600 text-white font-bold rounded-lg shadow hover:bg-purple-700 transition';
-                analysisContainer.classList.add('analysis-enhanced');
-                log('🔍 Enhanced analysis mode: ON', 'ANALYSIS');
-            } else {
-                toggleBtn.textContent = '🔍 Enhanced Analysis: OFF';
-                toggleBtn.className = 'px-4 py-2 bg-gray-600 text-white font-bold rounded-lg shadow hover:bg-gray-700 transition';
-                analysisContainer.classList.remove('analysis-enhanced');
-                log('🔍 Enhanced analysis mode: OFF', 'ANALYSIS');
-            }
-        }
-        
-        // Get predicted digit for trading
-        function getPredictedDigit() {
-            // Always use locked digit if available
-            if (window.analysisState.lockedDigit !== null) {
-                return window.analysisState.lockedDigit;
-            }
-            
-            // Enhanced prediction logic
-            if (window.analysisState.currentPrediction !== null && 
-                window.analysisState.predictionConfidence >= window.analysisConfig.confidenceThreshold &&
-                window.analysisState.overdueIndex > 50) {
-                return window.analysisState.currentPrediction;
-            }
-            
-            // Default fallback
-            return 5;
-        }
-        
-        // Update analysis progress
-        function updateAnalysisProgress() {
-            const progressElem = document.getElementById('analysisProgress');
-            const phaseDescElem = document.getElementById('phaseDescription');
-            const phaseProgressElem = document.getElementById('phaseProgress');
-            const phaseElem = document.getElementById('analysisPhase');
-            const phaseBadge = document.getElementById('phase-badge');
-            
-            const totalTicks = window.analysisState.ticksAnalyzed;
-            let progress = 0;
-            let phaseDescription = '';
-            let phaseName = '';
-            let phaseClass = '';
-            
-            switch(window.analysisState.phase) {
-                case window.analysisConfig.phases.MONITORING:
-                    progress = Math.min(100, (totalTicks / window.analysisConfig.minTicksForAnalysis) * 100);
-                    phaseDescription = `Collecting data (${totalTicks}/${window.analysisConfig.minTicksForAnalysis} ticks)`;
-                    phaseName = 'MONITORING';
-                    phaseClass = 'phase-monitoring';
-                    if (totalTicks >= window.analysisConfig.minTicksForAnalysis) {
-                        window.analysisState.phase = window.analysisConfig.phases.ANALYSIS;
-                    }
-                    break;
-                    
-                case window.analysisConfig.phases.ANALYSIS:
-                    progress = Math.min(100, 50 + (totalTicks / (window.analysisConfig.windowSize * 1.5)) * 50);
-                    phaseDescription = `Analyzing patterns (${totalTicks} ticks)`;
-                    phaseName = 'ANALYSIS';
-                    phaseClass = 'phase-analysis';
-                    if (totalTicks >= window.analysisConfig.windowSize) {
-                        window.analysisState.phase = window.analysisConfig.phases.TRADING;
-                        log('✅ Enhanced analysis complete! Ready to trade overdue digits', 'ANALYSIS');
-                    }
-                    break;
-                    
-                case window.analysisConfig.phases.TRADING:
-                    progress = 100;
-                    if (window.analysisState.lockedDigit !== null) {
-                        phaseDescription = `Trading digit ${window.analysisState.lockedDigit} (${window.analysisState.lockedDigitTradeCount} trades)`;
-                    } else {
-                        phaseDescription = `Ready to trade overdue digits`;
-                    }
-                    phaseName = 'TRADING';
-                    phaseClass = 'phase-trading';
-                    break;
-            }
-            
-            progressElem.style.width = `${progress}%`;
-            phaseDescElem.textContent = phaseDescription;
-            phaseProgressElem.textContent = `${Math.round(progress)}%`;
-            phaseElem.textContent = phaseName;
-            phaseBadge.className = `ml-2 inline-flex items-center px-3 py-1 text-sm font-medium rounded-full ${phaseClass} text-white shadow-md`;
-            phaseBadge.textContent = `📊 ${phaseName}`;
-        }
-        
         // ============================================================================
-        // CORE BOT FUNCTIONS WITH ENHANCED WIN DETECTION (NO TRADING AFTER WIN)
+        // CORE BOT FUNCTIONS WITH REAL TRADING
         // ============================================================================
         
         // Global State
@@ -1551,7 +1359,7 @@
         window.synth = null;
         window.calculatorMinimized = false;
         
-        // Trading State - MODIFIED: No trading after win detection
+        // Trading State - REAL TRADING
         window.baseStake = 1.0;
         window.currentStake = 1.0;
         window.multiplier = 1.15;
@@ -1563,7 +1371,7 @@
         window.currentBalance = 0.0;
         window.netProfit = 0.0;
         
-        // Enhanced PnL Tracking
+        // Enhanced PnL Tracking - REAL VALUES
         window.pnlTracker = {
             totalInvestment: 0.0,
             totalPayout: 0.0,
@@ -1571,7 +1379,7 @@
             trades: []
         };
         
-        // Enhanced PnL Update - 5 seconds
+        // PnL Update - 5 seconds
         window.pnlUpdateInterval = null;
         window.pnlUpdateStartTime = 0;
         window.pnlUpdateDuration = 5000; // 5 seconds
@@ -1584,11 +1392,10 @@
             losses: 0
         };
         
-        // Execution State - MODIFIED: No trading after win
+        // Execution State - REAL TRADING with win detection stop
         window.lastTick = null;
         window.nextTradeAllowed = true;
-        window.stopAllTrading = false; // NEW: Stops ALL trading when win is detected
-        window.winDetected = false; // NEW: Track if win was detected
+        window.stopAllTrading = false; // Stops ALL trading when win is detected
         window.pendingProposals = new Map();
         window.executionLock = false;
         
@@ -1611,150 +1418,9 @@
         const metricTotalProfit = document.getElementById('metricTotalProfit');
         
         // ============================================================================
-        // INITIALIZATION
+        // TRADE STATUS UI FUNCTIONS
         // ============================================================================
         
-        // Initialize on DOM ready
-        document.addEventListener('DOMContentLoaded', () => {
-            console.log('🤖 Enhanced Bot initialized - NO TRADING AFTER WIN');
-            initializeToggleState();
-            
-            initializeAnalysis();
-            initializeDigitMatrix();
-            
-            setInterval(calculateRates, 1000);
-            startQueueProcessor();
-            
-            calculateMartingale();
-            
-            // Set up event listeners
-            document.getElementById('baseStake').addEventListener('change', syncCalculatorWithMain);
-            document.getElementById('multiplier').addEventListener('change', syncCalculatorWithMain);
-            document.getElementById('maxTrades').addEventListener('change', syncCalculatorWithMain);
-            
-            document.getElementById('calc_base_stake').addEventListener('change', () => {
-                document.getElementById('baseStake').value = document.getElementById('calc_base_stake').value;
-                syncCalculatorWithMain();
-            });
-            document.getElementById('calc_multiplier').addEventListener('change', () => {
-                document.getElementById('multiplier').value = document.getElementById('calc_multiplier').value;
-                syncCalculatorWithMain();
-            });
-            document.getElementById('calc_max_trades').addEventListener('change', () => {
-                document.getElementById('maxTrades').value = document.getElementById('calc_max_trades').value;
-                syncCalculatorWithMain();
-            });
-            
-            document.getElementById('analysisWindow').addEventListener('change', function() {
-                window.analysisConfig.windowSize = parseInt(this.value) || 30;
-                log(`📊 Analysis window updated to ${window.analysisConfig.windowSize} ticks`, 'SETTINGS');
-            });
-            
-            document.getElementById('confidenceThreshold').addEventListener('change', function() {
-                window.analysisConfig.confidenceThreshold = parseInt(this.value) || 65;
-                log(`🎯 Confidence threshold updated to ${window.analysisConfig.confidenceThreshold}%`, 'SETTINGS');
-            });
-            
-            log('🤖 ENHANCED Smart Overdue Digit Analyzer Ready', 'SYSTEM');
-            log('⚡ Using 1.15x incremental martingale strategy', 'SYSTEM');
-            log('🔒 Bot will lock onto overdue digit', 'SYSTEM');
-            log('🎯 WIN DETECTION: Bot will detect wins but NOT execute any trades', 'SYSTEM');
-            log('⏹️ NO trading after win detection - Only PnL updates for 5 seconds', 'SYSTEM');
-            
-            updatePnL();
-            resetTradeStatus();
-            
-            // Initialize calculator toggle button
-            const calculatorToggle = document.getElementById('calculatorToggle');
-            if (calculatorToggle) {
-                calculatorToggle.textContent = '−';
-            }
-            
-            // Initialize enhanced analysis toggle
-            const enhancedToggle = document.getElementById('enhancedAnalysisToggle');
-            if (enhancedToggle) {
-                enhancedToggle.textContent = '🔍 Enhanced Analysis: ON';
-            }
-        });
-        
-        // ============================================================================
-        // CALCULATOR MINIMIZE/MAXIMIZE FUNCTION
-        // ============================================================================
-        
-        function toggleCalculator() {
-            const calculatorContainer = document.getElementById('calculatorContainer');
-            const calculatorContent = document.getElementById('calculatorContent');
-            const calculatorToggle = document.getElementById('calculatorToggle');
-            
-            window.calculatorMinimized = !window.calculatorMinimized;
-            
-            if (window.calculatorMinimized) {
-                calculatorContainer.classList.add('calculator-minimized');
-                calculatorContent.style.display = 'none';
-                calculatorToggle.textContent = '+';
-                calculatorToggle.title = 'Expand calculator';
-            } else {
-                calculatorContainer.classList.remove('calculator-minimized');
-                calculatorContent.style.display = 'block';
-                calculatorToggle.textContent = '−';
-                calculatorToggle.title = 'Minimize calculator';
-            }
-        }
-        
-        // ============================================================================
-        // BOT START/STOP FUNCTIONS
-        // ============================================================================
-        
-        // Check for authentication token
-        function checkAuthToken() {
-            const token = localStorage.getItem('active_token') || localStorage.getItem('derivToken');
-            if (!token) {
-                log('⚠️ No API token found. Please authenticate first.', 'WARNING');
-                alert('No API token found. Please authenticate first.');
-                return false;
-            }
-            return true;
-        }
-        
-        // Initialize account toggle
-        function initializeToggleState() {
-            const token = localStorage.getItem('active_token');
-            const allAccounts = JSON.parse(localStorage.getItem('deriv_accounts')) || [];
-            
-            if (token && allAccounts.length > 0) {
-                const currentAccount = allAccounts.find(acc => acc.token === token);
-                if (currentAccount) {
-                    const isReal = !currentAccount.account.startsWith('VR');
-                    document.getElementById('accTypeToggle').checked = isReal;
-                    log(`Account: ${isReal ? 'REAL' : 'DEMO'} (${currentAccount.account})`, 'SYSTEM');
-                }
-            }
-        }
-        
-        // Switch account
-        function switchAccount() {
-            const isRealRequested = document.getElementById('accTypeToggle').checked;
-            const allAccounts = JSON.parse(localStorage.getItem('deriv_accounts')) || [];
-            
-            const targetAccount = allAccounts.find(acc => 
-                isRealRequested ? !acc.account.startsWith('VR') : acc.account.startsWith('VR')
-            );
-        
-            if (targetAccount) {
-                localStorage.setItem('active_token', targetAccount.token);
-                log(`Switched to ${isRealRequested ? 'REAL' : 'DEMO'} account`, 'SYSTEM');
-                
-                if (window.isBotRunning) {
-                    stopBot();
-                    setTimeout(() => startBot(), 1000);
-                }
-            } else {
-                alert(`No ${isRealRequested ? 'Real' : 'Demo'} account found`);
-                document.getElementById('accTypeToggle').checked = !isRealRequested;
-            }
-        }
-        
-        // ENHANCED TRADE STATUS UI FUNCTIONS
         function updateTradeStatus(status, result, action, type = 'normal') {
             tradeResultContainer.classList.remove('win-glow', 'trade-status-highlight');
             metricPreviousResult.textContent = result;
@@ -1762,7 +1428,7 @@
             
             switch(type) {
                 case 'win':
-                    metricTradeResult.textContent = 'WIN DETECTED 🎯';
+                    metricTradeResult.textContent = 'WIN 🎯';
                     metricTradeResult.className = 'text-xs font-bold text-green-400';
                     metricPreviousResult.className = 'text-sm font-bold text-green-400';
                     metricNextAction.className = 'text-sm font-bold text-green-300';
@@ -1809,18 +1475,13 @@
             document.getElementById('statWinRate').textContent = `${winRate}%`;
         }
         
-        // ENHANCED PnL UPDATE FUNCTIONS (5 seconds)
-        function startExtendedPnlUpdate(theoreticalPayout) {
+        // PnL UPDATE FUNCTIONS (5 seconds) - REAL VALUES
+        function startExtendedPnlUpdate() {
             window.pnlUpdateStartTime = Date.now();
             
             if (window.pnlUpdateInterval) {
                 clearInterval(window.pnlUpdateInterval);
             }
-            
-            // Add theoretical profit to PnL
-            const theoreticalProfit = theoreticalPayout - window.currentStake;
-            window.pnlTracker.totalPayout += theoreticalPayout;
-            window.netProfit = window.pnlTracker.totalPayout - window.pnlTracker.totalInvestment;
             
             updatePnL();
             
@@ -1835,21 +1496,12 @@
                     // Update display one last time
                     updatePnL();
                     
-                    // Reset win detection for next session
-                    window.winDetected = false;
-                    window.stopAllTrading = false;
-                    
-                    // Remove win detection styling
-                    const predictionContainer = document.getElementById('predictionContainer');
-                    predictionContainer.classList.remove('win-detection');
-                    
-                    // Update status
-                    updateTradeStatus(
-                        'READY',
-                        'Win detection complete - PnL updated',
-                        'Bot ready for next prediction',
-                        'normal'
-                    );
+                    // Stop bot after 5 seconds
+                    setTimeout(() => {
+                        if (window.isBotRunning) {
+                            stopBot();
+                        }
+                    }, 100);
                     
                 } else {
                     updatePnL();
@@ -1871,11 +1523,11 @@
             }, 100);
         }
         
-        // ENHANCED PnL UPDATE with bold colors
+        // PnL UPDATE with bold colors - REAL VALUES
         function updatePnL() {
             const pnlElem = document.getElementById('metricTotalProfit');
             
-            // Use theoretical PnL from tracker
+            // Use REAL PnL from tracker
             window.netProfit = window.pnlTracker.totalPayout - window.pnlTracker.totalInvestment;
             const formattedProfit = window.netProfit.toFixed(2);
             
@@ -1926,116 +1578,6 @@
             
             updatePnL();
             log('💰 PnL reset', 'PNL');
-        }
-        
-        // ============================================================================
-        // MARTINGALE CALCULATOR (1.15x)
-        // ============================================================================
-        
-        function calculateMartingale() {
-            try {
-                const baseStake = parseFloat(document.getElementById('calc_base_stake').value) || 1.0;
-                const multiplier = parseFloat(document.getElementById('calc_multiplier').value) || 1.15;
-                const maxTrades = parseInt(document.getElementById('calc_max_trades').value) || 10;
-                const bankrollLimit = parseFloat(document.getElementById('calc_bankroll_limit').value) || 50.0;
-                
-                if (baseStake <= 0 || multiplier <= 1.0 || maxTrades <= 0) {
-                    alert('Please enter valid values for calculation.');
-                    return;
-                }
-                
-                let currentStake = baseStake;
-                let totalRequired = 0;
-                let finalStake = baseStake;
-                let tradeSequence = [];
-                
-                for (let i = 1; i <= maxTrades; i++) {
-                    if (i === 1) {
-                        currentStake = baseStake;
-                    } else {
-                        currentStake *= multiplier;
-                    }
-                    
-                    currentStake = Math.round(currentStake * 100) / 100;
-                    totalRequired += currentStake;
-                    finalStake = currentStake;
-                    
-                    tradeSequence.push({
-                        trade: i,
-                        stake: currentStake.toFixed(2),
-                        cumulative: Math.round(totalRequired * 100) / 100
-                    });
-                }
-                
-                totalRequired = Math.round(totalRequired * 100) / 100;
-                const profitOnWin = (finalStake * 9) - totalRequired;
-                
-                // Update main inputs
-                document.getElementById('baseStake').value = baseStake.toFixed(2);
-                document.getElementById('multiplier').value = multiplier.toFixed(2);
-                document.getElementById('maxTrades').value = maxTrades;
-                
-                // Update display elements
-                document.getElementById('calc_total_required').textContent = `$${totalRequired.toFixed(2)}`;
-                document.getElementById('calc_final_stake').textContent = `$${finalStake.toFixed(2)}`;
-                document.getElementById('calc_profit_on_win').textContent = `$${profitOnWin.toFixed(2)}`;
-                
-                // Update bankroll status
-                const bankrollStatusElem = document.getElementById('calc_bankroll_status');
-                bankrollStatusElem.classList.remove('calculator-safe', 'calculator-warning', 'calculator-highlight');
-                
-                if (totalRequired <= bankrollLimit) {
-                    bankrollStatusElem.textContent = '✅ Within Limit';
-                    bankrollStatusElem.classList.add('calculator-safe');
-                } else if (totalRequired <= bankrollLimit * 1.2) {
-                    bankrollStatusElem.textContent = '⚠️ Close to Limit';
-                    bankrollStatusElem.classList.add('calculator-warning');
-                } else {
-                    bankrollStatusElem.textContent = '❌ Over Limit';
-                    bankrollStatusElem.classList.add('calculator-warning');
-                }
-                
-                // Display trade sequence
-                const tradeSequenceElem = document.getElementById('tradeSequence');
-                tradeSequenceElem.innerHTML = '';
-                
-                tradeSequence.forEach(item => {
-                    const status = item.cumulative <= bankrollLimit ? '✅' : '❌';
-                    const row = document.createElement('div');
-                    row.className = `grid grid-cols-4 gap-1 text-xs py-1 ${item.trade % 2 === 0 ? 'bg-gray-900/30' : ''}`;
-                    row.innerHTML = `
-                        <div class="text-gray-300">Trade ${item.trade}</div>
-                        <div class="text-green-400">$${item.stake}</div>
-                        <div class="text-blue-400">$${item.cumulative.toFixed(2)}</div>
-                        <div class="${status === '✅' ? 'text-green-400' : 'text-red-400'} font-bold">${status}</div>
-                    `;
-                    tradeSequenceElem.appendChild(row);
-                });
-                
-                // Add animation
-                document.getElementById('calc_total_required').classList.add('calculator-pulse');
-                setTimeout(() => {
-                    document.getElementById('calc_total_required').classList.remove('calculator-pulse');
-                }, 500);
-                
-                log(`🧮 1.15x Martingale: Total required: $${totalRequired.toFixed(2)} for ${maxTrades} trades`, 'CALCULATOR');
-                
-            } catch (error) {
-                console.error('Calculator error:', error);
-                alert('Error in calculation. Please check your inputs.');
-            }
-        }
-        
-        function syncCalculatorWithMain() {
-            const baseStake = parseFloat(document.getElementById('baseStake').value) || 1.0;
-            const multiplier = parseFloat(document.getElementById('multiplier').value) || 1.15;
-            const maxTrades = parseInt(document.getElementById('maxTrades').value) || 10;
-            
-            document.getElementById('calc_base_stake').value = baseStake.toFixed(2);
-            document.getElementById('calc_multiplier').value = multiplier.toFixed(2);
-            document.getElementById('calc_max_trades').value = maxTrades;
-            
-            calculateMartingale();
         }
         
         // ============================================================================
@@ -2125,7 +1667,7 @@
             document.getElementById('metricTickRate').textContent = `Ticks/sec: ${tickRate.toFixed(1)}`;
         }
         
-        // TICK HANDLER - MODIFIED: Only detect, no trading
+        // TICK HANDLER - REAL TRADING with win detection
         function handleTick(tick) {
             if (!window.isBotRunning) return;
             
@@ -2159,32 +1701,145 @@
             
             processTickForAnalysis(tick);
             
-            // Don't add to queue for trading - we're only detecting
-            // addTickToQueue(tickData);
+            // Add to queue for trading (if not stopped)
+            if (!window.stopAllTrading) {
+                addTickToQueue(tickData);
+            }
             
             playAudioFeedback('TICK');
         }
         
-        // Add tick to queue - NOT USED for trading
+        // Add tick to queue for trading
         function addTickToQueue(tick) {
-            // This function is disabled since we're not trading
+            window.tickQueue.push(tick);
+            if (window.tickQueue.length > window.maxQueueSize) {
+                window.tickQueue.shift();
+            }
+            
+            return true;
+        }
+        
+        // Check for immediate win detection
+        function checkForImmediateWin(tick) {
+            if (!window.isBotRunning || window.stopAllTrading) return false;
+            
+            const predictedDigit = getPredictedDigit();
+            const tickDigit = parseInt(tick.digit);
+            
+            if (tickDigit === predictedDigit) {
+                log(`🎯 WIN DETECTED! Digit ${tickDigit} matches predicted ${predictedDigit}`, 'WIN');
+                
+                // Stop all further trades immediately
+                window.stopAllTrading = true;
+                log(`⏹️ All further trades stopped. Current trade can complete.`, 'SYSTEM');
+                
+                return true;
+            }
+            
             return false;
         }
         
-        // Process tick for trading - DISABLED
+        // Process tick for trading - REAL TRADING
         function processTickImmediately(tick) {
-            // Trading is disabled - only win detection is active
-            return;
+            // Don't trade if win was detected
+            if (window.stopAllTrading) return;
+            
+            // Check for immediate win first
+            if (checkForImmediateWin(tick)) {
+                return;
+            }
+            
+            // Don't trade if analysis isn't ready yet
+            if (window.analysisState.phase < window.analysisConfig.phases.TRADING) {
+                return;
+            }
+            
+            if (window.tradeCount >= window.maxTrades) {
+                log(`🛑 Max trades reached (${window.maxTrades})`, 'CRITICAL');
+                updateTradeStatus('MAX TRADES', `Maximum trades reached (${window.maxTrades})`, 'Bot stopped', 'loss');
+                stopBot();
+                return;
+            }
+            
+            // Only trade if we have a locked digit OR high confidence prediction
+            const predictedDigit = getPredictedDigit();
+            const confidence = window.analysisState.predictionConfidence;
+            
+            if (window.analysisState.lockedDigit === null && confidence < window.analysisConfig.confidenceThreshold) {
+                return;
+            }
+            
+            window.executionLock = true;
+            window.nextTradeAllowed = false;
+            
+            try {
+                window.stats.tradesExecuted++;
+                window.tradeCount++;
+                
+                // Increment locked digit trade count
+                if (window.analysisState.lockedDigit === predictedDigit) {
+                    window.analysisState.lockedDigitTradeCount++;
+                }
+                
+                document.getElementById('metricTradeCount').textContent = window.tradeCount;
+                
+                log(`⚡ Trade #${window.tradeCount}: $${window.currentStake.toFixed(2)} on digit ${predictedDigit} (${confidence}% confidence)`, 'TRADE');
+                
+                updateTradeStatus(
+                    'TRADING',
+                    `Trade #${window.tradeCount}: $${window.currentStake.toFixed(2)} on digit ${predictedDigit}`,
+                    'Executing trade...',
+                    'trade'
+                );
+                
+                playAudioFeedback('EXECUTION');
+                executeTrade(tick);
+                
+            } catch (error) {
+                log(`❌ Error: ${error}`, 'ERROR');
+                window.executionLock = false;
+                window.nextTradeAllowed = true;
+                updateTradeStatus('ERROR', `Trade failed: ${error}`, 'Retrying...', 'loss');
+            }
         }
         
-        // Execute trade - DISABLED
+        // Execute trade - REAL TRADING
         function executeTrade(tick) {
-            // Trading is disabled
-            log('❌ TRADING DISABLED: Win detected, no trades will be executed', 'SYSTEM');
-            return;
+            const contractType = document.getElementById('contractType').value;
+            const symbol = document.getElementById('symbol').value;
+            const predictedDigit = getPredictedDigit();
+            
+            let stake = window.currentStake;
+            trackTradeInvestment(stake);
+            
+            const proposalRequest = {
+                proposal: 1,
+                amount: stake.toFixed(2),
+                basis: "stake",
+                contract_type: contractType,
+                currency: "USD",
+                duration: 1,
+                duration_unit: "t",
+                symbol: symbol,
+                barrier: predictedDigit.toString(),
+                req_id: getNextReqId()
+            };
+            
+            window.pendingProposals.set(proposalRequest.req_id, {
+                tick: tick,
+                stake: stake,
+                contractType: contractType,
+                predictedDigit: predictedDigit,
+                startTime: Date.now(),
+                tradeNumber: window.tradeCount,
+                martingaleStep: window.martingaleStep,
+                isLockedDigit: window.analysisState.lockedDigit === predictedDigit
+            });
+            
+            sendRequest(proposalRequest);
         }
         
-        // Update stake function - MODIFIED: Only for display
+        // Update stake function with 1.15x multiplier - REAL TRADING
         function updateStake(winOrLoss) {
             window.baseStake = parseFloat(document.getElementById('baseStake').value) || 1.0;
             window.multiplier = parseFloat(document.getElementById('multiplier').value) || 1.15;
@@ -2193,15 +1848,32 @@
             if (winOrLoss === 'win') {
                 window.martingaleStep = 0;
                 window.currentStake = window.baseStake;
-                log(`✅ WIN DETECTED! Theoretical reset stake: $${window.currentStake.toFixed(2)}`, 'WIN');
+                log(`✅ WIN! Reset stake: $${window.currentStake.toFixed(2)}`, 'WIN');
                 
-                // Display only - no actual trading
+                const payout = window.currentStake * 9;
+                trackTradePayout(payout);
+                log(`💰 Payout: $${payout.toFixed(2)}`, 'PNL');
+                
+                // Unlock digit after win
+                if (window.analysisState.lockedDigit !== null) {
+                    log(`🔓 Unlocking digit ${window.analysisState.lockedDigit} after win`, 'TRADE');
+                    window.analysisState.lockedDigit = null;
+                    window.analysisState.lockedDigitTradeCount = 0;
+                }
+                
+                // Start 5-second PnL update sequence
+                startExtendedPnlUpdate();
+                
                 updateTradeStatus(
-                    'WIN DETECTED 🎯',
-                    `Digit matched - Theoretical payout: $${(window.currentStake * 9).toFixed(2)}`,
-                    'No trade executed - Only PnL updating',
+                    'WIN 🎯',
+                    `WON! Digit matched - Payout: $${payout.toFixed(2)}`,
+                    'PnL updating for 5 seconds...',
                     'win'
                 );
+                
+                // Stop all trading after win
+                window.stopAllTrading = true;
+                log(`⏹️ All further trades stopped after win.`, 'SYSTEM');
                 
             } else if (winOrLoss === 'loss') {
                 window.martingaleStep++;
@@ -2215,12 +1887,12 @@
                 
                 const newStake = window.currentStake * window.multiplier;
                 window.currentStake = parseFloat(newStake.toFixed(2));
-                log(`❌ LOSS. Theoretical next stake: $${window.currentStake.toFixed(2)} (Step: ${window.martingaleStep})`, 'LOSS');
+                log(`❌ LOSS. Next stake: $${window.currentStake.toFixed(2)} (Step: ${window.martingaleStep})`, 'LOSS');
                 
                 updateTradeStatus(
                     'LOSS ❌',
-                    `Theoretical loss - Next: $${window.currentStake.toFixed(2)}`,
-                    'Theoretical stake increase (1.15x)',
+                    `Lost - Next: $${window.currentStake.toFixed(2)}`,
+                    'Increasing stake (1.15x)',
                     'loss'
                 );
                 
@@ -2230,12 +1902,30 @@
                 window.martingaleStep = 0;
                 window.currentStake = window.baseStake;
                 log(`Starting. Base stake: $${window.currentStake.toFixed(2)}`, 'SYSTEM');
-                updateTradeStatus('STARTING', `Base stake: $${window.currentStake.toFixed(2)}`, 'Detecting wins only', 'normal');
+                updateTradeStatus('STARTING', `Base stake: $${window.currentStake.toFixed(2)}`, 'Waiting for trades', 'normal');
             }
             
             const stakeElem = document.getElementById('metricCurrentStake');
             stakeElem.textContent = `$${window.currentStake.toFixed(2)}`;
             stakeElem.className = 'text-lg font-bold text-white';
+        }
+        
+        // Get predicted digit for trading
+        function getPredictedDigit() {
+            // Always use locked digit if available
+            if (window.analysisState.lockedDigit !== null) {
+                return window.analysisState.lockedDigit;
+            }
+            
+            // Enhanced prediction logic
+            if (window.analysisState.currentPrediction !== null && 
+                window.analysisState.predictionConfidence >= window.analysisConfig.confidenceThreshold &&
+                window.analysisState.overdueIndex > 50) {
+                return window.analysisState.currentPrediction;
+            }
+            
+            // Default fallback
+            return 5;
         }
         
         // ============================================================================
@@ -2261,16 +1951,17 @@
             initializeAnalysis();
             
             window.isBotRunning = true;
+            window.stopAllTrading = false; // Reset trading stop flag
             updateButtonState();
             
-            log('🚀 Starting WIN DETECTION BOT (NO TRADING)...', 'SYSTEM');
-            log(`📊 Will analyze ${window.analysisConfig.windowSize} ticks for prediction`, 'SYSTEM');
-            log(`🎯 Detecting wins only with ≥${window.analysisConfig.confidenceThreshold}% confidence`, 'SYSTEM');
-            log(`⚡ Using 1.15x martingale for theoretical calculations only`, 'SYSTEM');
-            log(`🎯 WIN DETECTION: Bot will detect wins but NOT execute any trades`, 'SYSTEM');
-            log(`⏹️ NO trading after win detection - Only PnL updates for 5 seconds`, 'SYSTEM');
+            log('🚀 Starting REAL TRADING BOT with Win Detection...', 'SYSTEM');
+            log(`📊 Will analyze ${window.analysisConfig.windowSize} ticks before trading`, 'SYSTEM');
+            log(`🎯 Trading only with ≥${window.analysisConfig.confidenceThreshold}% confidence`, 'SYSTEM');
+            log(`⚡ Using 1.15x incremental martingale`, 'SYSTEM');
+            log(`🎯 WIN DETECTION: Bot will detect wins and STOP all further trades`, 'SYSTEM');
+            log(`⏹️ No trades after win detection - PnL updates for 5 seconds then stops`, 'SYSTEM');
             
-            updateTradeStatus('STARTING', 'Initializing win detection engine...', 'Collecting market data', 'normal');
+            updateTradeStatus('STARTING', 'Initializing trading engine...', 'Collecting market data', 'normal');
             updateStake('initial');
             initTone();
             connectWebSocket();
@@ -2288,8 +1979,7 @@
             
             window.isBotRunning = false;
             window.nextTradeAllowed = false;
-            window.stopAllTrading = false;
-            window.winDetected = false;
+            window.stopAllTrading = false; // Reset for next session
             updateButtonState();
             
             log('⏹️ Bot stopped', 'SYSTEM');
@@ -2314,10 +2004,6 @@
                 window.analysisState.lockedDigitTradeCount = 0;
             }
             
-            // Remove win detection styling
-            const predictionContainer = document.getElementById('predictionContainer');
-            predictionContainer.classList.remove('win-detection');
-            
             // Re-enable controls
             document.querySelectorAll('#symbol, #contractType, #baseStake, #maxTrades, #multiplier, #analysisWindow, #confidenceThreshold').forEach(control => {
                 control.disabled = false;
@@ -2337,15 +2023,6 @@
             );
             
             updateStatistics();
-        }
-        
-        // Toggle bot
-        function toggleBot() {
-            if (window.isBotRunning) {
-                stopBot();
-            } else {
-                startBot();
-            }
         }
         
         // ============================================================================
@@ -2453,10 +2130,16 @@
             }
         }
         
-        // QUEUE PROCESSOR - DISABLED (no trading)
+        // QUEUE PROCESSOR - REAL TRADING
         function startQueueProcessor() {
-            // Queue processing disabled since we're not trading
-            return;
+            setInterval(() => {
+                if (!window.isBotRunning || window.stopAllTrading) return;
+                
+                while (window.tickQueue.length > 0 && !window.executionLock && window.nextTradeAllowed) {
+                    const tick = window.tickQueue.shift();
+                    processTickImmediately(tick);
+                }
+            }, 50);
         }
         
         function sendRequest(request) {
@@ -2472,7 +2155,7 @@
             return ++window.req_id;
         }
         
-        // API RESPONSE HANDLER
+        // API RESPONSE HANDLER - REAL TRADING
         function handleAPIResponse(data) {
             if (data.error) {
                 log(`API Error: ${data.error.message}`, 'ERROR');
@@ -2492,9 +2175,9 @@
             } else if (data.msg_type === 'tick') {
                 handleTick(data.tick);
             } else if (data.msg_type === 'proposal') {
-                // Proposal responses disabled (no trading)
+                handleProposalResponse(data.proposal, data.req_id);
             } else if (data.msg_type === 'buy') {
-                // Buy responses disabled (no trading)
+                handleBuyResponse(data.buy);
             } else if (data.msg_type === 'balance') {
                 handleBalanceUpdate(data.balance);
             }
@@ -2528,6 +2211,78 @@
             log(`✅ Subscribed to ${symbol} ticks`, 'SYSTEM');
         }
         
+        function handleProposalResponse(proposal, req_id) {
+            if (!proposal || !proposal.id) {
+                log(`❌ Proposal failed`, 'ERROR');
+                updateTradeStatus('ERROR', 'Proposal failed', 'Retrying...', 'loss');
+                return;
+            }
+        
+            const pending = window.pendingProposals.get(req_id);
+            if (!pending) return;
+        
+            window.pendingProposals.delete(req_id);
+            executeBuy(proposal.id, proposal.ask_price, pending);
+        }
+        
+        function executeBuy(proposal_id, ask_price, pending) {
+            const buyRequest = {
+                buy: proposal_id,
+                price: ask_price,
+                req_id: getNextReqId()
+            };
+            
+            log(`✅ Buying: $${pending.stake.toFixed(2)} on digit ${pending.predictedDigit}`, 'TRADE');
+            
+            window.pendingProposals.set(buyRequest.req_id, {
+                ...pending,
+                proposal_id: proposal_id,
+                buyStartTime: Date.now()
+            });
+            
+            sendRequest(buyRequest);
+        }
+        
+        function handleBuyResponse(buyData) {
+            if (buyData.contract_id) {
+                log(`✅ Trade executed successfully`, 'TRADE');
+                
+                const wasWin = buyData.longcode && buyData.longcode.includes("win");
+                
+                updateStake(wasWin ? 'win' : 'loss');
+                onTradeComplete(true);
+            } else {
+                log(`❌ Trade failed`, 'ERROR');
+                updateTradeStatus('ERROR', 'Trade execution failed', 'Retrying...', 'loss');
+                onTradeComplete(false);
+            }
+        }
+        
+        function onTradeComplete(isSuccess = true) {
+            window.executionLock = false;
+            
+            // Only allow next trade if win wasn't detected
+            if (!window.stopAllTrading) {
+                window.nextTradeAllowed = true;
+            }
+            
+            if (!isSuccess) {
+                updateStake('loss');
+            }
+            
+            // Don't check for max trades if win was detected (trading is stopped)
+            if (window.stopAllTrading) {
+                return;
+            }
+            
+            if (window.tradeCount >= window.maxTrades) {
+                log(`🛑 Max trades reached (${window.maxTrades})`, 'CRITICAL');
+                updateTradeStatus('MAX TRADES', `Maximum trades reached (${window.maxTrades})`, 'Bot stopped', 'loss');
+                stopBot();
+                return;
+            }
+        }
+        
         // Reset all state
         function resetAllState() {
             window.maxTrades = parseInt(document.getElementById('maxTrades').value) || 10;
@@ -2558,15 +2313,65 @@
             window.executionLock = false;
             window.waitingForTradeResult = false;
             window.nextTradeAllowed = true;
-            window.stopAllTrading = false;
-            window.winDetected = false;
+            window.stopAllTrading = false; // Reset trading stop flag
             
             const logArea = document.getElementById('log-area');
-            logArea.innerHTML = '[00:00:00] 🤖 WIN DETECTION BOT reset. Ready.';
+            logArea.innerHTML = '[00:00:00] 🤖 REAL TRADING BOT reset. Ready.';
             
-            log('🔄 Win detection bot reset', 'SYSTEM');
+            log('🔄 Real trading bot reset', 'SYSTEM');
             updateStatistics();
         }
+        
+        // Initialize on DOM ready
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log('🤖 Real Trading Bot initialized with Win Detection');
+            initializeToggleState();
+            
+            initializeAnalysis();
+            initializeDigitMatrix();
+            
+            setInterval(calculateRates, 1000);
+            startQueueProcessor();
+            
+            calculateMartingale();
+            
+            // Set up event listeners
+            document.getElementById('baseStake').addEventListener('change', syncCalculatorWithMain);
+            document.getElementById('multiplier').addEventListener('change', syncCalculatorWithMain);
+            document.getElementById('maxTrades').addEventListener('change', syncCalculatorWithMain);
+            
+            document.getElementById('calc_base_stake').addEventListener('change', () => {
+                document.getElementById('baseStake').value = document.getElementById('calc_base_stake').value;
+                syncCalculatorWithMain();
+            });
+            document.getElementById('calc_multiplier').addEventListener('change', () => {
+                document.getElementById('multiplier').value = document.getElementById('calc_multiplier').value;
+                syncCalculatorWithMain();
+            });
+            document.getElementById('calc_max_trades').addEventListener('change', () => {
+                document.getElementById('maxTrades').value = document.getElementById('calc_max_trades').value;
+                syncCalculatorWithMain();
+            });
+            
+            document.getElementById('analysisWindow').addEventListener('change', function() {
+                window.analysisConfig.windowSize = parseInt(this.value) || 30;
+                log(`📊 Analysis window updated to ${window.analysisConfig.windowSize} ticks`, 'SETTINGS');
+            });
+            
+            document.getElementById('confidenceThreshold').addEventListener('change', function() {
+                window.analysisConfig.confidenceThreshold = parseInt(this.value) || 65;
+                log(`🎯 Confidence threshold updated to ${window.analysisConfig.confidenceThreshold}%`, 'SETTINGS');
+            });
+            
+            log('🤖 REAL TRADING BOT with Win Detection Ready', 'SYSTEM');
+            log('⚡ Using 1.15x incremental martingale strategy', 'SYSTEM');
+            log('🔒 Bot will lock onto overdue digit and trade until win', 'SYSTEM');
+            log('🎯 WIN DETECTION: Bot will detect wins and STOP all further trades', 'SYSTEM');
+            log('⏹️ No trades after win detection - PnL updates for 5 seconds then stops', 'SYSTEM');
+            
+            updatePnL();
+            resetTradeStatus();
+        });
     </script>
 </body>
 </html>
