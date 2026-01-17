@@ -3,746 +3,660 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-    <title>DIGITMATCHSTARv2 | Professional Trading Bot</title>
+    <title>Deriv DigitMatchStar Bot</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
     <style>
-        /* Enhanced Professional Styles */
-        body { 
-            font-family: 'Inter', 'SF Pro Display', -apple-system, BlinkMacSystemFont, sans-serif; 
-            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
-            min-height: 100vh;
-        }
-        
-        .glass-effect {
-            background: rgba(30, 41, 59, 0.7);
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-        }
-        
-        .professional-card {
-            background: linear-gradient(145deg, rgba(30, 41, 59, 0.9), rgba(15, 23, 42, 0.9));
-            border: 1px solid rgba(56, 189, 248, 0.2);
-            border-radius: 16px;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
-        }
-        
-        .gradient-primary {
-            background: linear-gradient(135deg, #7c3aed 0%, #4f46e5 50%, #3b82f6 100%);
-        }
-        
-        .gradient-success {
-            background: linear-gradient(135deg, #10b981 0%, #059669 50%, #047857 100%);
-        }
-        
-        .gradient-warning {
-            background: linear-gradient(135deg, #f59e0b 0%, #d97706 50%, #b45309 100%);
-        }
-        
-        .gradient-danger {
-            background: linear-gradient(135deg, #ef4444 0%, #dc2626 50%, #b91c1c 100%);
-        }
-        
-        .gradient-info {
-            background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 50%, #0369a1 100%);
-        }
-        
-        /* Enhanced Win Glow Effect */
-        @keyframes professional-win-glow {
+        #log-area::-webkit-scrollbar { width: 4px; }
+        #log-area::-webkit-scrollbar-thumb { background: #4ade80; border-radius: 2px; }
+        #log-area::-webkit-scrollbar-track { background: #374151; }
+        body { font-family: 'Inter', sans-serif; background-color: #111827; }
+        @keyframes pulse-once { 0% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.03); opacity: 0.9; } 100% { transform: scale(1); opacity: 1; } }
+        .tick-flash { animation: pulse-once 0.1s ease-out; }
+        @keyframes win-pulse { 
             0% { 
-                box-shadow: 0 0 10px #10B981, 
-                           0 0 20px rgba(16, 185, 129, 0.5),
-                           0 0 30px rgba(16, 185, 129, 0.3);
-                transform: scale(1);
-            }
+                box-shadow: 0 0 5px #10B981, 0 0 10px rgba(16, 185, 129, 0.5); 
+                border-color: #10B981;
+                background: linear-gradient(135deg, rgba(16, 185, 129, 0.1), rgba(16, 185, 129, 0.2)) !important;
+            } 
             50% { 
-                box-shadow: 0 0 40px #10B981, 
-                           0 0 80px rgba(16, 185, 129, 0.8),
-                           0 0 120px rgba(16, 185, 129, 0.5);
-                transform: scale(1.02);
-            }
+                box-shadow: 0 0 30px #10B981, 0 0 50px rgba(16, 185, 129, 0.8); 
+                border-color: #34d399;
+                background: linear-gradient(135deg, rgba(16, 185, 129, 0.3), rgba(16, 185, 129, 0.4)) !important;
+            } 
             100% { 
-                box-shadow: 0 0 10px #10B981, 
-                           0 0 20px rgba(16, 185, 129, 0.5),
-                           0 0 30px rgba(16, 185, 129, 0.3);
-                transform: scale(1);
-            }
+                box-shadow: 0 0 5px #10B981, 0 0 10px rgba(16, 185, 129, 0.5); 
+                border-color: #10B981;
+                background: linear-gradient(135deg, rgba(16, 185, 129, 0.1), rgba(16, 185, 129, 0.2)) !important;
+            } 
         }
-        
-        .win-glow-effect {
-            animation: professional-win-glow 1.5s infinite;
-            border-color: #10B981 !important;
+        .win-glow {
+            animation: win-pulse 1s infinite;
         }
-        
-        /* Digit Match Flash */
-        @keyframes digit-match-flash {
-            0% { background-color: #10B981; transform: scale(1); }
-            50% { background-color: #34d399; transform: scale(1.2); }
-            100% { background-color: #10B981; transform: scale(1); }
+        .pnl-update-animation {
+            animation: pnl-pulse 0.5s ease-in-out;
         }
-        
-        .digit-match-flash {
-            animation: digit-match-flash 0.5s ease-out;
+        @keyframes pnl-pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+            100% { transform: scale(1); }
         }
-        
-        /* Pulse Animation for Trading */
-        @keyframes trading-pulse {
-            0% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.7); }
-            70% { box-shadow: 0 0 0 10px rgba(59, 130, 246, 0); }
-            100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); }
-        }
-        
-        .trading-pulse {
-            animation: trading-pulse 2s infinite;
-        }
-        
-        /* Professional Badge */
-        .professional-badge {
-            background: linear-gradient(135deg, #8b5cf6, #7c3aed);
-            color: white;
-            padding: 4px 12px;
-            border-radius: 20px;
-            font-size: 11px;
-            font-weight: 700;
-            letter-spacing: 0.5px;
-            text-transform: uppercase;
-            border: 1px solid rgba(255, 255, 255, 0.2);
-        }
-        
-        /* Enhanced Stats Cards */
-        .stat-card {
-            background: rgba(30, 41, 59, 0.6);
-            border: 1px solid rgba(255, 255, 255, 0.1);
+        .contract-type-badge {
+            display: inline-block;
+            padding: 2px 8px;
             border-radius: 12px;
-            transition: all 0.3s ease;
+            font-size: 10px;
+            font-weight: bold;
+            margin-left: 5px;
         }
-        
-        .stat-card:hover {
-            transform: translateY(-2px);
-            border-color: rgba(56, 189, 248, 0.3);
-            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.2);
+        .stop-button-active {
+            background-color: #dc2626 !important;
+            border: 2px solid #fca5a5 !important;
+            animation: pulse-once 0.5s infinite;
         }
-        
-        /* Professional Inputs */
-        .pro-input {
-            background: rgba(15, 23, 42, 0.7);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 8px;
-            color: white;
-            transition: all 0.3s ease;
+        .start-button-active {
+            background-color: #16a34a !important;
+            border: 2px solid #86efac !important;
+            animation: pulse-once 0.5s;
         }
-        
-        .pro-input:focus {
-            border-color: #3b82f6;
-            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
-            outline: none;
+        .analysis-active {
+            border: 2px solid #00ffea !important;
+            box-shadow: 0 0 10px rgba(0, 255, 234, 0.3) !important;
         }
-        
-        /* Enhanced Button */
-        .pro-button {
-            background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
-            color: white;
-            font-weight: 600;
-            padding: 10px 24px;
-            border-radius: 10px;
-            border: none;
-            transition: all 0.3s ease;
-            position: relative;
-            overflow: hidden;
+        .analysis-complete {
+            border: 2px solid #10b981 !important;
+            background-color: #064e3b20 !important;
         }
-        
-        .pro-button:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 10px 25px rgba(59, 130, 246, 0.3);
+        .connection-badge-connected {
+            background: linear-gradient(90deg, #10b981, #059669) !important;
         }
-        
-        .pro-button:active {
-            transform: translateY(0);
+        .connection-badge-disconnected {
+            background: linear-gradient(90deg, #dc2626, #b91c1c) !important;
         }
-        
-        /* Professional Toggle */
-        .pro-toggle {
+        .connection-badge-connecting {
+            background: linear-gradient(90deg, #f59e0b, #d97706) !important;
+        }
+        /* Account Toggle */
+        .account-toggle-container {
+            display: inline-flex;
+            align-items: center;
+            margin-left: 15px;
+            background: rgba(0, 0, 0, 0.3);
+            padding: 2px 10px;
+            border-radius: 20px;
+        }
+        .account-toggle {
             position: relative;
             display: inline-block;
-            width: 60px;
-            height: 30px;
+            width: 44px;
+            height: 22px;
+            margin: 0 8px;
         }
-        
-        .pro-toggle input {
+        .account-toggle input {
             opacity: 0;
             width: 0;
             height: 0;
         }
-        
-        .pro-toggle-slider {
+        .account-toggle-slider {
             position: absolute;
             cursor: pointer;
             top: 0;
             left: 0;
             right: 0;
             bottom: 0;
-            background: linear-gradient(135deg, #475569, #334155);
+            background-color: #1e40af;
             border-radius: 34px;
             transition: .4s;
         }
-        
-        .pro-toggle-slider:before {
+        .account-toggle-slider:before {
             position: absolute;
             content: "";
-            height: 22px;
-            width: 22px;
-            left: 4px;
-            bottom: 4px;
-            background: linear-gradient(135deg, #ffffff, #f1f5f9);
+            height: 16px;
+            width: 16px;
+            left: 3px;
+            bottom: 3px;
+            background-color: white;
             border-radius: 50%;
             transition: .4s;
-            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
         }
-        
-        input:checked + .pro-toggle-slider {
-            background: linear-gradient(135deg, #10b981, #059669);
+        input:checked + .account-toggle-slider {
+            background-color: #059669;
         }
-        
-        input:checked + .pro-toggle-slider:before {
-            transform: translateX(30px);
+        input:checked + .account-toggle-slider:before {
+            transform: translateX(22px);
         }
-        
-        /* Enhanced Progress Bar */
-        .pro-progress {
-            height: 8px;
-            border-radius: 4px;
-            background: rgba(255, 255, 255, 0.1);
-            overflow: hidden;
-        }
-        
-        .pro-progress-bar {
-            height: 100%;
-            border-radius: 4px;
-            background: linear-gradient(90deg, #3b82f6, #8b5cf6);
-            transition: width 0.3s ease;
-        }
-        
-        /* Professional Table */
-        .pro-table {
-            background: rgba(15, 23, 42, 0.7);
-            border-radius: 12px;
-            overflow: hidden;
-            border: 1px solid rgba(255, 255, 255, 0.1);
-        }
-        
-        .pro-table th {
-            background: rgba(30, 41, 59, 0.9);
-            color: #94a3b8;
-            font-weight: 600;
-            padding: 12px 16px;
-            text-transform: uppercase;
-            font-size: 11px;
-            letter-spacing: 0.5px;
-        }
-        
-        .pro-table td {
-            padding: 12px 16px;
-            border-top: 1px solid rgba(255, 255, 255, 0.05);
-        }
-        
-        /* Enhanced Log Area */
-        #log-area {
-            background: rgba(15, 23, 42, 0.8);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 12px;
-            font-family: 'JetBrains Mono', 'SF Mono', Monaco, monospace;
-            font-size: 11px;
-            line-height: 1.5;
-            max-height: 400px;
-            overflow-y: auto;
-        }
-        
-        /* Connection Status */
-        .connection-badge {
-            padding: 6px 16px;
-            border-radius: 20px;
-            font-weight: 600;
+        .account-label {
             font-size: 12px;
-            letter-spacing: 0.5px;
-            text-transform: uppercase;
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            border: 1px solid transparent;
+            font-weight: 600;
         }
-        
-        .connection-connected {
-            background: linear-gradient(135deg, #10b981, #059669);
-            border-color: rgba(16, 185, 129, 0.3);
-            box-shadow: 0 4px 15px rgba(16, 185, 129, 0.2);
-        }
-        
-        .connection-disconnected {
-            background: linear-gradient(135deg, #ef4444, #dc2626);
-            border-color: rgba(239, 68, 68, 0.3);
-        }
-        
-        .connection-connecting {
-            background: linear-gradient(135deg, #f59e0b, #d97706);
-            border-color: rgba(245, 158, 11, 0.3);
-            animation: pulse-once 1s infinite;
-        }
-        
-        /* Profit/Loss Colors */
-        .profit-positive {
-            color: #10b981;
-            font-weight: 700;
-            text-shadow: 0 0 10px rgba(16, 185, 129, 0.3);
-        }
-        
-        .profit-negative {
-            color: #ef4444;
-            font-weight: 700;
-            text-shadow: 0 0 10px rgba(239, 68, 68, 0.3);
-        }
-        
-        /* Bold Green PnL */
-        .profit-bold-green {
-            color: #10b981;
-            font-weight: 900;
-            font-size: 3rem;
-            text-shadow: 0 0 20px rgba(16, 185, 129, 0.5),
-                         0 0 40px rgba(16, 185, 129, 0.3),
-                         0 0 60px rgba(16, 185, 129, 0.2);
-            letter-spacing: -0.5px;
-        }
-        
-        /* Martingale Level Indicator */
-        .martingale-level {
-            display: inline-block;
-            padding: 4px 12px;
-            border-radius: 20px;
-            font-size: 11px;
-            font-weight: 700;
-            background: rgba(59, 130, 246, 0.2);
+        .account-label-demo {
             color: #3b82f6;
-            border: 1px solid rgba(59, 130, 246, 0.3);
         }
-        
-        /* Tick Digit Display */
-        .tick-digit {
-            width: 48px;
-            height: 48px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            border-radius: 12px;
-            font-size: 24px;
-            font-weight: 800;
-            background: linear-gradient(135deg, #1e40af, #1d4ed8);
-            color: white;
-            border: 2px solid rgba(255, 255, 255, 0.2);
-            box-shadow: 0 4px 15px rgba(30, 64, 175, 0.3);
+        .account-label-real {
+            color: #10b981;
         }
-        
-        /* Win Celebration */
-        .win-celebration {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            pointer-events: none;
-            z-index: 1000;
-            opacity: 0;
+        .profit-positive {
+            color: #10b981 !important;
+            font-weight: bold !important;
         }
-        
-        .confetti {
-            position: absolute;
-            width: 10px;
-            height: 20px;
-            background: linear-gradient(45deg, #10b981, #34d399, #a7f3d0);
-            opacity: 0.8;
+        .profit-negative {
+            color: #ef4444 !important;
+            font-weight: bold !important;
         }
-        
-        /* Collapsible calculator styles */
-        .collapsible-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            cursor: pointer;
+        .profit-neutral {
+            color: #d1d5db !important;
+            font-weight: bold !important;
         }
-        
-        .collapsible-content {
-            overflow: hidden;
-            transition: max-height 0.3s ease-out;
+        .session-digit-locked {
+            background: linear-gradient(135deg, #1e3a8a, #1e40af) !important;
+            border: 2px solid #3b82f6 !important;
+            color: white !important;
         }
-        
-        .collapsible-content.collapsed {
-            max-height: 0;
+        .status-win {
+            color: #10b981 !important;
+            font-weight: bold !important;
+            text-shadow: 0 0 10px rgba(16, 185, 129, 0.5);
         }
-        
-        .collapsible-content.expanded {
-            max-height: 1000px;
+        .status-loss {
+            color: #ef4444 !important;
+            font-weight: bold !important;
         }
-        
-        .collapse-icon {
-            transition: transform 0.3s ease;
+        .status-trade {
+            color: #f59e0b !important;
+            font-weight: bold !important;
         }
-        
-        .collapse-icon.rotated {
-            transform: rotate(180deg);
+        /* Calculator Styles */
+        .calculator-highlight {
+            background: linear-gradient(135deg, #7c3aed, #8b5cf6) !important;
+            border: 1px solid #a78bfa !important;
+            color: white !important;
         }
-        
-        /* Scrollable calculator table */
-        .calculator-table-container {
-            max-height: 400px;
-            overflow-y: auto;
-            border-radius: 8px;
-            margin-bottom: 1rem;
+        .calculator-warning {
+            background: linear-gradient(135deg, #dc2626, #ef4444) !important;
+            border: 1px solid #f87171 !important;
+            color: white !important;
         }
-        
-        /* Custom scrollbar */
-        .calculator-table-container::-webkit-scrollbar {
-            width: 6px;
+        .calculator-safe {
+            background: linear-gradient(135deg, #059669, #10b981) !important;
+            border: 1px solid #34d399 !important;
+            color: white !important;
         }
-        
-        .calculator-table-container::-webkit-scrollbar-track {
-            background: rgba(15, 23, 42, 0.5);
-            border-radius: 3px;
+        @keyframes calculator-pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.02); }
+            100% { transform: scale(1); }
         }
-        
-        .calculator-table-container::-webkit-scrollbar-thumb {
-            background: linear-gradient(135deg, #3b82f6, #8b5cf6);
-            border-radius: 3px;
+        .calculator-pulse {
+            animation: calculator-pulse 0.5s ease-out;
+        }
+        .balance-green {
+            color: #10b981 !important;
+            font-weight: bold !important;
+        }
+        .network-recovery-badge {
+            background: linear-gradient(90deg, #f59e0b, #d97706) !important;
+            animation: pulse-once 0.8s infinite;
         }
     </style>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght300;400;500;600;700;800&display=swap" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght300;400;500&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght400;600;700&display=swap" rel="stylesheet">
 </head>
 <body class="min-h-screen p-4 sm:p-8 flex items-start justify-center">
 
-    <!-- Win Celebration Overlay -->
-    <div id="winCelebration" class="win-celebration"></div>
-
-    <div class="w-full max-w-7xl">
-        <!-- Header -->
-        <div class="professional-card p-6 mb-6">
-            <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                <div>
-                    <h1 class="text-3xl font-bold bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent">
-                        DIGITMATCHSTARv2
-                    </h1>
-                    <p class="text-gray-400 text-sm mt-1">First Tick Martingale System • Professional Trading Bot</p>
+    <div class="w-full max-w-6xl bg-gray-800 text-gray-100 shadow-2xl rounded-xl p-5 md:p-6">
+        <div class="flex justify-between items-center mb-4">
+            <h1 class="text-3xl font-extrabold text-green-400 border-b border-gray-700 pb-2">
+                DigitMatchStar Bot 
+                <span id="status-badge" class="ml-3 inline-flex items-center px-3 py-1 text-sm font-medium rounded-full connection-badge-disconnected text-white shadow-md">
+                    🔴 DISCONNECTED
+                </span>
+                <span id="contract-type-badge" class="contract-type-badge bg-purple-600 text-white">DIGITMATCH</span>
+                <!-- Network Recovery Badge -->
+                <span id="network-recovery-badge" class="ml-2 inline-flex items-center px-3 py-1 text-sm font-medium rounded-full hidden network-recovery-badge text-white shadow-md">
+                    🔄 AUTO-RECOVER
+                </span>
+                <!-- Account toggle -->
+                <div class="account-toggle-container ml-3">
+                    <span class="account-label account-label-demo">DEMO</span>
+                    <label class="account-toggle">
+                        <input type="checkbox" id="accTypeToggle" onchange="switchAccount()">
+                        <span class="account-toggle-slider"></span>
+                    </label>
+                    <span class="account-label account-label-real">REAL</span>
                 </div>
-                
-                <div class="flex flex-wrap items-center gap-3">
-                    <div class="connection-badge connection-disconnected" id="status-badge">
-                        <span class="w-2 h-2 rounded-full bg-white"></span>
-                        DISCONNECTED
-                    </div>
-                    
-                    <div class="professional-badge gradient-primary">
-                        FIRST TICK
-                    </div>
-                    
-                    <div class="flex items-center gap-3">
-                        <label class="flex items-center gap-2 text-sm text-gray-300">
-                            <span>DEMO</span>
-                            <label class="pro-toggle">
-                                <input type="checkbox" id="accTypeToggle" onchange="switchAccount()">
-                                <span class="pro-toggle-slider"></span>
-                            </label>
-                            <span>REAL</span>
-                        </label>
-                        
-                        <button id="soundToggle" onclick="toggleSound()" 
-                            class="px-4 py-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-300 text-sm font-medium transition">
-                            Sound
-                        </button>
-                    </div>
-                </div>
+            </h1>
+            <div class="flex items-center space-x-2">
+                <button id="soundToggle" onclick="toggleSound()" 
+                    class="px-4 py-2 bg-blue-600 text-white font-bold rounded-lg shadow hover:bg-blue-700 transition">
+                    🔊 Sound ON
+                </button>
+                <!-- Network Recovery Toggle -->
+                <button id="networkRecoveryToggle" onclick="toggleNetworkRecovery()" 
+                    class="px-4 py-2 bg-yellow-600 text-white font-bold rounded-lg shadow hover:bg-yellow-700 transition">
+                    🔄 Auto-Recovery: ON
+                </button>
             </div>
         </div>
-
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <!-- Left Column: Bot Status & Control Panel -->
-            <div class="lg:col-span-2 space-y-6">
-                <!-- Bot Status Panel -->
-                <div class="professional-card p-6">
-                    <h2 class="text-xl font-bold text-white mb-4 flex items-center gap-2">
-                        Bot Status & Control
+        
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+            <!-- LEFT COLUMN: SIMPLIFIED MARKET STATUS -->
+            <div class="lg:col-span-1">
+                <div class="bg-gray-900 border border-gray-700 rounded-xl p-4 shadow-lg">
+                    <h2 class="text-lg font-bold text-cyan-400 mb-4 pb-2 border-b border-gray-700">
+                        📊 MARKET STATUS
                     </h2>
                     
-                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-                        <div class="stat-card p-4">
-                            <div class="text-gray-400 text-sm mb-1">Bot Status</div>
-                            <div id="botStatus" class="text-lg font-bold text-green-400">STOPPED</div>
-                            <div id="botSubStatus" class="text-xs text-gray-400 mt-1">Ready to start</div>
-                        </div>
-                        
-                        <div class="stat-card p-4">
-                            <div class="text-gray-400 text-sm mb-1">Strategy Mode</div>
-                            <div class="text-lg font-bold text-purple-400">First Tick</div>
-                            <div class="text-xs text-gray-400 mt-1">Digit Match System</div>
-                        </div>
-                        
-                        <div class="stat-card p-4">
-                            <div class="text-gray-400 text-sm mb-1">Martingale Level</div>
-                            <div id="martingaleLevel" class="text-lg font-bold text-yellow-400">0</div>
-                            <div class="text-xs text-gray-400 mt-1">Current step</div>
-                        </div>
-                        
-                        <div class="stat-card p-4">
-                            <div class="text-gray-400 text-sm mb-1">Session Time</div>
-                            <div id="sessionTime" class="text-lg font-bold text-blue-400">00:00</div>
-                            <div class="text-xs text-gray-400 mt-1">Duration</div>
-                        </div>
-                    </div>
-                    
-                    <div class="mb-6">
-                        <div class="flex items-center justify-between mb-3">
-                            <h3 class="text-lg font-semibold text-white">Quick Settings</h3>
-                            <button onclick="applyQuickSettings('conservative')" class="text-xs px-3 py-1 rounded bg-gray-800 hover:bg-gray-700 text-gray-300">
-                                Apply Conservative
-                            </button>
-                        </div>
-                        
-                        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <!-- Connection Status -->
+                    <div class="mb-4 p-3 bg-gray-800 rounded-lg border border-gray-600">
+                        <h3 class="text-sm font-bold text-gray-300 mb-2">Market Status</h3>
+                        <div class="grid grid-cols-2 gap-2 text-xs">
                             <div>
-                                <label class="block text-sm font-medium text-gray-300 mb-2">Base Stake</label>
-                                <input type="number" id="baseStake" value="1.0" min="0.1" step="0.1" 
-                                    class="w-full pro-input py-2 px-3">
+                                <span class="text-gray-400">Connection:</span>
+                                <span id="market_status" class="ml-2 font-bold text-red-400">Offline</span>
                             </div>
-                            
                             <div>
-                                <label class="block text-sm font-medium text-gray-300 mb-2">Multiplier</label>
-                                <input type="number" id="multiplier" value="1.15" min="1.0" step="0.01" 
-                                    class="w-full pro-input py-2 px-3">
+                                <span class="text-gray-400">Symbol:</span>
+                                <span id="current_symbol" class="ml-2 font-bold text-cyan-400">V. 10 Index</span>
                             </div>
-                            
                             <div>
-                                <label class="block text-sm font-medium text-gray-300 mb-2">Max Trades</label>
-                                <input type="number" id="maxTrades" value="15" min="1" max="100" 
-                                    class="w-full pro-input py-2 px-3">
+                                <span class="text-gray-400">Ticks Received:</span>
+                                <span id="ticks_received" class="ml-2 font-bold text-green-400">0</span>
                             </div>
-                            
                             <div>
-                                <label class="block text-sm font-medium text-gray-300 mb-2">Symbol</label>
-                                <select id="symbol" class="w-full pro-input py-2 px-3">
-                                    <option value="R_10">V. 10 Index</option>
-                                    <option value="R_100">V. 100 Index</option>
-                                    <option value="R_25">V. 25 Index</option>
-                                    <option value="R_50">V. 50 Index</option>
-                                </select>
+                                <span class="text-gray-400">Tick Rate:</span>
+                                <span id="current_tick_rate" class="ml-2 font-bold text-blue-400">0/s</span>
                             </div>
                         </div>
                     </div>
                     
-                    <!-- Start/Stop Button -->
-                    <div class="mt-8">
-                        <button id="toggleButton" onclick="toggleBot()" 
-                            class="w-full pro-button text-lg py-4 rounded-xl gradient-success hover:shadow-xl transition-all duration-300">
-                            START TRADING BOT
-                        </button>
-                    </div>
-                </div>
-
-                <!-- Live Trading Dashboard -->
-                <div class="professional-card p-6">
-                    <h2 class="text-xl font-bold text-white mb-4 flex items-center gap-2">
-                        Live Trading Dashboard
-                    </h2>
-                    
-                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-                        <div class="stat-card p-4">
-                            <div class="text-gray-400 text-sm mb-1">Current Tick</div>
-                            <div id="metricLiveTick" class="text-2xl font-bold text-white">---</div>
-                            <div id="metricLastDigit" class="text-sm text-gray-300">Digit: ?</div>
-                        </div>
+                    <!-- Digit Display -->
+                    <div class="mb-4 p-3 bg-gray-800 rounded-lg border border-cyan-500/30">
+                        <h3 class="text-sm font-bold text-cyan-300 mb-3">Current Digit</h3>
                         
-                        <div class="stat-card p-4">
-                            <div class="text-gray-400 text-sm mb-1">Predicted Digit</div>
-                            <div id="metricPredictedDigit" class="text-3xl font-bold text-purple-400">?</div>
-                            <div class="text-sm text-gray-300">From first tick</div>
-                        </div>
-                        
-                        <div class="stat-card p-4">
-                            <div class="text-gray-400 text-sm mb-1">Current Stake</div>
-                            <div id="metricCurrentStake" class="text-2xl font-bold text-green-400">$0.00</div>
-                            <div id="currentMartingaleLevel" class="text-xs martingale-level mt-1">Level 0</div>
-                        </div>
-                        
-                        <div class="stat-card p-4">
-                            <div class="text-gray-400 text-sm mb-1">Trade Count</div>
-                            <div id="metricTradeCount" class="text-2xl font-bold text-yellow-400">0</div>
-                            <div class="text-sm text-gray-300">of <span id="maxTradesDisplay">15</span> max</div>
+                        <div id="prediction_box" class="p-3 bg-gray-800 rounded border border-cyan-500/50 text-sm">
+                            <div class="text-cyan-300 font-bold mb-1">Selected Digit:</div>
+                            <div class="text-2xl font-bold mb-2 text-center text-green-400">5</div>
+                            <div class="text-xs text-gray-300">Set digit in main controls</div>
                         </div>
                     </div>
                     
-                    <!-- Progress Bars -->
-                    <div class="space-y-4">
-                        <div>
-                            <div class="flex justify-between text-sm text-gray-300 mb-2">
-                                <span>Trading Progress</span>
-                                <span id="tradeProgressText">0/15</span>
+                    <!-- Session Status Display -->
+                    <div id="session_display" class="mt-4 p-3 bg-gray-800 rounded border border-blue-500/30 hidden">
+                        <h3 class="text-sm font-bold text-blue-300 mb-2">Active Session</h3>
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <div class="text-xs text-gray-300">Digit:</div>
+                                <div id="session_digit" class="text-xl font-bold text-green-400">-</div>
                             </div>
-                            <div class="pro-progress">
-                                <div id="tradeProgressBar" class="pro-progress-bar" style="width: 0%"></div>
-                            </div>
-                        </div>
-                        
-                        <div>
-                            <div class="flex justify-between text-sm text-gray-300 mb-2">
-                                <span>PnL Update</span>
-                                <span id="pnlTimer">--</span>
-                            </div>
-                            <div class="pro-progress">
-                                <div id="pnlProgressBar" class="pro-progress-bar bg-gradient-to-r from-green-500 to-emerald-500" style="width: 0%"></div>
+                            <div>
+                                <div class="text-xs text-gray-300">Trades:</div>
+                                <div id="session_trades" class="text-sm font-bold text-yellow-400">0/10</div>
                             </div>
                         </div>
                     </div>
                 </div>
             </div>
-
-            <!-- Right Column: Statistics & Info -->
-            <div class="space-y-6">
-                <!-- Profit & Loss -->
-                <div class="professional-card p-6">
-                    <h2 class="text-xl font-bold text-white mb-4 flex items-center gap-2">
-                        Profit & Loss
+            
+            <!-- MIDDLE COLUMN: MAIN CONTROLS -->
+            <div class="lg:col-span-2">
+                <!-- MARTINGALE CALCULATOR -->
+                <div class="mb-6 p-4 bg-gray-900 rounded-xl border border-purple-500/50 shadow-lg">
+                    <h2 class="text-lg font-bold text-purple-400 mb-3 pb-2 border-b border-gray-700 flex items-center">
+                        🧮 MARTINGALE CALCULATOR
+                        <button onclick="toggleCalculator()" class="ml-auto text-xs bg-gray-700 hover:bg-gray-600 px-2 py-1 rounded">
+                            <span id="calcToggleIcon">−</span>
+                        </button>
                     </h2>
                     
-                    <div class="text-center mb-6">
-                        <div class="text-gray-400 text-sm mb-2">Net Profit/Loss</div>
-                        <div id="metricTotalProfit" class="profit-bold-green">$0.00</div>
-                        <div class="text-sm text-gray-400 mt-2" id="pnlBreakdown">
-                            Investment: $0.00 • Payout: $0.00
-                        </div>
-                    </div>
-                    
-                    <div class="grid grid-cols-2 gap-4">
-                        <div class="text-center p-3 rounded-lg bg-gray-800/50">
-                            <div class="text-gray-400 text-sm">Starting Balance</div>
-                            <div id="startingBalance" class="text-lg font-bold text-white">$---</div>
-                        </div>
-                        
-                        <div class="text-center p-3 rounded-lg bg-gray-800/50">
-                            <div class="text-gray-400 text-sm">Current Balance</div>
-                            <div id="currentBalance" class="text-lg font-bold text-green-400">$---</div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Martingale Calculator (Expanded for 100 trades) -->
-                <div class="professional-card p-6" id="martingaleCalculator">
-                    <div class="collapsible-header" onclick="toggleCalculator()">
-                        <h2 class="text-xl font-bold text-white flex items-center gap-2">
-                            Martingale Calculator (Up to 100 Trades)
-                        </h2>
-                        <svg id="collapseIcon" class="collapse-icon w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-                        </svg>
-                    </div>
-                    
-                    <div id="calculatorContent" class="collapsible-content expanded space-y-4 mt-4">
-                        <div>
-                            <div class="flex justify-between items-center mb-2">
-                                <div class="text-sm text-gray-300">Stake Progression (1.15x)</div>
-                                <div class="text-xs text-gray-400">Showing first 20 of 100</div>
+                    <div id="calculatorContent" class="transition-all duration-300">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                            <!-- Left Column: Inputs -->
+                            <div class="space-y-3">
+                                <div>
+                                    <label class="block text-xs font-semibold text-gray-300 mb-1">Base Stake ($)</label>
+                                    <input type="number" id="calc_base_stake" value="1.0" min="0.1" step="0.1" 
+                                        class="w-full rounded-md bg-gray-700 border border-gray-600 text-white shadow-sm focus:border-purple-500 focus:ring-purple-500 py-1.5 px-2 text-sm calculator-highlight">
+                                </div>
+                                
+                                <div>
+                                    <label class="block text-xs font-semibold text-gray-300 mb-1">Multiplier</label>
+                                    <input type="number" id="calc_multiplier" value="1.15" min="1.0" step="0.01" 
+                                        class="w-full rounded-md bg-gray-700 border border-gray-600 text-white shadow-sm focus:border-purple-500 focus:ring-purple-500 py-1.5 px-2 text-sm">
+                                </div>
+                                
+                                <div>
+                                    <label class="block text-xs font-semibold text-gray-300 mb-1">Max Trades</label>
+                                    <input type="number" id="calc_max_trades" value="10" min="1" max="100" 
+                                        class="w-full rounded-md bg-gray-700 border border-gray-600 text-white shadow-sm focus:border-purple-500 focus:ring-purple-500 py-1.5 px-2 text-sm">
+                                </div>
+                                
+                                <div>
+                                    <label class="block text-xs font-semibold text-gray-300 mb-1">Bankroll Limit ($)</label>
+                                    <input type="number" id="calc_bankroll_limit" value="50.0" min="1.0" step="0.1" 
+                                        class="w-full rounded-md bg-gray-700 border border-gray-600 text-white shadow-sm focus:border-purple-500 focus:ring-purple-500 py-1.5 px-2 text-sm">
+                                </div>
+                                
+                                <button onclick="calculateMartingale()" 
+                                    class="w-full mt-2 px-4 py-2 bg-purple-600 text-white font-bold rounded-lg hover:bg-purple-700 transition">
+                                    🧮 CALCULATE
+                                </button>
                             </div>
-                            <div class="calculator-table-container">
-                                <div class="pro-table">
-                                    <table class="w-full">
-                                        <thead>
-                                            <tr>
-                                                <th class="text-left">Loss #</th>
-                                                <th class="text-right">Stake</th>
-                                                <th class="text-right">Total</th>
-                                                <th class="text-right">P/L at Win</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody id="martingaleTable">
-                                            <tr><td colspan="4" class="text-center text-gray-500 py-4">Enter stake to calculate</td></tr>
-                                        </tbody>
-                                    </table>
+                            
+                            <!-- Right Column: Results -->
+                            <div class="space-y-3">
+                                <div class="p-3 bg-gray-800 rounded-lg border border-green-500/50">
+                                    <div class="text-xs font-semibold text-green-400 mb-1">Total Required</div>
+                                    <div id="calc_total_required" class="text-xl font-bold text-white">$0.00</div>
+                                    <div class="text-xs text-gray-400 mt-1">For all trades</div>
+                                </div>
+                                
+                                <div class="p-3 bg-gray-800 rounded-lg border border-blue-500/50">
+                                    <div class="text-xs font-semibold text-blue-400 mb-1">Final Stake</div>
+                                    <div id="calc_final_stake" class="text-lg font-bold text-white">$0.00</div>
+                                    <div class="text-xs text-gray-400 mt-1">Last trade amount</div>
+                                </div>
+                                
+                                <div class="p-3 bg-gray-800 rounded-lg border border-yellow-500/50">
+                                    <div class="text-xs font-semibold text-yellow-400 mb-1">Bankroll Status</div>
+                                    <div id="calc_bankroll_status" class="text-lg font-bold text-white">-</div>
+                                    <div class="text-xs text-gray-400 mt-1">vs. your limit</div>
+                                </div>
+                                
+                                <div class="p-3 bg-gray-800 rounded-lg border border-cyan-500/50">
+                                    <div class="text-xs font-semibold text-cyan-400 mb-1">Profit on Win</div>
+                                    <div id="calc_profit_on_win" class="text-lg font-bold text-white">$0.00</div>
+                                    <div class="text-xs text-gray-400 mt-1">9x payout minus investment</div>
                                 </div>
                             </div>
                         </div>
                         
-                        <div class="text-center p-4 rounded-lg bg-gradient-to-r from-blue-900/30 to-purple-900/30">
-                            <div class="text-gray-300 text-sm mb-1">Payout on Win at Level 10</div>
-                            <div id="payoutAtLevel10" class="text-2xl font-bold text-green-400">$0.00</div>
-                            <div class="text-xs text-gray-400 mt-1">9x payout - total investment</div>
-                        </div>
-                        
-                        <div class="text-center p-4 rounded-lg bg-gradient-to-r from-purple-900/30 to-pink-900/30">
-                            <div class="text-gray-300 text-sm mb-1">Risk at Level 20</div>
-                            <div id="riskAtLevel20" class="text-2xl font-bold text-yellow-400">$0.00</div>
-                            <div class="text-xs text-gray-400 mt-1">Total exposure</div>
+                        <!-- Stake Progression Table -->
+                        <div class="mt-4">
+                            <div class="text-xs font-semibold text-gray-300 mb-2">Stake Progression</div>
+                            <div id="calc_progression" class="text-xs text-gray-400 italic">Click CALCULATE to see stake progression</div>
                         </div>
                     </div>
                 </div>
-
-                <!-- Bot Status Information -->
-                <div class="professional-card p-6">
-                    <h2 class="text-xl font-bold text-white mb-4 flex items-center gap-2">
-                        Bot Information
-                    </h2>
+                
+                <!-- Main Trading Controls -->
+                <div class="grid grid-cols-2 lg:grid-cols-3 gap-3 mb-6">
+                    <!-- Symbol -->
+                    <div>
+                        <label for="symbol" class="block text-xs font-semibold text-gray-300 mb-1">Symbol</label>
+                        <select id="symbol" class="block w-full rounded-md bg-gray-700 border border-gray-600 text-white shadow-sm focus:border-green-500 focus:ring-green-500 py-1.5 px-2 text-sm">
+                            <option value="R_10">V. 10 Index</option>
+                            <option value="R_100">V. 100 Index</option>
+                            <option value="R_25">V. 25 Index</option>
+                            <option value="R_50">V. 50 Index</option>
+                            <option value="R_75">V. 75 Index</option>
+                        </select>
+                    </div>
                     
-                    <div class="space-y-3">
-                        <div class="flex justify-between items-center">
-                            <span class="text-gray-400">Connection Status:</span>
-                            <span id="connectionStatus" class="px-3 py-1 rounded-full bg-red-900/30 text-red-400 text-sm">Offline</span>
+                    <!-- Predicted Digit -->
+                    <div>
+                        <label for="predictedDigit" class="block text-xs font-semibold text-gray-300 mb-1">
+                            Current Digit
+                        </label>
+                        <input type="number" id="predictedDigit" value="5" min="0" max="9" 
+                            class="block w-full rounded-md bg-gray-700 border border-gray-600 text-white shadow-sm focus:border-green-500 focus:ring-green-500 py-1.5 px-2 text-sm text-center">
+                    </div>
+
+                    <!-- Contract Type -->
+                    <div>
+                        <label for="contractType" class="block text-xs font-semibold text-gray-300 mb-1">Contract Type</label>
+                        <select id="contractType" class="block w-full rounded-md bg-gray-700 border border-gray-600 text-white shadow-sm focus:border-green-500 focus:ring-green-500 py-1.5 px-2 text-sm">
+                            <option value="DIGITMATCH">DIGITMATCH</option>
+                        </select>
+                    </div>
+
+                    <!-- Base Stake -->
+                    <div>
+                        <label for="baseStake" class="block text-xs font-semibold text-gray-300 mb-1">Base Stake</label>
+                        <input type="number" id="baseStake" value="1.0" min="0.1" step="0.1" 
+                            class="block w-full rounded-md bg-gray-700 border border-gray-600 text-white shadow-sm focus:border-green-500 focus:ring-green-500 py-1.5 px-2 text-sm">
+                    </div>
+
+                    <!-- Multiplier -->
+                    <div>
+                        <label for="multiplier" class="block text-xs font-semibold text-gray-300 mb-1">Multiplier</label>
+                        <input type="number" id="multiplier" value="1.15" min="1.0" step="0.01" 
+                            class="block w-full rounded-md bg-gray-700 border border-gray-600 text-white shadow-sm focus:border-green-500 focus:ring-green-500 py-1.5 px-2 text-sm">
+                    </div>
+
+                    <!-- Max Trades -->
+                    <div>
+                        <label for="maxTrades" class="block text-xs font-semibold text-gray-300 mb-1">Max Trades</label>
+                        <input type="number" id="maxTrades" value="10" min="1" max="100" 
+                            class="block w-full rounded-md bg-gray-700 border border-gray-600 text-white shadow-sm focus:border-green-500 focus:ring-green-500 py-1.5 px-2 text-sm">
+                    </div>
+                    
+                    <!-- Mode Toggle -->
+                    <div class="col-span-2 lg:col-span-3">
+                        <label class="block text-xs font-semibold text-gray-300 mb-1">Execution Mode</label>
+                        <div class="grid grid-cols-2 gap-2">
+                            <button id="mode_instant" onclick="switchMode('instant')" 
+                                class="px-4 py-2 bg-green-600 text-white font-bold rounded-lg hover:bg-green-700 transition">
+                                ⚡ INSTANT
+                            </button>
+                            <button id="mode_smart" onclick="switchMode('smart')" 
+                                class="px-4 py-2 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 transition">
+                                🧠 SMART
+                            </button>
                         </div>
-                        
-                        <div class="flex justify-between items-center">
-                            <span class="text-gray-400">Ticks Received:</span>
-                            <span id="ticksReceived" class="text-white font-medium">0</span>
+                        <p id="mode_description" class="text-xs text-gray-400 mt-1">
+                            ⚡ INSTANT: Trade on each tick
+                        </p>
+                    </div>
+                </div>
+                
+                <!-- METRICS -->
+                <div class="grid grid-cols-3 gap-3">
+                    <div class="bg-gray-700 rounded-lg p-2 shadow-inner border border-green-500/50 col-span-2">
+                        <p class="text-[10px] font-semibold text-green-500 uppercase">Current Tick</p>
+                        <p id="metricLiveTick" class="text-xl font-extrabold text-white">---</p>
+                        <p id="metricLastDigit" class="text-lg font-bold text-green-300">Digit: ?</p>
+                        <p id="metricTickRate" class="text-xs font-bold text-blue-400">Ticks/sec: --</p>
+                    </div>
+                    
+                    <div class="bg-gray-700 rounded-lg p-2 shadow-inner border border-green-500/50">
+                        <p class="text-[10px] font-semibold text-green-500 uppercase">Balance</p>
+                        <p id="metricAccountBalance" class="text-lg font-bold balance-green">$---</p>
+                    </div>
+                    
+                    <div class="bg-gray-700 rounded-lg p-2 shadow-inner">
+                        <p class="text-[10px] font-semibold text-green-500 uppercase">Trade #</p>
+                        <p id="metricTradeCount" class="text-lg font-bold text-white">0</p>
+                    </div>
+                    
+                    <div class="bg-gray-700 rounded-lg p-2 shadow-inner">
+                        <p class="text-[10px] font-semibold text-lime-400 uppercase">P/L</p>
+                        <p id="metricTotalProfit" class="text-lg font-bold profit-neutral">$0.00</p>
+                    </div>
+                    
+                    <div class="bg-gray-700 rounded-lg p-2 shadow-inner">
+                        <p class="text-[10px] font-semibold text-green-500 uppercase">Stake</p>
+                        <p id="metricCurrentStake" class="text-lg font-bold text-white">$0.00</p>
+                    </div>
+                    
+                    <!-- TRADE STATUS SECTION -->
+                    <div id="trade-result-container" class="bg-gray-900 rounded-lg p-3 shadow-inner border border-yellow-500/50 col-span-3">
+                        <div class="flex justify-between items-center mb-2">
+                            <p class="text-[10px] font-semibold text-yellow-500 uppercase">TRADE STATUS</p>
+                            <p id="metricTradeResult" class="text-xs font-bold text-gray-400">READY</p>
                         </div>
-                        
-                        <div class="flex justify-between items-center">
-                            <span class="text-gray-400">First Tick Status:</span>
-                            <span id="firstTickStatus" class="px-3 py-1 rounded-full bg-yellow-900/30 text-yellow-400 text-sm">Waiting</span>
+                        <div class="mb-2">
+                            <p class="text-[10px] font-semibold text-gray-400 uppercase mb-1">Status:</p>
+                            <p id="metricPreviousResult" class="text-sm font-bold text-gray-300">Waiting for connection...</p>
                         </div>
-                        
-                        <div class="flex justify-between items-center">
-                            <span class="text-gray-400">Win Rate:</span>
-                            <span id="winRate" class="text-green-400 font-medium">0%</span>
-                        </div>
-                        
-                        <div class="mt-4 p-3 rounded-lg bg-gray-800/50">
-                            <div class="text-sm text-gray-300 mb-1">Status Message</div>
-                            <div id="statusMessage" class="text-white font-medium">Ready to start trading</div>
-                            <div id="nextAction" class="text-xs text-gray-400 mt-1">Click START to begin</div>
+                        <div>
+                            <p class="text-[10px] font-semibold text-gray-400 uppercase mb-1">Action:</p>
+                            <p id="metricNextAction" class="text-sm font-bold text-yellow-400">Start bot to begin</p>
                         </div>
                     </div>
                 </div>
             </div>
         </div>
+        
+        <!-- START/STOP BUTTON -->
+        <div class="flex justify-center mb-5">
+            <button id="toggleButton" onclick="toggleBot()" 
+                class="w-full md:w-1/2 px-6 py-3 bg-green-600 text-white font-bold text-lg rounded-lg shadow-xl hover:bg-green-700 transition duration-150">
+                🚀 START BOT
+            </button>
+        </div>
 
-        <!-- Trading Log -->
-        <div class="professional-card p-6 mt-6">
-            <div class="flex justify-between items-center mb-4">
-                <h2 class="text-xl font-bold text-white flex items-center gap-2">
-                    Trading Log
-                </h2>
-                <button onclick="clearLog()" class="text-sm px-3 py-1 rounded bg-gray-800 hover:bg-gray-700 text-gray-300">
-                    Clear Log
-                </button>
-            </div>
-            
-            <div id="log-area" class="h-64 bg-gray-900/50 rounded-lg p-4 overflow-y-auto text-sm">
-                <div class="text-gray-500 text-center py-8">
-                    <div class="text-lg mb-2">DIGITMATCHSTARv2 Initialized</div>
-                    <div class="text-sm">First Tick Martingale System ready</div>
-                    <div class="text-xs mt-2">Ready to start trading with 1.15x martingale strategy</div>
-                </div>
+        <!-- LOG AREA -->
+        <div id="log-column" class="w-full flex flex-col">
+            <h2 class="text-lg font-bold text-gray-300 mb-2 border-b border-gray-700 pb-1">Live Log</h2>
+            <div id="log-area" class="flex-grow h-80 bg-gray-900 text-lime-400 p-2.5 rounded-lg overflow-y-scroll text-xs whitespace-pre-wrap shadow-inner">
+[00:00:00] 🤖 Deriv Bot Initialized
+[00:00:00] 📊 Ready to connect to live market
+[00:00:00] 🧮 Martingale calculator ready
+[00:00:00] 🔄 Auto-recovery system ready
             </div>
         </div>
     </div>
 
     <script>
         // ============================================================================
-        // DIGITMATCHSTARv2 | Professional Trading Bot
+        // MARTINGALE CALCULATOR FUNCTIONS
         // ============================================================================
         
-        // Global State - SIMPLIFIED
+        let calculatorExpanded = true;
+        
+        function toggleCalculator() {
+            calculatorExpanded = !calculatorExpanded;
+            const calculatorContent = document.getElementById('calculatorContent');
+            const toggleIcon = document.getElementById('calcToggleIcon');
+            
+            if (calculatorExpanded) {
+                calculatorContent.classList.remove('hidden');
+                toggleIcon.textContent = '−';
+            } else {
+                calculatorContent.classList.add('hidden');
+                toggleIcon.textContent = '+';
+            }
+        }
+        
+        function calculateMartingale() {
+            try {
+                const baseStake = parseFloat(document.getElementById('calc_base_stake').value) || 1.0;
+                const multiplier = parseFloat(document.getElementById('calc_multiplier').value) || 1.15;
+                const maxTrades = parseInt(document.getElementById('calc_max_trades').value) || 10;
+                const bankrollLimit = parseFloat(document.getElementById('calc_bankroll_limit').value) || 50.0;
+                
+                if (baseStake <= 0 || multiplier <= 1.0 || maxTrades <= 0) {
+                    alert('Please enter valid values for calculation.');
+                    return;
+                }
+                
+                let currentStake = baseStake;
+                let totalRequired = 0;
+                let progression = [];
+                let finalStake = baseStake;
+                
+                // Calculate progression and totals
+                for (let i = 1; i <= maxTrades; i++) {
+                    if (i === 1) {
+                        currentStake = baseStake;
+                    } else {
+                        currentStake *= multiplier;
+                    }
+                    
+                    // Round to 2 decimal places
+                    currentStake = Math.round(currentStake * 100) / 100;
+                    totalRequired += currentStake;
+                    finalStake = currentStake;
+                    
+                    progression.push({
+                        trade: i,
+                        stake: currentStake.toFixed(2),
+                        cumulative: Math.round(totalRequired * 100) / 100
+                    });
+                }
+                
+                // Round total required
+                totalRequired = Math.round(totalRequired * 100) / 100;
+                
+                // Calculate profit on win (DIGITMATCH pays 9x)
+                const profitOnWin = (finalStake * 9) - totalRequired;
+                
+                // Update main bot controls with calculated values
+                document.getElementById('baseStake').value = baseStake.toFixed(2);
+                document.getElementById('multiplier').value = multiplier.toFixed(2);
+                document.getElementById('maxTrades').value = maxTrades;
+                
+                // Update calculator results
+                document.getElementById('calc_total_required').textContent = `$${totalRequired.toFixed(2)}`;
+                document.getElementById('calc_final_stake').textContent = `$${finalStake.toFixed(2)}`;
+                document.getElementById('calc_profit_on_win').textContent = `$${profitOnWin.toFixed(2)}`;
+                
+                // Update bankroll status
+                const bankrollStatusElem = document.getElementById('calc_bankroll_status');
+                bankrollStatusElem.classList.remove('calculator-safe', 'calculator-warning', 'calculator-highlight');
+                
+                if (totalRequired <= bankrollLimit) {
+                    bankrollStatusElem.textContent = '✅ Within Limit';
+                    bankrollStatusElem.classList.add('calculator-safe');
+                } else if (totalRequired <= bankrollLimit * 1.5) {
+                    bankrollStatusElem.textContent = '⚠️ Close to Limit';
+                    bankrollStatusElem.classList.add('calculator-warning');
+                } else {
+                    bankrollStatusElem.textContent = '❌ Over Limit';
+                    bankrollStatusElem.classList.add('calculator-warning');
+                }
+                
+                // Update progression display
+                const progressionElem = document.getElementById('calc_progression');
+                let progressionHTML = '<div class="grid grid-cols-4 gap-1 text-xs mb-1 font-semibold text-gray-300">';
+                progressionHTML += '<div>Trade #</div><div>Stake</div><div>Cumulative</div><div>Status</div>';
+                progressionHTML += '</div>';
+                
+                progression.forEach(item => {
+                    const status = item.cumulative <= bankrollLimit ? '✅' : '❌';
+                    progressionHTML += `
+                        <div class="grid grid-cols-4 gap-1 text-xs py-1 ${item.trade % 2 === 0 ? 'bg-gray-800/50' : ''}">
+                            <div class="text-gray-300">${item.trade}</div>
+                            <div class="text-green-400">$${item.stake}</div>
+                            <div class="text-blue-400">$${item.cumulative.toFixed(2)}</div>
+                            <div class="${status === '✅' ? 'text-green-400' : 'text-red-400'}">${status}</div>
+                        </div>
+                    `;
+                });
+                
+                progressionElem.innerHTML = progressionHTML;
+                
+                // Add pulse animation
+                document.getElementById('calc_total_required').classList.add('calculator-pulse');
+                setTimeout(() => {
+                    document.getElementById('calc_total_required').classList.remove('calculator-pulse');
+                }, 500);
+                
+                log(`🧮 Calculator: Total required: $${totalRequired.toFixed(2)} for ${maxTrades} trades`, 'CALCULATOR');
+                
+            } catch (error) {
+                console.error('Calculator error:', error);
+                alert('Error in calculation. Please check your inputs.');
+            }
+        }
+        
+        function syncCalculatorWithMain() {
+            const baseStake = parseFloat(document.getElementById('baseStake').value) || 1.0;
+            const multiplier = parseFloat(document.getElementById('multiplier').value) || 1.15;
+            const maxTrades = parseInt(document.getElementById('maxTrades').value) || 10;
+            
+            document.getElementById('calc_base_stake').value = baseStake.toFixed(2);
+            document.getElementById('calc_multiplier').value = multiplier.toFixed(2);
+            document.getElementById('calc_max_trades').value = maxTrades;
+            
+            // Auto-calculate when main controls change
+            calculateMartingale();
+        }
+        
+        // ============================================================================
+        // CORE BOT FUNCTIONS - UPDATED FOR 10 SECOND PNL DISPLAY & NETWORK RECOVERY
+        // ============================================================================
+        
+        // Global State
         window.ws = null;
         window.req_id = 0;
         window.isBotRunning = false;
@@ -751,642 +665,556 @@
         window.ToneInitialized = false;
         window.synth = null;
         
-        // Trading State
-        window.firstTickReceived = false;
-        window.firstTickDigit = null;
-        window.predictedDigit = null;
-        window.waitingForFirstTick = true;
+        // NETWORK RECOVERY SYSTEM
+        window.networkRecoveryEnabled = true;
+        window.reconnectionAttempts = 0;
+        window.maxReconnectionAttempts = 5;
+        window.reconnectionDelay = 2000;
+        window.lastDisconnectTime = 0;
+        window.autoReconnectTimer = null;
         
+        // Trading State
         window.baseStake = 1.0;
         window.currentStake = 1.0;
         window.multiplier = 1.15;
-        window.maxTrades = 15;
+        window.maxTrades = 20;
         window.tradeCount = 0;
         window.martingaleStep = 0;
         window.accountBalance = 0.0;
         window.startingBalance = 0.0;
         window.currentBalance = 0.0;
-        window.totalInvestment = 0.0;
-        window.totalPayout = 0.0;
+        window.netProfit = 0.0;
         
-        // Stats
-        window.stats = {
-            wins: 0,
-            losses: 0,
-            totalTrades: 0,
-            winRate: 0
+        // PnL Tracking - UPDATED TO 10 SECONDS
+        window.pnlTracker = {
+            totalInvestment: 0.0,
+            totalPayout: 0.0,
+            netProfit: 0.0,
+            trades: []
         };
         
-        // Trading Execution
+        // PnL Update Timer - INCREASED FROM 3 TO 10 SECONDS
+        window.pnlUpdateInterval = null;
+        window.pnlUpdateStartTime = 0;
+        window.pnlUpdateDuration = 10000; // 10 seconds instead of 3
+        
+        // Execution State
         window.lastTick = null;
         window.nextTradeAllowed = true;
         window.stopAfterWin = false;
         window.pendingProposals = new Map();
         window.executionLock = false;
         
-        // Performance Tracking
+        // Statistics
+        window.stats = {
+            totalTicks: 0,
+            tradesExecuted: 0,
+            wins: 0,
+            losses: 0
+        };
+        
+        // Rate tracking
+        window.botTickTimestamps = [];
+        
+        // Queue
+        window.tickQueue = [];
+        window.maxQueueSize = 30;
+        
+        // Session State
+        let sessionState = {
+            active: false,
+            mode: 'instant',
+            sessionDigit: null,
+            sessionStarted: false,
+            manualOverride: false
+        };
+        
+        // Tick tracking for connection status
         window.totalTicksReceived = 0;
-        
-        // Calculator State
-        window.calculatorCollapsed = false;
-        
-        // Session Timer
-        window.sessionTimer = null;
-        window.sessionStartTime = null;
-        
-        // PnL Tracking
-        window.sessionProfitLoss = 0.0;
-        window.sessionInvestment = 0.0;
-        window.sessionPayout = 0.0;
+        window.tickTimestamps = [];
         
         // DOM Elements
         const toggleButton = document.getElementById('toggleButton');
-        const statusBadge = document.getElementById('status-badge');
+        const soundToggleButton = document.getElementById('soundToggle');
+        const networkRecoveryToggle = document.getElementById('networkRecoveryToggle');
+        const networkRecoveryBadge = document.getElementById('network-recovery-badge');
+        const sessionDisplay = document.getElementById('session_display');
+        const tradeResultContainer = document.getElementById('trade-result-container');
+        const metricPreviousResult = document.getElementById('metricPreviousResult');
+        const metricNextAction = document.getElementById('metricNextAction');
+        const metricTradeResult = document.getElementById('metricTradeResult');
         const metricTotalProfit = document.getElementById('metricTotalProfit');
-        const metricPredictedDigit = document.getElementById('metricPredictedDigit');
-        const metricCurrentStake = document.getElementById('metricCurrentStake');
-        const metricTradeCount = document.getElementById('metricTradeCount');
-        const metricLiveTick = document.getElementById('metricLiveTick');
-        const metricLastDigit = document.getElementById('metricLastDigit');
-        const martingaleLevel = document.getElementById('martingaleLevel');
-        const currentMartingaleLevel = document.getElementById('currentMartingaleLevel');
-        const maxTradesDisplay = document.getElementById('maxTradesDisplay');
-        const tradeProgressBar = document.getElementById('tradeProgressBar');
-        const tradeProgressText = document.getElementById('tradeProgressText');
-        const pnlProgressBar = document.getElementById('pnlProgressBar');
-        const pnlTimer = document.getElementById('pnlTimer');
-        const pnlBreakdown = document.getElementById('pnlBreakdown');
-        const startingBalance = document.getElementById('startingBalance');
-        const currentBalance = document.getElementById('currentBalance');
-        const martingaleTable = document.getElementById('martingaleTable');
-        const payoutAtLevel10 = document.getElementById('payoutAtLevel10');
-        const riskAtLevel20 = document.getElementById('riskAtLevel20');
-        const botStatus = document.getElementById('botStatus');
-        const botSubStatus = document.getElementById('botSubStatus');
-        const sessionTime = document.getElementById('sessionTime');
-        const winRate = document.getElementById('winRate');
-        const connectionStatus = document.getElementById('connectionStatus');
-        const ticksReceived = document.getElementById('ticksReceived');
-        const firstTickStatus = document.getElementById('firstTickStatus');
-        const statusMessage = document.getElementById('statusMessage');
-        const nextAction = document.getElementById('nextAction');
-        const calculatorContent = document.getElementById('calculatorContent');
-        const collapseIcon = document.getElementById('collapseIcon');
         
         // ============================================================================
-        // CALCULATOR MINIMIZE FUNCTION
+        // NETWORK RECOVERY SYSTEM
         // ============================================================================
         
-        function toggleCalculator() {
-            window.calculatorCollapsed = !window.calculatorCollapsed;
+        function toggleNetworkRecovery() {
+            window.networkRecoveryEnabled = !window.networkRecoveryEnabled;
+            updateNetworkRecoveryButton();
             
-            if (window.calculatorCollapsed) {
-                calculatorContent.classList.remove('expanded');
-                calculatorContent.classList.add('collapsed');
-                collapseIcon.classList.add('rotated');
+            log(`🔄 Network auto-recovery ${window.networkRecoveryEnabled ? 'ENABLED' : 'DISABLED'}`, 'SYSTEM');
+            
+            if (window.networkRecoveryEnabled) {
+                networkRecoveryBadge.classList.remove('hidden');
             } else {
-                calculatorContent.classList.remove('collapsed');
-                calculatorContent.classList.add('expanded');
-                collapseIcon.classList.remove('rotated');
-                calculateMartingaleTable();
-            }
-        }
-        
-        // ============================================================================
-        // SESSION TIMER
-        // ============================================================================
-        
-        function startSessionTimer() {
-            window.sessionStartTime = Date.now();
-            
-            if (window.sessionTimer) {
-                clearInterval(window.sessionTimer);
-            }
-            
-            window.sessionTimer = setInterval(() => {
-                if (!window.sessionStartTime) return;
-                
-                const elapsed = Date.now() - window.sessionStartTime;
-                const minutes = Math.floor(elapsed / 60000);
-                const seconds = Math.floor((elapsed % 60000) / 1000);
-                
-                sessionTime.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-            }, 1000);
-        }
-        
-        function stopSessionTimer() {
-            if (window.sessionTimer) {
-                clearInterval(window.sessionTimer);
-                window.sessionTimer = null;
-            }
-            window.sessionStartTime = null;
-            sessionTime.textContent = '00:00';
-        }
-        
-        // ============================================================================
-        // MARTINGALE CALCULATOR (UP TO 100 TRADES)
-        // ============================================================================
-        
-        function calculateMartingaleTable() {
-            const baseStake = parseFloat(document.getElementById('baseStake').value) || 1.0;
-            const multiplier = parseFloat(document.getElementById('multiplier').value) || 1.15;
-            const maxTrades = parseInt(document.getElementById('maxTrades').value) || 15;
-            
-            let html = '';
-            let totalInvestment = 0;
-            let currentStake = baseStake;
-            
-            // Calculate up to 100 trades but display first 20
-            const displayTrades = Math.min(20, maxTrades);
-            
-            for (let i = 0; i <= maxTrades; i++) {
-                if (i === 0) {
-                    currentStake = baseStake;
-                } else {
-                    currentStake *= multiplier;
-                }
-                
-                totalInvestment += currentStake;
-                const payout = currentStake * 9;
-                const netProfit = payout - totalInvestment;
-                
-                // Only add to table for display trades
-                if (i <= displayTrades) {
-                    const rowClass = i % 2 === 0 ? 'bg-gray-800/20' : '';
-                    const stakeClass = i > 0 ? 'text-yellow-400' : 'text-white';
-                    const profitClass = netProfit >= 0 ? 'text-green-400' : 'text-red-400';
-                    
-                    html += `
-                        <tr class="${rowClass}">
-                            <td class="text-gray-300">${i}</td>
-                            <td class="text-right font-medium ${stakeClass}">$${currentStake.toFixed(2)}</td>
-                            <td class="text-right font-medium ${profitClass}">$${totalInvestment.toFixed(2)}</td>
-                            <td class="text-right font-medium ${netProfit >= 0 ? 'text-green-400' : 'text-red-400'}">
-                                ${netProfit >= 0 ? '+' : ''}$${netProfit.toFixed(2)}
-                            </td>
-                        </tr>
-                    `;
-                }
-                
-                // Calculate payout at level 10
-                if (i === 10) {
-                    payoutAtLevel10.textContent = `$${netProfit.toFixed(2)}`;
-                }
-                
-                // Calculate risk at level 20
-                if (i === 20) {
-                    riskAtLevel20.textContent = `$${totalInvestment.toFixed(2)}`;
+                networkRecoveryBadge.classList.add('hidden');
+                // Clear any pending reconnection attempts
+                if (window.autoReconnectTimer) {
+                    clearTimeout(window.autoReconnectTimer);
+                    window.autoReconnectTimer = null;
                 }
             }
-            
-            martingaleTable.innerHTML = html;
         }
         
-        // ============================================================================
-        // WIN EFFECTS
-        // ============================================================================
+        function updateNetworkRecoveryButton() {
+            if (networkRecoveryToggle) {
+                networkRecoveryToggle.textContent = window.networkRecoveryEnabled ? 
+                    '🔄 Auto-Recovery: ON' : '🔌 Auto-Recovery: OFF';
+                networkRecoveryToggle.className = window.networkRecoveryEnabled ? 
+                    'px-4 py-2 bg-yellow-600 text-white font-bold rounded-lg shadow hover:bg-yellow-700 transition' :
+                    'px-4 py-2 bg-gray-600 text-white font-bold rounded-lg shadow hover:bg-gray-700 transition';
+            }
+        }
         
-        function createWinCelebration() {
-            const celebration = document.getElementById('winCelebration');
-            celebration.innerHTML = '';
-            celebration.style.opacity = '1';
-            
-            for (let i = 0; i < 100; i++) {
-                const confetti = document.createElement('div');
-                confetti.className = 'confetti';
-                confetti.style.left = Math.random() * 100 + '%';
-                confetti.style.top = '-20px';
-                confetti.style.transform = `rotate(${Math.random() * 360}deg)`;
-                confetti.style.animation = `fall ${Math.random() * 3 + 2}s linear forwards`;
-                celebration.appendChild(confetti);
-                
-                const style = document.createElement('style');
-                style.textContent = `
-                    @keyframes fall {
-                        0% { transform: translateY(0) rotate(0deg); opacity: 1; }
-                        100% { transform: translateY(100vh) rotate(${Math.random() * 360}deg); opacity: 0; }
-                    }
-                `;
-                document.head.appendChild(style);
+        function attemptNetworkRecovery() {
+            if (!window.networkRecoveryEnabled || !window.isBotRunning) {
+                return;
             }
             
-            setTimeout(() => {
-                celebration.style.opacity = '0';
-                setTimeout(() => celebration.innerHTML = '', 1000);
-            }, 3000);
+            window.reconnectionAttempts++;
+            
+            if (window.reconnectionAttempts > window.maxReconnectionAttempts) {
+                log(`❌ Max reconnection attempts (${window.maxReconnectionAttempts}) reached. Stopping bot.`, 'NETWORK');
+                stopBot();
+                return;
+            }
+            
+            const delay = window.reconnectionDelay * Math.pow(1.5, window.reconnectionAttempts - 1);
+            
+            log(`🔄 Network recovery attempt ${window.reconnectionAttempts}/${window.maxReconnectionAttempts} in ${delay/1000}s...`, 'NETWORK');
+            
+            updateTradeStatus('RECONNECTING', 
+                `Network recovery attempt ${window.reconnectionAttempts}/${window.maxReconnectionAttempts}`,
+                `Reconnecting in ${delay/1000}s...`,
+                'normal');
+            
+            window.autoReconnectTimer = setTimeout(() => {
+                if (window.isBotRunning) {
+                    log('🔗 Attempting to reconnect WebSocket...', 'NETWORK');
+                    connectWebSocket();
+                }
+            }, delay);
         }
         
-        function playVictorySound() {
-            if (!window.soundEnabled || !window.ToneInitialized) return;
-            
-            try {
-                const now = Tone.now();
-                window.synth.triggerAttackRelease("C5", "8n", now);
-                window.synth.triggerAttackRelease("E5", "8n", now + 0.1);
-                window.synth.triggerAttackRelease("G5", "8n", now + 0.2);
-                window.synth.triggerAttackRelease("C6", "8n", now + 0.3);
-            } catch (e) {
-                console.error("Audio error:", e);
+        function resetReconnectionAttempts() {
+            window.reconnectionAttempts = 0;
+            if (window.autoReconnectTimer) {
+                clearTimeout(window.autoReconnectTimer);
+                window.autoReconnectTimer = null;
             }
         }
         
         // ============================================================================
-        // PnL UPDATE SYSTEM - FIXED TO START FROM ZERO
+        // PnL UPDATE FUNCTIONS - UPDATED FOR 10 SECOND DISPLAY
         // ============================================================================
         
-        function startPnLUpdate(payout) {
-            window.stopAfterWin = true;
-            window.nextTradeAllowed = false;
-            window.executionLock = true;
-            
+        function startExtendedPnlUpdate(payout) {
             window.pnlUpdateStartTime = Date.now();
-            window.pnlUpdateActive = true;
             
             // Clear any existing interval
             if (window.pnlUpdateInterval) {
                 clearInterval(window.pnlUpdateInterval);
             }
             
-            // Apply bold green style
-            metricTotalProfit.classList.remove('profit-positive', 'profit-negative', 'profit-neutral');
-            metricTotalProfit.classList.add('profit-bold-green');
+            // Start with immediate update
+            updatePnL();
             
-            // Calculate session PnL
-            const sessionPnL = window.sessionPayout - window.sessionInvestment;
-            updatePnLDisplay(sessionPnL);
-            
+            // Start continuous updates for 10 seconds
             window.pnlUpdateInterval = setInterval(() => {
                 const elapsed = Date.now() - window.pnlUpdateStartTime;
-                const remaining = Math.max(0, 3000 - elapsed);
                 
-                const progressPercent = 100 - (remaining / 3000 * 100);
-                pnlProgressBar.style.width = `${progressPercent}%`;
-                pnlTimer.textContent = `${(remaining / 1000).toFixed(1)}s`;
-                
-                // Update PnL display
-                const currentPnL = window.sessionPayout - window.sessionInvestment;
-                updatePnLDisplay(currentPnL);
-                
-                if (elapsed >= 3000) {
+                if (elapsed >= window.pnlUpdateDuration) {
+                    // Stop after 10 seconds
                     clearInterval(window.pnlUpdateInterval);
                     window.pnlUpdateInterval = null;
-                    window.pnlUpdateActive = false;
+                    log('💰 PnL update sequence completed (10 seconds)', 'PNL');
                     
                     // Final update
-                    const finalPnL = window.sessionPayout - window.sessionInvestment;
-                    updatePnLDisplay(finalPnL);
-                    log('PnL update complete', 'PNL');
+                    updatePnL();
                     
+                    // Stop bot after PnL updates are complete
                     setTimeout(() => {
-                        stopBot();
-                    }, 500);
+                        if (window.isBotRunning) {
+                            stopBot();
+                        }
+                    }, 100);
+                } else {
+                    // Continue updating PnL with visual feedback
+                    updatePnL();
+                    
+                    // Add visual pulse every 500ms
+                    if (elapsed % 500 < 50) {
+                        metricTotalProfit.classList.add('pnl-update-animation');
+                        setTimeout(() => {
+                            metricTotalProfit.classList.remove('pnl-update-animation');
+                        }, 500);
+                    }
+                    
+                    // Log progress every second
+                    if (elapsed % 1000 < 50) {
+                        const secondsLeft = Math.ceil((window.pnlUpdateDuration - elapsed) / 1000);
+                        log(`💰 PnL updating... ${secondsLeft}s`, 'PNL');
+                    }
                 }
-            }, 100);
+            }, 100); // Update every 100ms for smooth animation
         }
         
-        function updatePnLDisplay(netProfit) {
-            const formattedProfit = Math.abs(netProfit).toFixed(2);
+        function updatePnL() {
+            const pnlElem = document.getElementById('metricTotalProfit');
             
-            metricTotalProfit.textContent = `${netProfit >= 0 ? '+' : '-'}$${formattedProfit}`;
-            
-            metricTotalProfit.classList.remove('profit-positive', 'profit-negative', 'profit-neutral');
-            if (netProfit > 0) {
-                metricTotalProfit.classList.add('profit-bold-green');
-            } else if (netProfit < 0) {
-                metricTotalProfit.classList.add('profit-negative');
-            } else {
-                metricTotalProfit.classList.add('profit-neutral');
-            }
-            
-            pnlBreakdown.textContent = `Investment: $${window.sessionInvestment.toFixed(2)} • Payout: $${window.sessionPayout.toFixed(2)}`;
-            
-            return netProfit;
-        }
-        
-        function updateBalanceDisplay() {
-            startingBalance.textContent = `$${window.startingBalance.toFixed(2)}`;
-            currentBalance.textContent = `$${window.currentBalance.toFixed(2)}`;
-        }
-        
-        // ============================================================================
-        // BOT STATUS UPDATES
-        // ============================================================================
-        
-        function updateBotStatus(status, subStatus) {
-            botStatus.textContent = status;
-            botSubStatus.textContent = subStatus;
-            
-            botStatus.classList.remove('text-green-400', 'text-red-400', 'text-yellow-400', 'text-blue-400');
-            
-            if (status === 'RUNNING' || status === 'TRADING') {
-                botStatus.classList.add('text-green-400');
-            } else if (status === 'STOPPED' || status === 'DISCONNECTED') {
-                botStatus.classList.add('text-red-400');
-            } else if (status === 'WAITING' || status === 'CONNECTING') {
-                botStatus.classList.add('text-yellow-400');
-            } else {
-                botStatus.classList.add('text-blue-400');
-            }
-        }
-        
-        function updateStakeDisplay() {
-            metricCurrentStake.textContent = `$${window.currentStake.toFixed(2)}`;
-            martingaleLevel.textContent = window.martingaleStep;
-            currentMartingaleLevel.textContent = `Level ${window.martingaleStep}`;
-            
-            if (window.martingaleStep >= 5) {
-                currentMartingaleLevel.classList.remove('bg-blue-900/30', 'text-blue-400');
-                currentMartingaleLevel.classList.add('bg-yellow-900/30', 'text-yellow-400');
-            } else if (window.martingaleStep >= 10) {
-                currentMartingaleLevel.classList.remove('bg-yellow-900/30', 'text-yellow-400');
-                currentMartingaleLevel.classList.add('bg-red-900/30', 'text-red-400');
-            } else {
-                currentMartingaleLevel.classList.remove('bg-yellow-900/30', 'text-yellow-400', 'bg-red-900/30', 'text-red-400');
-                currentMartingaleLevel.classList.add('bg-blue-900/30', 'text-blue-400');
-            }
-        }
-        
-        function updateTradeProgress() {
-            const progress = (window.tradeCount / window.maxTrades) * 100;
-            tradeProgressBar.style.width = `${progress}%`;
-            tradeProgressText.textContent = `${window.tradeCount}/${window.maxTrades}`;
-        }
-        
-        function updateConnectionDisplay(isConnected, isConnecting) {
-            if (isConnected) {
-                statusBadge.className = 'connection-badge connection-connected';
-                statusBadge.innerHTML = '<span class="w-2 h-2 rounded-full bg-white"></span> CONNECTED';
-                connectionStatus.textContent = 'Connected';
-                connectionStatus.className = 'px-3 py-1 rounded-full bg-green-900/30 text-green-400 text-sm';
-            } else if (isConnecting) {
-                statusBadge.className = 'connection-badge connection-connecting';
-                statusBadge.innerHTML = '<span class="w-2 h-2 rounded-full bg-white"></span> CONNECTING';
-                connectionStatus.textContent = 'Connecting';
-                connectionStatus.className = 'px-3 py-1 rounded-full bg-yellow-900/30 text-yellow-400 text-sm';
-            } else {
-                statusBadge.className = 'connection-badge connection-disconnected';
-                statusBadge.innerHTML = '<span class="w-2 h-2 rounded-full bg-white"></span> DISCONNECTED';
-                connectionStatus.textContent = 'Offline';
-                connectionStatus.className = 'px-3 py-1 rounded-full bg-red-900/30 text-red-400 text-sm';
-            }
-        }
-        
-        // ============================================================================
-        // TRADING ENGINE FUNCTIONS - FIXED PnL RESET
-        // ============================================================================
-        
-        function resetTradingState() {
-            window.firstTickReceived = false;
-            window.firstTickDigit = null;
-            window.predictedDigit = null;
-            window.waitingForFirstTick = true;
-            
-            window.tradeCount = 0;
-            window.martingaleStep = 0;
-            window.totalInvestment = 0.0;
-            window.totalPayout = 0.0;
-            
-            // RESET SESSION PnL TRACKING
-            window.sessionInvestment = 0.0;
-            window.sessionPayout = 0.0;
-            window.sessionProfitLoss = 0.0;
-            
-            window.stats = { 
-                wins: 0, 
-                losses: 0, 
-                totalTrades: 0, 
-                winRate: 0
-            };
-            
-            window.stopAfterWin = false;
-            window.nextTradeAllowed = false;
-            window.executionLock = false;
-            
-            metricPredictedDigit.textContent = '?';
-            metricCurrentStake.textContent = '$0.00';
-            metricTradeCount.textContent = '0';
-            metricLiveTick.textContent = '---';
-            metricLastDigit.textContent = 'Digit: ?';
-            martingaleLevel.textContent = '0';
-            currentMartingaleLevel.textContent = 'Level 0';
-            tradeProgressBar.style.width = '0%';
-            tradeProgressText.textContent = '0/15';
-            firstTickStatus.textContent = 'Waiting';
-            firstTickStatus.className = 'px-3 py-1 rounded-full bg-yellow-900/30 text-yellow-400 text-sm';
-            
-            // RESET PnL DISPLAY TO ZERO
-            updatePnLDisplay(0);
-            updateBalanceDisplay();
-            updateWinRate();
-            updateBotStatus('STOPPED', 'Ready to start');
-        }
-        
-        function extractDigitFromTick(tick) {
-            try {
-                const price = parseFloat(tick.quote);
-                const symbol = document.getElementById('symbol').value;
-                let decimalPlaces = 3;
-                if (symbol === 'R_100') decimalPlaces = 2;
-                const formattedPrice = price.toFixed(decimalPlaces);
-                const digit = formattedPrice.charAt(formattedPrice.length - 1);
+            if (window.startingBalance > 0 && window.currentBalance > 0) {
+                window.netProfit = window.currentBalance - window.startingBalance;
+                const formattedProfit = window.netProfit.toFixed(2);
+                const isPositive = window.netProfit > 0;
+                const isNegative = window.netProfit < 0;
                 
-                return {
-                    digit: digit,
-                    price: price,
-                    formattedPrice: formattedPrice
-                };
-            } catch (error) {
-                console.error('Error extracting digit:', error);
-                return null;
+                pnlElem.textContent = `${isPositive ? '+' : ''}$${formattedProfit}`;
+                pnlElem.classList.remove('profit-positive', 'profit-negative', 'profit-neutral');
+                
+                if (isPositive) pnlElem.classList.add('profit-positive');
+                else if (isNegative) pnlElem.classList.add('profit-negative');
+                else pnlElem.classList.add('profit-neutral');
+                
+                return window.netProfit;
             }
+            
+            if (window.pnlTracker.totalPayout > 0 || window.pnlTracker.totalInvestment > 0) {
+                window.netProfit = window.pnlTracker.totalPayout - window.pnlTracker.totalInvestment;
+                const formattedProfit = window.netProfit.toFixed(2);
+                const isPositive = window.netProfit > 0;
+                const isNegative = window.netProfit < 0;
+                
+                pnlElem.textContent = `${isPositive ? '+' : ''}$${formattedProfit}`;
+                pnlElem.classList.remove('profit-positive', 'profit-negative', 'profit-neutral');
+                
+                if (isPositive) pnlElem.classList.add('profit-positive');
+                else if (isNegative) pnlElem.classList.add('profit-negative');
+                else pnlElem.classList.add('profit-neutral');
+                
+                return window.netProfit;
+            }
+            
+            pnlElem.textContent = '$0.00';
+            pnlElem.classList.remove('profit-positive', 'profit-negative');
+            pnlElem.classList.add('profit-neutral');
+            return 0;
         }
         
-        function processFirstTick(tick) {
-            if (window.firstTickReceived || !window.waitingForFirstTick) {
-                return;
-            }
-            
-            if (window.stopAfterWin || !window.isBotRunning) {
-                return;
-            }
-            
-            const tickData = extractDigitFromTick(tick);
-            if (!tickData) return;
-            
-            window.firstTickReceived = true;
-            window.waitingForFirstTick = false;
-            window.firstTickDigit = tickData.digit;
-            window.predictedDigit = tickData.digit;
-            
-            metricPredictedDigit.textContent = tickData.digit;
-            metricPredictedDigit.classList.add('digit-match-flash');
-            firstTickStatus.textContent = 'Ready';
-            firstTickStatus.className = 'px-3 py-1 rounded-full bg-green-900/30 text-green-400 text-sm';
-            
-            log(`FIRST TICK DETECTED: ${tickData.formattedPrice}`, 'SYSTEM');
-            log(`PREDICTION SET: Digit ${tickData.digit}`, 'SYSTEM');
-            
-            updateBotStatus('TRADING', `Digit ${tickData.digit} locked`);
-            updateStatus('READY', `Digit ${tickData.digit} locked`, 'Trading active');
-            
-            window.nextTradeAllowed = true;
+        function trackTradeInvestment(amount) {
+            window.pnlTracker.totalInvestment += parseFloat(amount);
+            window.pnlTracker.trades.push({
+                type: 'investment',
+                amount: parseFloat(amount),
+                timestamp: Date.now()
+            });
+            updatePnL();
+            log(`💰 Investment tracked: $${amount.toFixed(2)}`, 'PNL');
         }
         
-        function checkForDigitMatch(tick, currentDigit) {
-            if (!window.isBotRunning || window.stopAfterWin) {
+        function trackTradePayout(amount) {
+            window.pnlTracker.totalPayout += parseFloat(amount);
+            window.pnlTracker.trades.push({
+                type: 'payout',
+                amount: parseFloat(amount),
+                timestamp: Date.now()
+            });
+            updatePnL();
+            log(`💰 Payout tracked: $${amount.toFixed(2)}`, 'PNL');
+        }
+        
+        function resetPnL() {
+            window.pnlTracker = { totalInvestment: 0.0, totalPayout: 0.0, netProfit: 0.0, trades: [] };
+            window.startingBalance = 0.0;
+            window.currentBalance = 0.0;
+            window.netProfit = 0.0;
+            
+            if (window.pnlUpdateInterval) {
+                clearInterval(window.pnlUpdateInterval);
+                window.pnlUpdateInterval = null;
+            }
+            
+            updatePnL();
+            log('💰 PnL reset', 'PNL');
+        }
+        
+        // ============================================================================
+        // CORE BOT FUNCTIONS CONTINUED
+        // ============================================================================
+        
+        // Check for authentication token
+        function checkAuthToken() {
+            const token = localStorage.getItem('active_token') || localStorage.getItem('derivToken');
+            if (!token) {
+                log('⚠️ No API token found. Please authenticate first.', 'WARNING');
                 return false;
             }
-            
-            if (currentDigit === window.predictedDigit) {
-                log(`DIGIT MATCH! ${currentDigit} = ${window.predictedDigit}`, 'WIN');
-                
-                window.stopAfterWin = true;
-                window.nextTradeAllowed = false;
-                window.executionLock = true;
-                
-                window.stats.wins++;
-                window.stats.totalTrades++;
-                
-                const payout = window.currentStake * 9;
-                window.totalPayout += payout;
-                window.sessionPayout += payout; // Add to session payout
-                
-                playVictorySound();
-                createWinCelebration();
-                
-                updateBotStatus('WIN', `Digit ${currentDigit} matched`);
-                updateStatus('VICTORY!', 
-                    `Digit ${currentDigit} matched! Payout: $${payout.toFixed(2)}`,
-                    'Bot stopping after PnL update');
-                
-                startPnLUpdate(payout);
-                
-                window.martingaleStep = 0;
-                updateStakeDisplay();
-                updateWinRate();
-                
-                return true;
-            }
-            
-            return false;
+            return true;
         }
         
-        function executeTradeOnTick(tick) {
-            if (window.stopAfterWin || window.executionLock || !window.isBotRunning) {
-                return;
+        // Initialize account toggle
+        function initializeToggleState() {
+            const token = localStorage.getItem('active_token');
+            const allAccounts = JSON.parse(localStorage.getItem('deriv_accounts')) || [];
+            
+            if (token && allAccounts.length > 0) {
+                const currentAccount = allAccounts.find(acc => acc.token === token);
+                if (currentAccount) {
+                    const isReal = !currentAccount.account.startsWith('VR');
+                    document.getElementById('accTypeToggle').checked = isReal;
+                    log(`Account: ${isReal ? 'REAL' : 'DEMO'} (${currentAccount.account})`, 'SYSTEM');
+                }
+            }
+        }
+        
+        // Switch account
+        function switchAccount() {
+            const isRealRequested = document.getElementById('accTypeToggle').checked;
+            const allAccounts = JSON.parse(localStorage.getItem('deriv_accounts')) || [];
+            
+            const targetAccount = allAccounts.find(acc => 
+                isRealRequested ? !acc.account.startsWith('VR') : acc.account.startsWith('VR')
+            );
+        
+            if (targetAccount) {
+                localStorage.setItem('active_token', targetAccount.token);
+                log(`Switched to ${isRealRequested ? 'REAL' : 'DEMO'} account`, 'SYSTEM');
+                
+                if (window.isBotRunning) {
+                    stopBot();
+                    setTimeout(() => startBot(), 1000);
+                }
+            } else {
+                alert(`No ${isRealRequested ? 'Real' : 'Demo'} account found`);
+                document.getElementById('accTypeToggle').checked = !isRealRequested;
+            }
+        }
+        
+        // TRADE STATUS UI FUNCTIONS
+        function updateTradeStatus(status, result, action, type = 'normal') {
+            tradeResultContainer.classList.remove('win-glow');
+            metricPreviousResult.textContent = result;
+            metricNextAction.textContent = action;
+            
+            switch(type) {
+                case 'win':
+                    metricTradeResult.textContent = 'WIN 🎯';
+                    metricTradeResult.className = 'text-xs font-bold status-win';
+                    metricPreviousResult.className = 'text-sm font-bold status-win';
+                    metricNextAction.className = 'text-sm font-bold text-green-400';
+                    tradeResultContainer.classList.add('win-glow');
+                    log(`🎯 Trade Status: ${result}`, 'WIN');
+                    break;
+                case 'loss':
+                    metricTradeResult.textContent = 'LOSS ❌';
+                    metricTradeResult.className = 'text-xs font-bold status-loss';
+                    metricPreviousResult.className = 'text-sm font-bold status-loss';
+                    metricNextAction.className = 'text-sm font-bold text-red-400';
+                    log(`❌ Trade Status: ${result}`, 'LOSS');
+                    break;
+                case 'trade':
+                    metricTradeResult.textContent = 'TRADING ⚡';
+                    metricTradeResult.className = 'text-xs font-bold status-trade';
+                    metricPreviousResult.className = 'text-sm font-bold status-trade';
+                    metricNextAction.className = 'text-sm font-bold text-yellow-400';
+                    log(`⚡ Trade Status: ${result}`, 'TRADE');
+                    break;
+                default:
+                    metricTradeResult.textContent = status || 'READY';
+                    metricTradeResult.className = 'text-xs font-bold text-gray-400';
+                    metricPreviousResult.className = 'text-sm font-bold text-gray-300';
+                    metricNextAction.className = 'text-sm font-bold text-yellow-400';
+                    break;
+            }
+        }
+        
+        function resetTradeStatus() {
+            updateTradeStatus('READY', 'Waiting for connection...', 'Start bot to begin', 'normal');
+        }
+        
+        // SESSION MANAGEMENT
+        function updateSessionDisplay() {
+            if (sessionState.sessionStarted && sessionState.sessionDigit !== null) {
+                document.getElementById('session_digit').textContent = sessionState.sessionDigit;
+                document.getElementById('session_trades').textContent = `${window.tradeCount}/${window.maxTrades}`;
+                sessionDisplay.classList.remove('hidden');
+            } else {
+                sessionDisplay.classList.add('hidden');
+            }
+        }
+        
+        function lockSessionDigit(digit) {
+            if (sessionState.sessionStarted && sessionState.sessionDigit !== null) {
+                log(`🔒 Digit ${digit} is already locked for this session`, 'SESSION');
+                return sessionState.sessionDigit;
             }
             
-            if (window.tradeCount >= window.maxTrades) {
-                log(`MAX TRADES REACHED (${window.maxTrades})`, 'WARNING');
-                updateBotStatus('LIMIT', 'Maximum trades reached');
-                updateStatus('LIMIT REACHED', 'Maximum trades executed', 'Bot stopping');
-                stopBot();
-                return;
+            sessionState.sessionDigit = digit;
+            sessionState.sessionStarted = true;
+            sessionState.manualOverride = false;
+            document.getElementById('predictedDigit').value = digit;
+            updateSessionDisplay();
+            log(`🔒 Digit ${digit} locked for current session`, 'SESSION');
+            return digit;
+        }
+        
+        // CONNECTION STATUS
+        function updateConnectionStatus() {
+            const isConnected = window.ws && window.ws.readyState === WebSocket.OPEN;
+            const isConnecting = window.isConnecting || false;
+            
+            if (isConnected) {
+                document.getElementById('status-badge').textContent = '🟢 CONNECTED';
+                document.getElementById('status-badge').className = 'ml-3 inline-flex items-center px-3 py-1 text-sm font-medium rounded-full connection-badge-connected text-white shadow-md';
+                document.getElementById('market_status').textContent = 'Live';
+                document.getElementById('market_status').className = 'ml-2 font-bold text-green-400';
+                updateTradeStatus('CONNECTED', 'Market live - Ready to trade', 'Set parameters and start trading', 'normal');
+            } else if (isConnecting) {
+                document.getElementById('status-badge').textContent = '🟡 CONNECTING';
+                document.getElementById('status-badge').className = 'ml-3 inline-flex items-center px-3 py-1 text-sm font-medium rounded-full connection-badge-connecting text-white shadow-md';
+                document.getElementById('market_status').textContent = 'Connecting...';
+                document.getElementById('market_status').className = 'ml-2 font-bold text-yellow-400';
+                updateTradeStatus('CONNECTING', 'Connecting to market...', 'Please wait', 'normal');
+            } else {
+                document.getElementById('status-badge').textContent = '🔴 DISCONNECTED';
+                document.getElementById('status-badge').className = 'ml-3 inline-flex items-center px-3 py-1 text-sm font-medium rounded-full connection-badge-disconnected text-white shadow-md';
+                document.getElementById('market_status').textContent = 'Offline';
+                document.getElementById('market_status').className = 'ml-2 font-bold text-red-400';
+                updateTradeStatus('DISCONNECTED', 'Market offline', 'Start bot to connect', 'normal');
             }
             
-            window.executionLock = true;
+            document.getElementById('current_symbol').textContent = 
+                document.getElementById('symbol').options[document.getElementById('symbol').selectedIndex].text;
             
-            try {
-                window.tradeCount++;
-                window.stats.totalTrades++;
-                
-                window.totalInvestment += window.currentStake;
-                window.sessionInvestment += window.currentStake; // Add to session investment
-                
-                updateTradeProgress();
-                
-                log(`Trade #${window.tradeCount}: $${window.currentStake.toFixed(2)} on digit ${window.predictedDigit}`, 'TRADE');
-                
-                updateBotStatus('TRADING', `Trade ${window.tradeCount} active`);
-                updateStatus('TRADING', 
-                    `Trade ${window.tradeCount}: $${window.currentStake.toFixed(2)} stake`,
-                    'Martingale Level: ' + window.martingaleStep);
-                
-                sendTradeRequest(tick);
-                
-            } catch (error) {
-                log(`Trade error: ${error}`, 'ERROR');
-                window.executionLock = false;
+            document.getElementById('ticks_received').textContent = window.totalTicksReceived;
+            
+            // Update tick rate
+            const now = Date.now();
+            const recentTicks = window.tickTimestamps.filter(ts => now - ts < 5000);
+            const tickRate = recentTicks.length / 5;
+            document.getElementById('current_tick_rate').textContent = tickRate.toFixed(1) + '/s';
+        }
+        
+        // MODE MANAGEMENT
+        function switchMode(mode) {
+            sessionState.mode = mode;
+            
+            document.getElementById('mode_instant').classList.remove('bg-green-600', 'bg-blue-600');
+            document.getElementById('mode_smart').classList.remove('bg-green-600', 'bg-blue-600');
+            
+            if (mode === 'instant') {
+                document.getElementById('mode_instant').classList.add('bg-green-600');
+                document.getElementById('mode_smart').classList.add('bg-blue-600');
+                document.getElementById('mode_description').textContent = '⚡ INSTANT: Trade on each tick';
+                log('🔄 Switched to INSTANT mode', 'SYSTEM');
                 window.nextTradeAllowed = true;
+                
+                if (window.isBotRunning && !sessionState.manualOverride) {
+                    const manualDigit = parseInt(document.getElementById('predictedDigit').value);
+                    if (!isNaN(manualDigit) && manualDigit >= 0 && manualDigit <= 9) {
+                        sessionState.sessionDigit = manualDigit;
+                        sessionState.sessionStarted = true;
+                        sessionState.manualOverride = true;
+                        updateSessionDisplay();
+                        log(`🔒 Digit ${manualDigit} set manually for instant mode`, 'SESSION');
+                    }
+                }
+            } else {
+                document.getElementById('mode_smart').classList.add('bg-green-600');
+                document.getElementById('mode_instant').classList.add('bg-blue-600');
+                document.getElementById('mode_description').textContent = '🧠 SMART: Analyze first, then trade';
+                log('🔄 Switched to SMART mode', 'SYSTEM');
+                
+                if (sessionState.sessionDigit !== null) {
+                    log(`🔒 Using locked digit ${sessionState.sessionDigit}`, 'SESSION');
+                }
             }
         }
         
-        function sendTradeRequest(tick) {
-            if (window.stopAfterWin) {
-                log('Trade cancelled - win condition met', 'SYSTEM');
-                handleTradeResult(false);
-                return;
+        function updateExecutionLogic() {
+            if (sessionState.mode === 'smart' && !sessionState.sessionDigit) {
+                log('🧠 Waiting for digit selection...', 'SYSTEM');
+                window.nextTradeAllowed = false;
+                updateTradeStatus('WAITING', 'No digit selected for smart mode', 'Set a digit to begin trading', 'normal');
+            } else if (sessionState.mode === 'smart' && sessionState.sessionDigit !== null) {
+                log(`🧠 Ready! Using locked digit: ${sessionState.sessionDigit}`, 'SESSION');
+                window.nextTradeAllowed = true;
+                document.getElementById('predictedDigit').value = sessionState.sessionDigit;
+                updateTradeStatus('READY', `Digit ${sessionState.sessionDigit} locked`, 'Ready to trade', 'normal');
+            } else if (sessionState.mode === 'instant') {
+                window.nextTradeAllowed = true;
+                updateTradeStatus('READY', 'Instant mode active', 'Trading on each tick', 'normal');
+            }
+        }
+        
+        // DOM Ready
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log('🤖 Bot initialized');
+            initializeToggleState();
+            
+            // Initialize network recovery
+            updateNetworkRecoveryButton();
+            
+            if (!checkAuthToken()) {
+                document.getElementById('prediction_text').textContent = 'Please authenticate first';
             }
             
-            const contractType = "DIGITMATCH";
-            const symbol = document.getElementById('symbol').value;
+            setInterval(calculateRates, 1000);
+            startQueueProcessor();
             
-            const proposalRequest = {
-                proposal: 1,
-                amount: window.currentStake.toFixed(2),
-                basis: "stake",
-                contract_type: contractType,
-                currency: "USD",
-                duration: 1,
-                duration_unit: "t",
-                symbol: symbol,
-                barrier: window.predictedDigit.toString(),
-                req_id: getNextReqId()
-            };
+            calculateMartingale();
             
-            window.pendingProposals.set(proposalRequest.req_id, {
-                tick: tick,
-                stake: window.currentStake,
-                contractType: contractType,
-                predictedDigit: window.predictedDigit,
-                tradeNumber: window.tradeCount,
-                martingaleStep: window.martingaleStep
+            document.getElementById('baseStake').addEventListener('change', syncCalculatorWithMain);
+            document.getElementById('multiplier').addEventListener('change', syncCalculatorWithMain);
+            document.getElementById('maxTrades').addEventListener('change', syncCalculatorWithMain);
+            document.getElementById('calc_base_stake').addEventListener('change', () => {
+                document.getElementById('baseStake').value = document.getElementById('calc_base_stake').value;
+            });
+            document.getElementById('calc_multiplier').addEventListener('change', () => {
+                document.getElementById('multiplier').value = document.getElementById('calc_multiplier').value;
+            });
+            document.getElementById('calc_max_trades').addEventListener('change', () => {
+                document.getElementById('maxTrades').value = document.getElementById('calc_max_trades').value;
             });
             
-            sendRequest(proposalRequest);
-        }
-        
-        function handleTradeResult(isWin) {
-            window.executionLock = false;
+            log('🤖 Bot ready', 'SYSTEM');
+            switchMode('instant');
+            updatePnL();
+            resetTradeStatus();
             
-            if (isWin) {
-                return;
-            } else {
-                if (window.stopAfterWin) {
-                    return;
+            document.getElementById('predictedDigit').addEventListener('change', function() {
+                const newDigit = parseInt(this.value);
+                if (!isNaN(newDigit) && newDigit >= 0 && newDigit <= 9) {
+                    
+                    if (sessionState.sessionStarted) {
+                        const confirmChange = confirm('⚠️ Changing digit will reset current session. Continue?');
+                        if (!confirmChange) {
+                            this.value = sessionState.sessionDigit || 5;
+                            return;
+                        }
+                    }
+                    
+                    sessionState.sessionDigit = newDigit;
+                    sessionState.sessionStarted = true;
+                    sessionState.manualOverride = true;
+                    updateSessionDisplay();
+                    log(`🔢 Digit manually set to ${newDigit}`, 'SESSION');
+                    updateTradeStatus('MANUAL', `Digit manually set to ${newDigit}`, 'Ready to trade', 'normal');
                 }
-                
-                window.stats.losses++;
-                window.martingaleStep++;
-                
-                window.currentStake = window.baseStake * Math.pow(window.multiplier, window.martingaleStep);
-                window.currentStake = parseFloat(window.currentStake.toFixed(2));
-                
-                log(`Loss #${window.martingaleStep}. Next stake: $${window.currentStake.toFixed(2)}`, 'MARTINGALE');
-                
-                updateBotStatus('MARTINGALE', `Level ${window.martingaleStep} active`);
-                updateStatus('MARTINGALE ACTIVE', 
-                    `Loss streak: ${window.martingaleStep}`,
-                    `Next stake: $${window.currentStake.toFixed(2)}`);
-                
-                updateStakeDisplay();
-                updatePnLDisplay(window.sessionPayout - window.sessionInvestment);
-                updateWinRate();
-                
-                window.nextTradeAllowed = true;
-            }
-        }
+            });
+        });
         
-        function updateWinRate() {
-            winRate.textContent = window.stats.totalTrades > 0 
-                ? `${((window.stats.wins / window.stats.totalTrades) * 100).toFixed(1)}%`
-                : '0%';
-        }
-        
-        // ============================================================================
-        // WEBSOCKET & API HANDLING
-        // ============================================================================
-        
+        // WEBSOCKET CONNECTION - UPDATED WITH NETWORK RECOVERY
         function connectWebSocket() {
             if (window.ws) {
                 try {
@@ -1395,23 +1223,22 @@
             }
             
             window.isConnecting = true;
-            updateConnectionDisplay(false, true);
-            updateBotStatus('CONNECTING', 'Establishing connection...');
+            updateConnectionStatus();
             
-            const wsUrl = 'wss://ws.binaryws.com/websockets/v3?app_id=120389';
-            log('Connecting to Deriv API...', 'SYSTEM');
+            const wsUrl = 'wss://ws.binaryws.com/websockets/v3?app_id=118332';
+            log('🔗 Connecting to Deriv API...', 'SYSTEM');
             
             window.ws = new WebSocket(wsUrl);
             
             window.ws.onopen = () => {
                 window.isConnecting = false;
-                updateConnectionDisplay(true, false);
-                log('WebSocket connected', 'SYSTEM');
+                resetReconnectionAttempts();
+                log('✅ WebSocket connected', 'SYSTEM');
+                updateConnectionStatus();
                 
                 const token = localStorage.getItem('active_token') || localStorage.getItem('derivToken');
                 if (!token) {
-                    log('No API token found', 'ERROR');
-                    updateBotStatus('ERROR', 'No API token');
+                    log('❌ No API token found in storage', 'ERROR');
                     stopBot();
                     return;
                 }
@@ -1433,236 +1260,347 @@
             
             window.ws.onclose = () => {
                 window.isConnecting = false;
-                updateConnectionDisplay(false, false);
-                log('Connection closed', 'SYSTEM');
+                updateConnectionStatus();
+                log('🔌 WebSocket disconnected', 'SYSTEM');
                 
                 if (window.isBotRunning) {
-                    updateBotStatus('DISCONNECTED', 'Connection lost');
-                    updateStatus('DISCONNECTED', 'WebSocket connection lost', 'Attempting to reconnect...');
-                    setTimeout(() => {
-                        if (window.isBotRunning) {
-                            connectWebSocket();
-                        }
-                    }, 3000);
+                    window.lastDisconnectTime = Date.now();
+                    
+                    // Attempt automatic reconnection if enabled
+                    if (window.networkRecoveryEnabled) {
+                        attemptNetworkRecovery();
+                    } else {
+                        log('⚠️ Network recovery disabled. Manual restart required.', 'NETWORK');
+                        updateTradeStatus('DISCONNECTED', 'WebSocket disconnected', 'Click START to reconnect', 'normal');
+                    }
                 }
             };
             
             window.ws.onerror = (error) => {
                 console.error('WebSocket error:', error);
-                log('Connection error', 'ERROR');
-                updateBotStatus('ERROR', 'Connection failed');
+                log('❌ WebSocket connection error', 'ERROR');
             };
         }
         
+        // TICK HANDLER - CRITICAL: RESTORED TRADE EXECUTION
         function handleTick(tick) {
-            if (!window.isBotRunning || window.stopAfterWin) {
-                return;
-            }
+            if (!window.isBotRunning) return;
             
-            window.totalTicksReceived++;
-            ticksReceived.textContent = window.totalTicksReceived;
+            const price = parseFloat(tick.quote);
+            const symbol = document.getElementById('symbol').value;
+            let decimalPlaces = 3;
+            if (symbol === 'R_100') decimalPlaces = 2;
+            const formattedPrice = price.toFixed(decimalPlaces);
+            const digit = formattedPrice.charAt(formattedPrice.length - 1);
             
-            const tickData = extractDigitFromTick(tick);
-            if (!tickData) return;
-            
-            metricLiveTick.textContent = tickData.formattedPrice;
-            metricLastDigit.textContent = `Digit: ${tickData.digit}`;
-            
-            metricLiveTick.classList.add('tick-flash');
-            setTimeout(() => metricLiveTick.classList.remove('tick-flash'), 100);
+            const tickData = { 
+                digit: digit, 
+                price: price, 
+                time: Date.now() 
+            };
             
             window.lastTick = tickData;
             
-            if (window.waitingForFirstTick) {
-                processFirstTick(tick);
+            document.getElementById('metricLiveTick').textContent = price.toFixed(3);
+            document.getElementById('metricLastDigit').textContent = `Digit: ${digit}`;
+            document.getElementById('metricLiveTick').classList.add('tick-flash');
+            setTimeout(() => document.getElementById('metricLiveTick').classList.remove('tick-flash'), 50);
+            
+            window.stats.totalTicks++;
+            window.botTickTimestamps.push(Date.now());
+            
+            // Track ticks for connection status
+            window.totalTicksReceived++;
+            window.tickTimestamps.push(Date.now());
+            const tenSecondsAgo = Date.now() - 10000;
+            window.tickTimestamps = window.tickTimestamps.filter(ts => ts > tenSecondsAgo);
+            
+            addTickToQueue(tickData);
+            playAudioFeedback('TICK');
+        }
+        
+        // Add tick to queue
+        function addTickToQueue(tick) {
+            window.tickQueue.push(tick);
+            if (window.tickQueue.length > window.maxQueueSize) {
+                window.tickQueue.shift();
+            }
+            
+            return true;
+        }
+        
+        // PROCESS TICK IMMEDIATELY - CRITICAL TRADE EXECUTION FUNCTION
+        function processTickImmediately(tick) {
+            if (window.stopAfterWin) return;
+            
+            if (sessionState.mode === 'smart' && !sessionState.sessionDigit) {
                 return;
             }
             
-            if (window.predictedDigit && !window.stopAfterWin) {
-                if (checkForDigitMatch(tick, tickData.digit)) {
-                    return;
-                }
+            if (checkForImmediateWin(tick)) {
+                return;
             }
             
-            if (window.predictedDigit && window.nextTradeAllowed && !window.executionLock && !window.stopAfterWin) {
-                executeTradeOnTick(tick);
+            if (window.tradeCount >= window.maxTrades) {
+                log(`🛑 Max trades reached (${window.maxTrades})`, 'CRITICAL');
+                updateTradeStatus('MAX TRADES', `Maximum trades reached (${window.maxTrades})`, 'Bot stopped', 'loss');
+                stopBot();
+                return;
+            }
+            
+            window.executionLock = true;
+            window.nextTradeAllowed = false;
+            
+            try {
+                window.stats.tradesExecuted++;
+                window.tradeCount++;
+                document.getElementById('metricTradeCount').textContent = window.tradeCount;
+                
+                updateSessionDisplay();
+                log(`⚡ Trade #${window.tradeCount}: ${tick.price.toFixed(3)} (Digit ${tick.digit})`, 'TRADE');
+                
+                updateTradeStatus(
+                    'TRADING',
+                    `Trade #${window.tradeCount}: $${window.currentStake.toFixed(2)} on digit ${parseInt(document.getElementById('predictedDigit').value)}`,
+                    'Executing trade...',
+                    'trade'
+                );
+                
+                playAudioFeedback('EXECUTION');
+                executeTrade(tick);
+                
+            } catch (error) {
+                log(`❌ Error: ${error}`, 'ERROR');
+                window.executionLock = false;
+                window.nextTradeAllowed = true;
+                updateTradeStatus('ERROR', `Trade failed: ${error}`, 'Retrying...', 'loss');
             }
         }
         
-        function handleAPIResponse(data) {
-            if (data.error) {
-                log(`API Error: ${data.error.message}`, 'ERROR');
-                if (data.error.code === 'InvalidToken') {
-                    log('Invalid token - please reauthenticate', 'CRITICAL');
-                    updateBotStatus('ERROR', 'Invalid token');
-                    stopBot();
-                }
-                return;
-            }
+        // EXECUTE TRADE - CRITICAL FUNCTION
+        function executeTrade(tick) {
+            const contractType = document.getElementById('contractType').value;
+            const symbol = document.getElementById('symbol').value;
+            const predictedDigit = parseInt(document.getElementById('predictedDigit').value);
             
-            if (data.msg_type === 'authorize') {
-                log(`Authorized as ${data.authorize.loginid}`, 'SYSTEM');
-                subscribeToTicks(document.getElementById('symbol').value);
-                subscribeToBalance();
-                updateBotStatus('CONNECTED', 'Market data streaming');
-            } else if (data.msg_type === 'tick') {
-                handleTick(data.tick);
-            } else if (data.msg_type === 'proposal') {
-                handleProposalResponse(data);
-            } else if (data.msg_type === 'buy') {
-                handleBuyResponse(data);
-            } else if (data.msg_type === 'balance') {
-                handleBalanceUpdate(data);
-            }
-        }
-        
-        function handleProposalResponse(data) {
-            const pending = window.pendingProposals.get(data.req_id);
-            if (!pending) return;
+            let stake = window.currentStake;
+            trackTradeInvestment(stake);
             
-            window.pendingProposals.delete(data.req_id);
-            
-            if (window.stopAfterWin) {
-                log('Proposal cancelled - win condition met', 'SYSTEM');
-                return;
-            }
-            
-            if (data.proposal && data.proposal.id) {
-                executeBuy(data.proposal.id, data.proposal.ask_price, pending);
-            } else {
-                log('Proposal failed', 'ERROR');
-                handleTradeResult(false);
-            }
-        }
-        
-        function executeBuy(proposal_id, ask_price, pending) {
-            if (window.stopAfterWin) {
-                log('Buy cancelled - win condition met', 'SYSTEM');
-                handleTradeResult(false);
-                return;
-            }
-            
-            const buyRequest = {
-                buy: proposal_id,
-                price: ask_price,
+            const proposalRequest = {
+                proposal: 1,
+                amount: stake.toFixed(2),
+                basis: "stake",
+                contract_type: contractType,
+                currency: "USD",
+                duration: 1,
+                duration_unit: "t",
+                symbol: symbol,
+                barrier: predictedDigit.toString(),
                 req_id: getNextReqId()
             };
             
-            window.pendingProposals.set(buyRequest.req_id, pending);
-            sendRequest(buyRequest);
+            window.pendingProposals.set(proposalRequest.req_id, {
+                tick: tick,
+                stake: stake,
+                contractType: contractType,
+                predictedDigit: predictedDigit,
+                startTime: Date.now(),
+                tradeNumber: window.tradeCount,
+                martingaleStep: window.martingaleStep
+            });
+            
+            sendRequest(proposalRequest);
         }
         
-        function handleBuyResponse(data) {
-            if (data.buy && data.buy.contract_id) {
-                const wasWin = data.buy.longcode && data.buy.longcode.includes("win");
-                handleTradeResult(wasWin);
+        // CHECK FOR IMMEDIATE WIN - CRITICAL FUNCTION
+        function checkForImmediateWin(tick) {
+            if (!window.isBotRunning || window.stopAfterWin) return false;
+            
+            const predictedDigit = parseInt(document.getElementById('predictedDigit').value);
+            const tickDigit = parseInt(tick.digit);
+            
+            if (tickDigit === predictedDigit) {
+                log(`🎯 IMMEDIATE WIN! Digit ${tickDigit} matches ${predictedDigit}`, 'WIN');
+                
+                window.lastTradeResult = 'win';
+                window.stopAfterWin = true;
+                window.stats.wins++;
+                window.tradeCount++;
+                
+                playAudioFeedback('WIN');
+                
+                const payout = window.currentStake * 9;
+                trackTradePayout(payout);
+                log(`💰 Payout: $${payout.toFixed(2)}`, 'PNL');
+                
+                // Start extended PnL updates for 10 seconds
+                startExtendedPnlUpdate(payout);
+                
+                updateTradeStatus(
+                    'IMMEDIATE WIN 🎯',
+                    `Digit ${tickDigit} matched! Payout: $${payout.toFixed(2)}`,
+                    'PnL updating for 10 seconds...',
+                    'win'
+                );
+                
+                updateStake('win');
+                return true;
+            }
+            
+            return false;
+        }
+        
+        // UPDATE STAKE - CRITICAL FUNCTION
+        function updateStake(winOrLoss) {
+            window.baseStake = parseFloat(document.getElementById('baseStake').value) || 1.0;
+            window.multiplier = parseFloat(document.getElementById('multiplier').value) || 1.15;
+            window.maxTrades = parseInt(document.getElementById('maxTrades').value) || 10;
+            
+            if (winOrLoss === 'win') {
+                window.martingaleStep = 0;
+                window.currentStake = window.baseStake;
+                log(`✅ WIN! Reset stake: $${window.currentStake.toFixed(2)}`, 'WIN');
+                
+                const payout = window.currentStake * 9;
+                trackTradePayout(payout);
+                log(`💰 Payout: $${payout.toFixed(2)}`, 'PNL');
+                
+                // Start extended PnL updates for 10 seconds
+                startExtendedPnlUpdate(payout);
+                
+                updateTradeStatus(
+                    'WIN 🎯',
+                    `WON! Digit matched - Payout: $${payout.toFixed(2)}`,
+                    'PnL updating for 10 seconds...',
+                    'win'
+                );
+                
+            } else if (winOrLoss === 'loss') {
+                window.martingaleStep++;
+                
+                if (window.martingaleStep >= window.maxTrades) {
+                    log(`🛑 MAX TRADES REACHED (${window.maxTrades})`, 'CRITICAL');
+                    updateTradeStatus('MAX TRADES', `Maximum trades reached (${window.maxTrades})`, 'Bot stopped', 'loss');
+                    stopBot();
+                    return;
+                }
+                
+                const newStake = window.currentStake * window.multiplier;
+                window.currentStake = parseFloat(newStake.toFixed(2));
+                log(`❌ LOSS. Next stake: $${window.currentStake.toFixed(2)} (Step: ${window.martingaleStep})`, 'LOSS');
+                
+                updateTradeStatus(
+                    'LOSS ❌',
+                    `Lost - Next: $${window.currentStake.toFixed(2)}`,
+                    'Increasing stake',
+                    'loss'
+                );
+                
+                // Always update PnL
+                updatePnL();
+                
             } else {
-                log('Buy failed', 'ERROR');
-                handleTradeResult(false);
-            }
-        }
-        
-        function handleBalanceUpdate(data) {
-            const newBalance = parseFloat(data.balance.balance);
-            
-            if (window.startingBalance === 0) {
-                window.startingBalance = newBalance;
+                window.martingaleStep = 0;
+                window.currentStake = window.baseStake;
+                log(`Starting. Base stake: $${window.currentStake.toFixed(2)}`, 'SYSTEM');
+                updateTradeStatus('STARTING', `Base stake: $${window.currentStake.toFixed(2)}`, 'Waiting for trades', 'normal');
             }
             
-            window.currentBalance = newBalance;
-            updateBalanceDisplay();
-            
-            // Update PnL display with current session data
-            updatePnLDisplay(window.sessionPayout - window.sessionInvestment);
+            const stakeElem = document.getElementById('metricCurrentStake');
+            stakeElem.textContent = `$${window.currentStake.toFixed(2)}`;
+            stakeElem.className = winOrLoss === 'win' ? 'text-lg font-bold text-green-400' : 'text-lg font-bold text-white';
         }
         
-        function subscribeToTicks(symbol) {
-            sendRequest({ ticks: symbol, subscribe: 1, req_id: getNextReqId() });
-            log(`Subscribed to ${symbol} ticks`, 'SYSTEM');
-            updateBotStatus('WAITING', 'Listening for first tick...');
-            updateStatus('CONNECTED', 'Market data streaming', 'Waiting for first tick...');
-        }
-        
-        function subscribeToBalance() {
-            sendRequest({ balance: 1, subscribe: 1, req_id: getNextReqId() });
-        }
-        
-        // ============================================================================
-        // BOT CONTROL FUNCTIONS
-        // ============================================================================
-        
+        // START BOT - CRITICAL FUNCTION
         function startBot() {
             if (window.isBotRunning) {
                 stopBot();
                 return;
             }
             
-            window.baseStake = parseFloat(document.getElementById('baseStake').value) || 1.0;
-            window.multiplier = parseFloat(document.getElementById('multiplier').value) || 1.15;
-            window.maxTrades = parseInt(document.getElementById('maxTrades').value) || 15;
-            maxTradesDisplay.textContent = window.maxTrades;
+            window.maxTrades = parseInt(document.getElementById('maxTrades').value) || 10;
             
             const token = localStorage.getItem('active_token') || localStorage.getItem('derivToken');
             if (!token) {
-                log('Please authenticate first', 'ERROR');
-                updateBotStatus('ERROR', 'No API token');
-                updateStatus('AUTH REQUIRED', 'No API token found', 'Please authenticate');
+                log('❌ No API token found. Please authenticate first.', 'CRITICAL');
+                updateTradeStatus('ERROR', 'No API token found', 'Please authenticate first', 'loss');
                 return;
             }
             
-            resetTradingState();
+            resetAllState();
+            
+            sessionState.sessionDigit = parseInt(document.getElementById('predictedDigit').value) || 5;
+            sessionState.sessionStarted = true;
+            sessionState.manualOverride = true;
+            
             window.isBotRunning = true;
-            window.stopAfterWin = false;
+            updateButtonState();
             
-            toggleButton.innerHTML = 'STOP TRADING';
-            toggleButton.classList.remove('gradient-success');
-            toggleButton.classList.add('gradient-danger');
+            log('🚀 Starting bot...', 'SYSTEM');
+            log(`📊 Mode: ${sessionState.mode}`, 'SYSTEM');
+            log(`📊 Max Trades: ${window.maxTrades}`, 'SYSTEM');
+            log(`🔑 Using token: ${token.substring(0, 10)}...`, 'SYSTEM');
+            log(`🌐 Network auto-recovery: ${window.networkRecoveryEnabled ? 'ENABLED' : 'DISABLED'}`, 'SYSTEM');
             
-            log('DIGITMATCHSTARv2 STARTED', 'SYSTEM');
-            log(`Settings: $${window.baseStake} base • ${window.multiplier}x martingale • ${window.maxTrades} max trades`, 'SYSTEM');
-            
-            updateBotStatus('STARTING', 'Initializing session...');
-            updateStatus('INITIALIZING', 'Starting trading session', 'Connecting to market...');
-            
-            calculateMartingaleTable();
+            updateTradeStatus('STARTING', 'Initializing bot...', 'Connecting to market', 'normal');
+            updateStake('initial');
             initTone();
-            startSessionTimer();
             connectWebSocket();
+            
+            document.querySelectorAll('#symbol, #predictedDigit, #contractType, #baseStake, #multiplier, #maxTrades').forEach(control => {
+                control.disabled = true;
+                control.classList.add('opacity-50', 'cursor-not-allowed');
+            });
         }
         
+        // STOP BOT - CRITICAL FUNCTION
         function stopBot() {
             if (!window.isBotRunning) return;
             
             window.isBotRunning = false;
             window.nextTradeAllowed = false;
-            window.stopAfterWin = true;
-            window.executionLock = false;
+            window.stopAfterWin = false;
+            updateButtonState();
             
-            toggleButton.innerHTML = 'START TRADING BOT';
-            toggleButton.classList.remove('gradient-danger');
-            toggleButton.classList.add('gradient-success');
+            log('⏹️ Bot stopped', 'SYSTEM');
             
-            if (window.ws) {
-                window.ws.close();
-                window.ws = null;
-            }
-            
-            window.pendingProposals.clear();
-            stopSessionTimer();
-            
+            // Stop any ongoing PnL updates
             if (window.pnlUpdateInterval) {
                 clearInterval(window.pnlUpdateInterval);
                 window.pnlUpdateInterval = null;
             }
             
-            const sessionPnL = window.sessionPayout - window.sessionInvestment;
-            log(`SESSION COMPLETE: PnL = $${sessionPnL.toFixed(2)}`, 'SYSTEM');
-            log(`Stats: ${window.stats.wins} wins • ${window.stats.losses} losses • ${window.stats.totalTrades} total trades`, 'SYSTEM');
+            // Stop any network recovery attempts
+            resetReconnectionAttempts();
             
-            updateBotStatus('STOPPED', 'Session ended');
-            updateStatus('BOT STOPPED', 
-                `Final PnL: $${sessionPnL.toFixed(2)}`, 
-                'Click START to begin new session');
+            if (window.ws) {
+                window.ws.close();
+                window.ws = null;
+            }
+            window.tickSubscriptionSent = false;
+            window.pendingProposals.clear();
+            window.executionLock = false;
+            
+            document.querySelectorAll('#symbol, #predictedDigit, #contractType, #baseStake, #multiplier, #maxTrades').forEach(control => {
+                control.disabled = false;
+                control.classList.remove('opacity-50', 'cursor-not-allowed');
+            });
+            
+            updateConnectionStatus();
+            
+            // Ensure PnL is updated one more time before showing final status
+            const finalPnL = updatePnL();
+            log(`💰 Final PnL: ${finalPnL >= 0 ? '+' : ''}$${finalPnL.toFixed(2)}`, 'PNL');
+            
+            updateTradeStatus(
+                'STOPPED',
+                `Final PnL: ${finalPnL >= 0 ? '+' : ''}$${finalPnL.toFixed(2)}`,
+                'Bot stopped - Ready for new session',
+                finalPnL > 0 ? 'win' : 'normal'
+            );
+            
+            sessionState.sessionStarted = false;
+            sessionDisplay.classList.add('hidden');
         }
         
         function toggleBot() {
@@ -1673,9 +1611,116 @@
             }
         }
         
-        // ============================================================================
         // HELPER FUNCTIONS
-        // ============================================================================
+        function calculateRates() {
+            const now = Date.now();
+            window.botTickTimestamps = window.botTickTimestamps.filter(ts => now - ts < 5000);
+            const tickRate = window.botTickTimestamps.length / 5;
+            document.getElementById('metricTickRate').textContent = `Ticks/sec: ${tickRate.toFixed(1)}`;
+        }
+        
+        function toggleSound() {
+            window.soundEnabled = !window.soundEnabled;
+            localStorage.setItem('soundEnabled', window.soundEnabled);
+            updateSoundButton();
+            log(`🔊 Sound ${window.soundEnabled ? 'ON' : 'OFF'}`, 'SYSTEM');
+        }
+        
+        function updateSoundButton() {
+            if (soundToggleButton) {
+                soundToggleButton.textContent = window.soundEnabled ? '🔊 Sound ON' : '🔇 Sound OFF';
+                soundToggleButton.className = window.soundEnabled ? 
+                    'px-4 py-2 bg-blue-600 text-white font-bold rounded-lg shadow hover:bg-blue-700 transition' :
+                    'px-4 py-2 bg-gray-600 text-white font-bold rounded-lg shadow hover:bg-gray-700 transition';
+            }
+        }
+        
+        async function initTone() {
+            if (!window.soundEnabled) return;
+            
+            if (typeof Tone === 'undefined') {
+                console.error("Tone.js not loaded");
+                return;
+            }
+            
+            try {
+                await Tone.start();
+                window.synth = new Tone.Synth().toDestination();
+                window.ToneInitialized = true;
+            } catch (e) {
+                console.error("Audio init error:", e);
+            }
+        }
+        
+        function playAudioFeedback(type) {
+            if (!window.soundEnabled || !window.ToneInitialized || !window.synth) return;
+            
+            try {
+                if (type === 'WIN') {
+                    window.synth.triggerAttackRelease("C5", "8n");
+                    setTimeout(() => window.synth.triggerAttackRelease("E5", "8n"), 100);
+                    setTimeout(() => window.synth.triggerAttackRelease("G5", "8n"), 200);
+                } else if (type === 'TICK') {
+                    window.synth.triggerAttackRelease("C4", "32n", Tone.now(), 0.3);
+                } else if (type === 'EXECUTION') {
+                    window.synth.triggerAttackRelease("E5", "16n", Tone.now(), 0.5);
+                }
+            } catch (e) {
+                console.error("Audio error:", e);
+            }
+        }
+        
+        function log(message, type = 'INFO') {
+            const logArea = document.getElementById('log-area');
+            const timestamp = new Date().toLocaleTimeString('en-US', { 
+                hour12: false, 
+                hour: '2-digit', 
+                minute: '2-digit', 
+                second: '2-digit' 
+            });
+            
+            let color = 'text-lime-400';
+            if (type === 'ERROR') color = 'text-red-500 font-bold'; 
+            if (type === 'WARNING') color = 'text-yellow-400';
+            if (type === 'TRADE') color = 'text-green-300';
+            if (type === 'WIN') color = 'text-green-400 font-bold';
+            if (type === 'LOSS') color = 'text-red-400 font-bold';
+            if (type === 'TICK') color = 'text-cyan-300';
+            if (type === 'SYSTEM') color = 'text-white';
+            if (type === 'PNL') color = 'text-purple-300 font-bold';
+            if (type === 'SESSION') color = 'text-blue-300 font-bold';
+            if (type === 'CALCULATOR') color = 'text-purple-300 font-bold';
+            if (type === 'NETWORK') color = 'text-yellow-300 font-bold';
+            
+            logArea.innerHTML += `\n[${timestamp}] <span class="${color}">${message}</span>`;
+            logArea.scrollTop = logArea.scrollHeight;
+        }
+        
+        function updateButtonState() {
+            if (!toggleButton) return;
+            
+            if (window.isBotRunning) {
+                toggleButton.innerHTML = '<span class="flex items-center justify-center"><span class="mr-2">⏹️</span> STOP BOT</span>';
+                toggleButton.classList.remove('bg-green-600', 'hover:bg-green-700', 'start-button-active');
+                toggleButton.classList.add('stop-button-active', 'hover:bg-red-700');
+            } else {
+                toggleButton.innerHTML = '<span class="flex items-center justify-center"><span class="mr-2">🚀</span> START BOT</span>';
+                toggleButton.classList.remove('stop-button-active', 'hover:bg-red-700');
+                toggleButton.classList.add('bg-green-600', 'hover:bg-green-700', 'start-button-active');
+            }
+        }
+        
+        // QUEUE PROCESSOR - CRITICAL FOR TRADE EXECUTION
+        function startQueueProcessor() {
+            setInterval(() => {
+                if (!window.isBotRunning || window.stopAfterWin) return;
+                
+                while (window.tickQueue.length > 0 && !window.executionLock && window.nextTradeAllowed) {
+                    const tick = window.tickQueue.shift();
+                    processTickImmediately(tick);
+                }
+            }, 50);
+        }
         
         function sendRequest(request) {
             if (window.ws && window.ws.readyState === WebSocket.OPEN) {
@@ -1690,104 +1735,167 @@
             return ++window.req_id;
         }
         
-        function log(message, type = 'INFO') {
-            const logArea = document.getElementById('log-area');
-            const timestamp = new Date().toLocaleTimeString('en-US', { 
-                hour12: false, 
-                hour: '2-digit', 
-                minute: '2-digit', 
-                second: '2-digit' 
-            });
-            
-            let color = 'text-gray-400';
-            if (type === 'ERROR') color = 'text-red-400'; 
-            if (type === 'WARNING') color = 'text-yellow-400';
-            if (type === 'TRADE') color = 'text-blue-400';
-            if (type === 'WIN') color = 'text-green-400 font-bold';
-            if (type === 'MARTINGALE') color = 'text-purple-400';
-            if (type === 'SYSTEM') color = 'text-cyan-400';
-            if (type === 'PNL') color = 'text-emerald-400';
-            
-            const entry = document.createElement('div');
-            entry.className = 'mb-1';
-            entry.innerHTML = `<span class="text-gray-500">[${timestamp}]</span> <span class="${color}">${message}</span>`;
-            
-            logArea.appendChild(entry);
-            logArea.scrollTop = logArea.scrollHeight;
-        }
+        // API RESPONSE HANDLER - CRITICAL FOR TRADE EXECUTION
+        function handleAPIResponse(data) {
+            if (data.error) {
+                log(`API Error: ${data.error.message}`, 'ERROR');
+                if (data.error.code === 'InvalidToken') {
+                    log('❌ Invalid API Token. Please check your authentication.', 'CRITICAL');
+                    stopBot();
+                }
+                return;
+            }
         
-        function clearLog() {
-            const logArea = document.getElementById('log-area');
-            logArea.innerHTML = '<div class="text-gray-500 text-center py-8">Log cleared</div>';
-        }
-        
-        function toggleSound() {
-            window.soundEnabled = !window.soundEnabled;
-            const button = document.getElementById('soundToggle');
-            button.textContent = window.soundEnabled ? 'Sound' : 'Muted';
-            log(`Sound ${window.soundEnabled ? 'enabled' : 'disabled'}`, 'SYSTEM');
-        }
-        
-        async function initTone() {
-            if (!window.soundEnabled) return;
-            
-            try {
-                await Tone.start();
-                window.synth = new Tone.Synth().toDestination();
-                window.ToneInitialized = true;
-            } catch (e) {
-                console.error("Audio init error:", e);
+            if (data.msg_type === 'authorize') {
+                if (data.authorize) {
+                    log(`🔐 Authorized as ${data.authorize.loginid}`, 'SYSTEM');
+                    subscribeToTicks(document.getElementById('symbol').value);
+                    subscribeToBalance();
+                }
+            } else if (data.msg_type === 'tick') {
+                handleTick(data.tick);
+            } else if (data.msg_type === 'proposal') {
+                handleProposalResponse(data.proposal, data.req_id);
+            } else if (data.msg_type === 'buy') {
+                handleBuyResponse(data.buy);
+            } else if (data.msg_type === 'balance') {
+                handleBalanceUpdate(data.balance);
             }
         }
         
-        function applyQuickSettings(type) {
-            if (type === 'conservative') {
-                document.getElementById('baseStake').value = '0.5';
-                document.getElementById('multiplier').value = '1.15';
-                document.getElementById('maxTrades').value = '10';
-                calculateMartingaleTable();
-                log('Applied conservative settings', 'SYSTEM');
+        function subscribeToBalance() {
+            sendRequest({ balance: 1, subscribe: 1, req_id: getNextReqId() });
+            log('💰 Subscribed to balance', 'SYSTEM');
+        }
+        
+        function handleBalanceUpdate(balanceData) {
+            const newBalance = parseFloat(balanceData.balance);
+            
+            if (window.startingBalance === 0) {
+                window.startingBalance = newBalance;
+                log(`💰 Starting Balance: $${window.startingBalance.toFixed(2)}`, 'PNL');
+            }
+            
+            window.currentBalance = newBalance;
+            const balanceElem = document.getElementById('metricAccountBalance');
+            balanceElem.textContent = `$${window.currentBalance.toFixed(2)}`;
+            balanceElem.className = 'text-lg font-bold balance-green';
+            updatePnL();
+        }
+        
+        function subscribeToTicks(symbol) {
+            if (window.tickSubscriptionSent) return;
+            
+            sendRequest({ ticks: symbol, subscribe: 1, req_id: getNextReqId() });
+            window.tickSubscriptionSent = true;
+            log(`✅ Subscribed to ${symbol} ticks`, 'SYSTEM');
+        }
+        
+        function handleProposalResponse(proposal, req_id) {
+            if (!proposal || !proposal.id) {
+                log(`❌ Proposal failed`, 'ERROR');
+                updateTradeStatus('ERROR', 'Proposal failed', 'Retrying...', 'loss');
+                return;
+            }
+        
+            const pending = window.pendingProposals.get(req_id);
+            if (!pending) return;
+        
+            window.pendingProposals.delete(req_id);
+            executeBuy(proposal.id, proposal.ask_price, pending);
+        }
+        
+        function executeBuy(proposal_id, ask_price, pending) {
+            const buyRequest = {
+                buy: proposal_id,
+                price: ask_price,
+                req_id: getNextReqId()
+            };
+            
+            log(`✅ Buying: $${pending.stake.toFixed(2)} on digit ${pending.predictedDigit}`, 'TRADE');
+            
+            window.pendingProposals.set(buyRequest.req_id, {
+                ...pending,
+                proposal_id: proposal_id,
+                buyStartTime: Date.now()
+            });
+            
+            sendRequest(buyRequest);
+        }
+        
+        function handleBuyResponse(buyData) {
+            if (buyData.contract_id) {
+                log(`✅ Trade executed successfully`, 'TRADE');
+                
+                // Check if this was a win or loss
+                const wasWin = buyData.longcode && buyData.longcode.includes("win");
+                
+                updateStake(wasWin ? 'win' : 'loss');
+                onTradeComplete(true);
+            } else {
+                log(`❌ Trade failed`, 'ERROR');
+                updateTradeStatus('ERROR', 'Trade execution failed', 'Retrying...', 'loss');
+                onTradeComplete(false);
             }
         }
         
-        function switchAccount() {
-            const isReal = document.getElementById('accTypeToggle').checked;
-            log(`Switched to ${isReal ? 'REAL' : 'DEMO'} account mode`, 'SYSTEM');
+        function onTradeComplete(isSuccess = true) {
+            window.executionLock = false;
+            window.nextTradeAllowed = true;
+            updateSessionDisplay();
+            
+            if (!isSuccess) {
+                updateStake('loss');
+            }
+            
+            if (window.stopAfterWin) {
+                return;
+            }
+            
+            if (window.tradeCount >= window.maxTrades) {
+                log(`🛑 Max trades reached (${window.maxTrades})`, 'CRITICAL');
+                updateTradeStatus('MAX TRADES', `Maximum trades reached (${window.maxTrades})`, 'Bot stopped', 'loss');
+                stopBot();
+                return;
+            }
         }
         
-        function updateStatus(status, message, action) {
-            statusMessage.textContent = message;
-            nextAction.textContent = action;
+        // Reset all state
+        function resetAllState() {
+            window.maxTrades = parseInt(document.getElementById('maxTrades').value) || 10;
+            
+            updateStake('initial');
+            resetPnL();
+            resetTradeStatus();
+            
+            window.startingBalance = 0.0;
+            window.currentBalance = 0.0;
+            window.netProfit = 0.0;
+            
+            document.getElementById('metricTradeCount').textContent = '0';
+            document.getElementById('metricAccountBalance').textContent = '$---';
+            document.getElementById('metricLiveTick').textContent = '---';
+            document.getElementById('metricLastDigit').textContent = 'Digit: ?';
+            
+            window.stats = { totalTicks: 0, tradesExecuted: 0, wins: 0, losses: 0 };
+            window.tickQueue = [];
+            window.lastTick = null;
+            window.lastTradeResult = null;
+            window.tradeCount = 0;
+            window.martingaleStep = 0;
+            window.pendingProposals.clear();
+            window.botTickTimestamps = [];
+            
+            window.executionLock = false;
+            window.waitingForTradeResult = false;
+            window.nextTradeAllowed = true;
+            window.stopAfterWin = false;
+            
+            const logArea = document.getElementById('log-area');
+            logArea.innerHTML = '[00:00:00] 🤖 Bot reset. Ready.';
+            
+            log('🔄 Bot reset', 'SYSTEM');
         }
-        
-        // ============================================================================
-        // INITIALIZATION
-        // ============================================================================
-        
-        document.addEventListener('DOMContentLoaded', () => {
-            console.log('DIGITMATCHSTARv2 Professional Trading Bot initialized');
-            
-            document.getElementById('baseStake').value = '1.0';
-            document.getElementById('multiplier').value = '1.15';
-            document.getElementById('maxTrades').value = '15';
-            maxTradesDisplay.textContent = '15';
-            
-            calculateMartingaleTable();
-            
-            document.getElementById('baseStake').addEventListener('input', calculateMartingaleTable);
-            document.getElementById('multiplier').addEventListener('input', calculateMartingaleTable);
-            document.getElementById('maxTrades').addEventListener('input', function() {
-                maxTradesDisplay.textContent = this.value;
-                calculateMartingaleTable();
-            });
-            
-            initTone();
-            
-            log('DIGITMATCHSTARv2 Professional Trading Bot ready', 'SYSTEM');
-            log('First Tick Martingale System with 1.15x multiplier', 'SYSTEM');
-            log('Supports up to 100 martingale trades', 'SYSTEM');
-            log('Ready for professional trading', 'SYSTEM');
-        });
     </script>
 </body>
 </html>
