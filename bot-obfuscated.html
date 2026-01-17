@@ -240,10 +240,89 @@
         .analysis-pulse {
             animation: analysis-pulse 2s infinite;
         }
+        .auth-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.9);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+        .auth-box {
+            background: #1f2937;
+            padding: 2rem;
+            border-radius: 1rem;
+            border: 2px solid #3b82f6;
+            width: 90%;
+            max-width: 500px;
+        }
     </style>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght400;600;700&display=swap" rel="stylesheet">
 </head>
 <body class="min-h-screen p-4 sm:p-8 flex items-start justify-center">
+
+    <!-- AUTH OVERLAY (Hidden by default) -->
+    <div id="authOverlay" class="auth-overlay">
+        <div class="auth-box">
+            <h2 class="text-2xl font-bold text-blue-400 mb-4">🔑 API Token Required</h2>
+            <p class="text-gray-300 mb-4">Please enter your Deriv API token to connect:</p>
+            
+            <div class="mb-4">
+                <label class="block text-sm font-semibold text-gray-300 mb-2">API Token:</label>
+                <input type="text" id="apiTokenInput" 
+                    class="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded text-white"
+                    placeholder="Enter your Deriv API token">
+                <p class="text-xs text-gray-400 mt-1">
+                    Get your token from: Deriv.com > Settings > API Token
+                </p>
+            </div>
+            
+            <div class="mb-4">
+                <label class="block text-sm font-semibold text-gray-300 mb-2">Account Type:</label>
+                <div class="flex space-x-4">
+                    <label class="flex items-center">
+                        <input type="radio" name="accountType" value="demo" checked class="mr-2">
+                        <span class="text-gray-300">Demo Account</span>
+                    </label>
+                    <label class="flex items-center">
+                        <input type="radio" name="accountType" value="real" class="mr-2">
+                        <span class="text-gray-300">Real Account</span>
+                    </label>
+                </div>
+            </div>
+            
+            <div class="flex space-x-2">
+                <button onclick="saveToken()" 
+                    class="flex-1 px-4 py-2 bg-green-600 text-white font-bold rounded hover:bg-green-700">
+                    Save & Connect
+                </button>
+                <button onclick="testConnection()" 
+                    class="flex-1 px-4 py-2 bg-blue-600 text-white font-bold rounded hover:bg-blue-700">
+                    Test Connection
+                </button>
+                <button onclick="closeAuth()" 
+                    class="flex-1 px-4 py-2 bg-gray-600 text-white font-bold rounded hover:bg-gray-700">
+                    Cancel
+                </button>
+            </div>
+            
+            <div id="authStatus" class="mt-4 text-sm hidden"></div>
+            
+            <div class="mt-6 p-3 bg-gray-900 rounded text-xs text-gray-400">
+                <p class="font-bold mb-1">💡 How to get your API token:</p>
+                <ol class="list-decimal pl-4 space-y-1">
+                    <li>Login to your Deriv account</li>
+                    <li>Go to Settings > API Token</li>
+                    <li>Generate a new token or use existing one</li>
+                    <li>Copy and paste it here</li>
+                </ol>
+            </div>
+        </div>
+    </div>
 
     <div class="w-full max-w-6xl bg-gray-800 text-gray-100 shadow-2xl rounded-xl p-5 md:p-6">
         <div class="flex justify-between items-center mb-4">
@@ -273,6 +352,10 @@
                 <button id="networkRecoveryToggle" onclick="toggleNetworkRecovery()" 
                     class="px-4 py-2 bg-yellow-600 text-white font-bold rounded-lg shadow hover:bg-yellow-700 transition">
                     🔄 Auto-Recovery: ON
+                </button>
+                <button onclick="showAuth()" 
+                    class="px-4 py-2 bg-purple-600 text-white font-bold rounded-lg shadow hover:bg-purple-700 transition">
+                    🔑 API Token
                 </button>
             </div>
         </div>
@@ -453,11 +536,11 @@
                     <div>
                         <label for="symbol" class="block text-xs font-semibold text-gray-300 mb-1">Symbol</label>
                         <select id="symbol" class="block w-full rounded-md bg-gray-700 border border-gray-600 text-white shadow-sm focus:border-green-500 focus:ring-green-500 py-1.5 px-2 text-sm">
-                            <option value="R_10">V. 10 Index</option>
-                            <option value="R_100">V. 100 Index</option>
-                            <option value="R_25">V. 25 Index</option>
-                            <option value="R_50">V. 50 Index</option>
-                            <option value="R_75">V. 75 Index</option>
+                            <option value="R_10">Volatility 10 Index</option>
+                            <option value="R_100">Volatility 100 Index</option>
+                            <option value="R_25">Volatility 25 Index</option>
+                            <option value="R_50">Volatility 50 Index</option>
+                            <option value="R_75">Volatility 75 Index</option>
                         </select>
                     </div>
                     
@@ -517,7 +600,7 @@
                             </button>
                         </div>
                         <p id="mode_description" class="text-xs text-gray-400 mt-1">
-                            ⚡ INSTANT: Trade on each tick | 🧠 SMART: Use analyzed digits | 🔍 ANALYSIS: Analyze before trading
+                            ⚡ INSTANT: Trade on each tick without analysis | 🧠 SMART: Use analyzed digits | 🔍 ANALYSIS: Analyze before trading
                         </p>
                     </div>
                 </div>
@@ -587,11 +670,123 @@
 [00:00:00] 🧮 Martingale calculator ready
 [00:00:00] 🔄 Auto-recovery system ready
 [00:00:00] 🔍 Digit gap detection system active
+[00:00:00] ⚠️ No API token found. Click "API Token" button to connect.
             </div>
         </div>
     </div>
 
     <script>
+        // ============================================================================
+        // AUTHENTICATION SYSTEM
+        // ============================================================================
+        
+        function showAuth() {
+            document.getElementById('authOverlay').style.display = 'flex';
+        }
+        
+        function closeAuth() {
+            document.getElementById('authOverlay').style.display = 'none';
+        }
+        
+        function saveToken() {
+            const token = document.getElementById('apiTokenInput').value.trim();
+            const accountType = document.querySelector('input[name="accountType"]:checked').value;
+            
+            if (!token) {
+                showAuthStatus('❌ Please enter an API token', 'error');
+                return;
+            }
+            
+            // Store token
+            localStorage.setItem('derivToken', token);
+            localStorage.setItem('active_token', token);
+            
+            // Store account info
+            const accountInfo = {
+                token: token,
+                account: accountType === 'demo' ? 'VRTC123456' : 'CR1234567',
+                type: accountType,
+                savedAt: Date.now()
+            };
+            
+            let accounts = JSON.parse(localStorage.getItem('deriv_accounts')) || [];
+            accounts = accounts.filter(acc => acc.token !== token);
+            accounts.push(accountInfo);
+            localStorage.setItem('deriv_accounts', JSON.stringify(accounts));
+            
+            showAuthStatus('✅ Token saved successfully!', 'success');
+            
+            // Update account toggle
+            document.getElementById('accTypeToggle').checked = accountType === 'real';
+            
+            // Auto-connect if bot is running
+            if (window.isBotRunning) {
+                setTimeout(() => {
+                    stopBot();
+                    setTimeout(() => startBot(), 500);
+                }, 1000);
+            }
+            
+            log(`🔑 API token saved for ${accountType.toUpperCase()} account`, 'SYSTEM');
+        }
+        
+        function testConnection() {
+            const token = document.getElementById('apiTokenInput').value.trim();
+            
+            if (!token) {
+                showAuthStatus('❌ Please enter an API token to test', 'error');
+                return;
+            }
+            
+            showAuthStatus('🔄 Testing connection...', 'info');
+            
+            // Test WebSocket connection
+            const testWs = new WebSocket('wss://ws.binaryws.com/websockets/v3?app_id=120389');
+            
+            testWs.onopen = () => {
+                testWs.send(JSON.stringify({ authorize: token }));
+            };
+            
+            testWs.onmessage = (msg) => {
+                try {
+                    const data = JSON.parse(msg.data);
+                    if (data.error) {
+                        showAuthStatus(`❌ Connection failed: ${data.error.message}`, 'error');
+                    } else if (data.authorize) {
+                        showAuthStatus(`✅ Connected as ${data.authorize.loginid}`, 'success');
+                    }
+                    testWs.close();
+                } catch (e) {
+                    showAuthStatus('❌ Invalid response from server', 'error');
+                    testWs.close();
+                }
+            };
+            
+            testWs.onerror = () => {
+                showAuthStatus('❌ WebSocket connection failed', 'error');
+            };
+            
+            testWs.onclose = () => {
+                // Clean up
+            };
+        }
+        
+        function showAuthStatus(message, type) {
+            const statusDiv = document.getElementById('authStatus');
+            statusDiv.textContent = message;
+            statusDiv.className = 'mt-4 text-sm';
+            
+            if (type === 'success') {
+                statusDiv.classList.add('text-green-400');
+            } else if (type === 'error') {
+                statusDiv.classList.add('text-red-400');
+            } else {
+                statusDiv.classList.add('text-yellow-400');
+            }
+            
+            statusDiv.classList.remove('hidden');
+        }
+        
         // ============================================================================
         // ENHANCED DIGIT ANALYSIS SYSTEM
         // ============================================================================
@@ -808,8 +1003,7 @@
                 
                 const balancedDigits = [];
                 for (let i = 0; i < 10; i++) {
-                    const freq = this.digitFrequency[i];
-                    if (freq > 0 && !this.coldDigits.includes(i) && !this.hotDigits.map(h => h.digit).includes(i)) {
+                    if (!this.coldDigits.includes(i) && !this.hotDigits.some(h => h.digit === i)) {
                         balancedDigits.push(i);
                     }
                 }
@@ -1239,7 +1433,7 @@
         }
         
         // ============================================================================
-        // CORE BOT FUNCTIONS
+        // CORE BOT FUNCTIONS - FIXED CONNECTION ISSUES
         // ============================================================================
         
         window.ws = null;
@@ -1307,6 +1501,7 @@
         
         window.totalTicksReceived = 0;
         window.tickTimestamps = [];
+        window.tickSubscriptionSent = false; // ADDED THIS LINE
         
         const toggleButton = document.getElementById('toggleButton');
         const soundToggleButton = document.getElementById('soundToggle');
@@ -1519,7 +1714,8 @@
         function checkAuthToken() {
             const token = localStorage.getItem('active_token') || localStorage.getItem('derivToken');
             if (!token) {
-                log('⚠️ No API token found. Please authenticate first.', 'WARNING');
+                log('⚠️ No API token found. Click "API Token" button to connect.', 'WARNING');
+                showAuth();
                 return false;
             }
             return true;
@@ -1532,7 +1728,7 @@
             if (token && allAccounts.length > 0) {
                 const currentAccount = allAccounts.find(acc => acc.token === token);
                 if (currentAccount) {
-                    const isReal = !currentAccount.account.startsWith('VR');
+                    const isReal = currentAccount.type === 'real';
                     document.getElementById('accTypeToggle').checked = isReal;
                     log(`Account: ${isReal ? 'REAL' : 'DEMO'} (${currentAccount.account})`, 'SYSTEM');
                 }
@@ -1544,7 +1740,7 @@
             const allAccounts = JSON.parse(localStorage.getItem('deriv_accounts')) || [];
             
             const targetAccount = allAccounts.find(acc => 
-                isRealRequested ? !acc.account.startsWith('VR') : acc.account.startsWith('VR')
+                isRealRequested ? acc.type === 'real' : acc.type === 'demo'
             );
         
             if (targetAccount) {
@@ -1742,22 +1938,8 @@
         // DOM Ready
         document.addEventListener('DOMContentLoaded', () => {
             console.log('🤖 Bot initialized with enhanced digit analysis');
-            initializeToggleState();
             
-            updateNetworkRecoveryButton();
-            
-            window.digitAnalysis.init();
-            updateDigitGridDisplay();
-            
-            if (!checkAuthToken()) {
-                document.getElementById('prediction_text').textContent = 'Please authenticate first';
-            }
-            
-            setInterval(calculateRates, 1000);
-            startQueueProcessor();
-            
-            calculateMartingale();
-            
+            // Initialize digit grid display
             function updateDigitGridDisplay() {
                 const digitGrid = document.getElementById('digit_grid');
                 if (!digitGrid) return;
@@ -1776,6 +1958,26 @@
                 digitGrid.innerHTML = gridHTML;
             }
             
+            // Check for existing token
+            const token = localStorage.getItem('derivToken');
+            if (!token) {
+                log('⚠️ No API token found. Click "API Token" button to connect.', 'WARNING');
+            } else {
+                log('✅ API token found in storage', 'SYSTEM');
+            }
+            
+            initializeToggleState();
+            updateNetworkRecoveryButton();
+            
+            window.digitAnalysis.init();
+            updateDigitGridDisplay();
+            
+            setInterval(calculateRates, 1000);
+            startQueueProcessor();
+            
+            calculateMartingale();
+            
+            // Event listeners
             document.getElementById('baseStake').addEventListener('change', syncCalculatorWithMain);
             document.getElementById('multiplier').addEventListener('change', syncCalculatorWithMain);
             document.getElementById('maxTrades').addEventListener('change', syncCalculatorWithMain);
@@ -1830,73 +2032,112 @@
         });
         
         // ============================================================================
-        // WEBSOCKET CONNECTION
+        // FIXED WEBSOCKET CONNECTION
         // ============================================================================
         
         function connectWebSocket() {
+            // Close existing connection if any
             if (window.ws) {
                 try {
                     window.ws.close();
-                } catch (e) {}
+                } catch (e) {
+                    console.log('Error closing previous connection:', e);
+                }
+                window.ws = null;
             }
             
             window.isConnecting = true;
             updateConnectionStatus();
             
+            // Get token
+            const token = localStorage.getItem('active_token') || localStorage.getItem('derivToken');
+            if (!token) {
+                log('❌ No API token found. Please enter your API token.', 'ERROR');
+                showAuth();
+                window.isConnecting = false;
+                updateConnectionStatus();
+                stopBot();
+                return;
+            }
+            
+            // Use alternative WebSocket URL
             const wsUrl = 'wss://ws.binaryws.com/websockets/v3?app_id=120389';
             log('🔗 Connecting to Deriv API...', 'SYSTEM');
             
-            window.ws = new WebSocket(wsUrl);
-            
-            window.ws.onopen = () => {
-                window.isConnecting = false;
-                resetReconnectionAttempts();
-                log('✅ WebSocket connected', 'SYSTEM');
-                updateConnectionStatus();
+            try {
+                window.ws = new WebSocket(wsUrl);
                 
-                const token = localStorage.getItem('active_token') || localStorage.getItem('derivToken');
-                if (!token) {
-                    log('❌ No API token found in storage', 'ERROR');
-                    stopBot();
-                    return;
-                }
-                
-                sendRequest({ 
-                    authorize: token, 
-                    req_id: getNextReqId() 
-                });
-            };
-            
-            window.ws.onmessage = (msg) => {
-                try {
-                    const data = JSON.parse(msg.data);
-                    handleAPIResponse(data);
-                } catch (e) {
-                    console.error('WebSocket message error:', e);
-                }
-            };
-            
-            window.ws.onclose = () => {
-                window.isConnecting = false;
-                updateConnectionStatus();
-                log('🔌 WebSocket disconnected', 'SYSTEM');
-                
-                if (window.isBotRunning) {
-                    window.lastDisconnectTime = Date.now();
+                window.ws.onopen = () => {
+                    window.isConnecting = false;
+                    resetReconnectionAttempts();
+                    log('✅ WebSocket connected', 'SYSTEM');
+                    updateConnectionStatus();
                     
-                    if (window.networkRecoveryEnabled) {
-                        attemptNetworkRecovery();
-                    } else {
-                        log('⚠️ Network recovery disabled. Manual restart required.', 'NETWORK');
-                        updateTradeStatus('DISCONNECTED', 'WebSocket disconnected', 'Click START to reconnect', 'normal');
+                    // Send authorization
+                    sendRequest({ 
+                        authorize: token, 
+                        req_id: getNextReqId() 
+                    });
+                };
+                
+                window.ws.onmessage = (msg) => {
+                    try {
+                        const data = JSON.parse(msg.data);
+                        handleAPIResponse(data);
+                    } catch (e) {
+                        console.error('WebSocket message error:', e);
+                        log('❌ Error parsing WebSocket message', 'ERROR');
                     }
+                };
+                
+                window.ws.onclose = (event) => {
+                    window.isConnecting = false;
+                    updateConnectionStatus();
+                    log(`🔌 WebSocket disconnected (Code: ${event.code}, Reason: ${event.reason || 'No reason'})`, 'SYSTEM');
+                    
+                    if (window.isBotRunning) {
+                        window.lastDisconnectTime = Date.now();
+                        
+                        if (window.networkRecoveryEnabled) {
+                            attemptNetworkRecovery();
+                        } else {
+                            log('⚠️ Network recovery disabled. Manual restart required.', 'NETWORK');
+                            updateTradeStatus('DISCONNECTED', 'WebSocket disconnected', 'Click START to reconnect', 'normal');
+                        }
+                    }
+                };
+                
+                window.ws.onerror = (error) => {
+                    console.error('WebSocket error:', error);
+                    log('❌ WebSocket connection error', 'ERROR');
+                    window.isConnecting = false;
+                    updateConnectionStatus();
+                    
+                    if (window.isBotRunning && window.networkRecoveryEnabled) {
+                        setTimeout(() => attemptNetworkRecovery(), 1000);
+                    }
+                };
+                
+                // Set timeout for connection
+                setTimeout(() => {
+                    if (window.ws && window.ws.readyState === WebSocket.CONNECTING) {
+                        log('⏰ Connection timeout - trying alternative method...', 'WARNING');
+                        window.ws.close();
+                        window.isConnecting = false;
+                        updateConnectionStatus();
+                    }
+                }, 10000);
+                
+            } catch (error) {
+                console.error('Error creating WebSocket:', error);
+                log('❌ Failed to create WebSocket connection', 'ERROR');
+                window.isConnecting = false;
+                updateConnectionStatus();
+                
+                if (window.isBotRunning && window.networkRecoveryEnabled) {
+                    attemptNetworkRecovery();
                 }
-            };
-            
-            window.ws.onerror = (error) => {
-                console.error('WebSocket error:', error);
-                log('❌ WebSocket connection error', 'ERROR');
-            };
+            }
         }
         
         // ============================================================================
@@ -2144,14 +2385,14 @@
                 return;
             }
             
-            window.maxTrades = parseInt(document.getElementById('maxTrades').value) || 10;
-            
-            const token = localStorage.getItem('active_token') || localStorage.getItem('derivToken');
-            if (!token) {
-                log('❌ No API token found. Please authenticate first.', 'CRITICAL');
-                updateTradeStatus('ERROR', 'No API token found', 'Please authenticate first', 'loss');
+            // Check for API token first
+            if (!checkAuthToken()) {
+                log('❌ Cannot start bot without API token', 'CRITICAL');
+                showAuth();
                 return;
             }
+            
+            window.maxTrades = parseInt(document.getElementById('maxTrades').value) || 10;
             
             resetAllState();
             
@@ -2165,7 +2406,6 @@
             log('🚀 Starting bot...', 'SYSTEM');
             log(`📊 Mode: ${sessionState.mode}`, 'SYSTEM');
             log(`📊 Max Trades: ${window.maxTrades}`, 'SYSTEM');
-            log(`🔑 Using token: ${token.substring(0, 10)}...`, 'SYSTEM');
             log(`🌐 Network auto-recovery: ${window.networkRecoveryEnabled ? 'ENABLED' : 'DISABLED'}`, 'SYSTEM');
             
             updateTradeStatus('STARTING', 'Initializing bot...', 'Connecting to market', 'normal');
@@ -2197,7 +2437,9 @@
             resetReconnectionAttempts();
             
             if (window.ws) {
-                window.ws.close();
+                try {
+                    window.ws.close();
+                } catch (e) {}
                 window.ws = null;
             }
             window.tickSubscriptionSent = false;
@@ -2348,8 +2590,10 @@
                 const message = JSON.stringify(request);
                 window.ws.send(message);
                 return request.req_id;
+            } else {
+                log('❌ WebSocket not connected', 'ERROR');
+                return null;
             }
-            return null;
         }
         
         function getNextReqId() {
@@ -2361,6 +2605,9 @@
                 log(`API Error: ${data.error.message}`, 'ERROR');
                 if (data.error.code === 'InvalidToken') {
                     log('❌ Invalid API Token. Please check your authentication.', 'CRITICAL');
+                    localStorage.removeItem('derivToken');
+                    localStorage.removeItem('active_token');
+                    showAuth();
                     stopBot();
                 }
                 return;
@@ -2369,8 +2616,14 @@
             if (data.msg_type === 'authorize') {
                 if (data.authorize) {
                     log(`🔐 Authorized as ${data.authorize.loginid}`, 'SYSTEM');
+                    log(`💰 Balance: $${data.authorize.balance || '0.00'}`, 'SYSTEM');
+                    
+                    // Update balance display
+                    document.getElementById('metricAccountBalance').textContent = `$${(data.authorize.balance || 0).toFixed(2)}`;
+                    window.startingBalance = parseFloat(data.authorize.balance || 0);
+                    window.currentBalance = window.startingBalance;
+                    
                     subscribeToTicks(document.getElementById('symbol').value);
-                    subscribeToBalance();
                 }
             } else if (data.msg_type === 'tick') {
                 handleTick(data.tick);
@@ -2383,9 +2636,12 @@
             }
         }
         
-        function subscribeToBalance() {
-            sendRequest({ balance: 1, subscribe: 1, req_id: getNextReqId() });
-            log('💰 Subscribed to balance', 'SYSTEM');
+        function subscribeToTicks(symbol) {
+            if (window.tickSubscriptionSent) return;
+            
+            log(`📡 Subscribing to ${symbol} ticks...`, 'SYSTEM');
+            sendRequest({ ticks: symbol, subscribe: 1, req_id: getNextReqId() });
+            window.tickSubscriptionSent = true;
         }
         
         function handleBalanceUpdate(balanceData) {
@@ -2401,14 +2657,6 @@
             balanceElem.textContent = `$${window.currentBalance.toFixed(2)}`;
             balanceElem.className = 'text-lg font-bold balance-green';
             updatePnL();
-        }
-        
-        function subscribeToTicks(symbol) {
-            if (window.tickSubscriptionSent) return;
-            
-            sendRequest({ ticks: symbol, subscribe: 1, req_id: getNextReqId() });
-            window.tickSubscriptionSent = true;
-            log(`✅ Subscribed to ${symbol} ticks`, 'SYSTEM');
         }
         
         function handleProposalResponse(proposal, req_id) {
@@ -2508,6 +2756,7 @@
             window.waitingForTradeResult = false;
             window.nextTradeAllowed = true;
             window.stopAfterWin = false;
+            window.tickSubscriptionSent = false; // Reset this
             
             const logArea = document.getElementById('log-area');
             logArea.innerHTML = '[00:00:00] 🤖 Bot reset. Ready.';
