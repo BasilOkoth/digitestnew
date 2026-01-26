@@ -688,7 +688,13 @@
                 if (!this.enabled) return;
                 
                 for (let i = 0; i < prices.length; i++) {
-                    const digit = Number(String(prices[i]).slice(-1));
+                    // 🔒 Unified robust digit extraction (engine + UI use same source)
+                    const priceStr = String(prices[i]);
+                    const digitChar = priceStr[priceStr.length - 1];
+                    
+                    if (digitChar < '0' || digitChar > '9') continue;  // safety guard
+                    
+                    const digit = parseInt(digitChar);
                     
                     this.updateRegime(digit);
                     this.onNewDigit(digit);
@@ -717,11 +723,32 @@
             
             // Process live tick
             processLiveTick: function(digit) {
-                if (!this.enabled || !this.warmupDone) return;
+                if (!this.enabled) return;
+                
+                if (digit < 0 || digit > 9 || isNaN(digit)) return;
+                
+                // 🔥 FIX #3: advance tick index
+                this.tickIndex++;
+                
+                // Update warmup ticks if still in warmup phase
+                if (!this.warmupDone) {
+                    this.warmupTicks++;
+                    
+                    // Update progress every 10 ticks
+                    if (this.warmupTicks % 10 === 0) {
+                        const progress = Math.min(100, Math.round((this.warmupTicks / this.targetWarmupTicks) * 100));
+                        updateEngineStatus(`Warming up... ${this.warmupTicks}/${this.targetWarmupTicks}`, 'WARMUP', progress);
+                    }
+                    
+                    if (this.warmupTicks >= this.targetWarmupTicks && !this.warmupDone) {
+                        this.warmupDone = true;
+                        log(`🧠 Warm-up complete! Analyzed ${this.warmupTicks} ticks`, 'ENGINE');
+                        updateEngineStatus('Analyzing market...', 'ANALYZING', 100);
+                    }
+                }
                 
                 this.updateRegime(digit);
                 this.onNewDigit(digit);
-                this.tickIndex++;
                 
                 // Update analysis every 50 ticks
                 if (this.tickIndex % 50 === 0) {
@@ -775,20 +802,24 @@
                 };
             },
             
-            // Handle new digit
+            // Handle new digit - FIXED VERSION
             onNewDigit: function(digit) {
+                if (digit < 0 || digit > 9 || isNaN(digit)) return;
+
                 const s = this.digitStats[digit];
+
+                // 🔥 FIX #2: increment count
                 s.count++;
-                
-                // Update gap statistics
+
+                // gap update
                 if (s.lastSeen !== null) {
                     const gap = this.tickIndex - s.lastSeen - 1;
                     if (gap >= 0) this.updateGapStats(digit, gap);
                 }
-                
+
                 s.lastSeen = this.tickIndex;
-                
-                // Update current gaps for all digits
+
+                // update current gaps
                 for (let d = 0; d < 10; d++) {
                     const st = this.digitStats[d];
                     st.currentGap = (st.lastSeen === null)
@@ -1976,6 +2007,50 @@
             };
         }
         
+        // ============================================================================
+        // ✅ FIX #1 — UNIFIED DIGIT EXTRACTION (CRITICAL FIX)
+        // ============================================================================
+        
+        // TICK HANDLER - CRITICAL: FIXED DIGIT EXTRACTION
+        function handleTick(tick) {
+            if (!window.isBotRunning) return;
+            
+            const price = parseFloat(tick.quote);
+            
+            // 🔒 Unified robust digit extraction (engine + UI use same source)
+            const priceStr = String(tick.quote);
+            const digitChar = priceStr[priceStr.length - 1];
+            
+            if (digitChar < '0' || digitChar > '9') return;  // safety guard
+            
+            const digit = parseInt(digitChar);
+            
+            const tickData = { 
+                digit: digit, 
+                price: price, 
+                time: Date.now() 
+            };
+            
+            window.lastTick = tickData;
+            
+            document.getElementById('metricLiveTick').textContent = price.toFixed(3);
+            document.getElementById('metricLastDigit').textContent = `Digit: ${digit}`;
+            document.getElementById('metricLiveTick').classList.add('tick-flash');
+            setTimeout(() => document.getElementById('metricLiveTick').classList.remove('tick-flash'), 50);
+            
+            window.stats.totalTicks++;
+            window.botTickTimestamps.push(Date.now());
+            
+            // Track ticks for connection status
+            window.totalTicksReceived++;
+            window.tickTimestamps.push(Date.now());
+            const tenSecondsAgo = Date.now() - 10000;
+            window.tickTimestamps = window.tickTimestamps.filter(ts => ts > tenSecondsAgo);
+            
+            addTickToQueue(tickData);
+            playAudioFeedback('TICK');
+        }
+        
         // API RESPONSE HANDLER - MODIFIED FOR ENGINE INTEGRATION
         function handleAPIResponse(data) {
             if (data.error) {
@@ -2009,10 +2084,16 @@
             } else if (data.msg_type === 'tick') {
                 handleTick(data.tick);
                 
-                // Process tick in intelligence engine
+                // Process tick in intelligence engine - with same unified digit extraction
                 if (window.digitIntelligenceEngine.enabled) {
-                    const digit = Number(String(data.tick.quote).slice(-1));
-                    window.digitIntelligenceEngine.processLiveTick(digit);
+                    // 🔒 Use the same unified digit extraction method
+                    const priceStr = String(data.tick.quote);
+                    const digitChar = priceStr[priceStr.length - 1];
+                    
+                    if (digitChar >= '0' && digitChar <= '9') {
+                        const digit = parseInt(digitChar);
+                        window.digitIntelligenceEngine.processLiveTick(digit);
+                    }
                 }
             } else if (data.msg_type === 'proposal') {
                 handleProposalResponse(data.proposal, data.req_id);
@@ -2021,43 +2102,6 @@
             } else if (data.msg_type === 'balance') {
                 handleBalanceUpdate(data.balance);
             }
-        }
-        
-        // TICK HANDLER - CRITICAL: RESTORED TRADE EXECUTION
-        function handleTick(tick) {
-            if (!window.isBotRunning) return;
-            
-            const price = parseFloat(tick.quote);
-            const symbol = document.getElementById('symbol').value;
-            let decimalPlaces = 3;
-            if (symbol === 'R_100') decimalPlaces = 2;
-            const formattedPrice = price.toFixed(decimalPlaces);
-            const digit = formattedPrice.charAt(formattedPrice.length - 1);
-            
-            const tickData = { 
-                digit: digit, 
-                price: price, 
-                time: Date.now() 
-            };
-            
-            window.lastTick = tickData;
-            
-            document.getElementById('metricLiveTick').textContent = price.toFixed(3);
-            document.getElementById('metricLastDigit').textContent = `Digit: ${digit}`;
-            document.getElementById('metricLiveTick').classList.add('tick-flash');
-            setTimeout(() => document.getElementById('metricLiveTick').classList.remove('tick-flash'), 50);
-            
-            window.stats.totalTicks++;
-            window.botTickTimestamps.push(Date.now());
-            
-            // Track ticks for connection status
-            window.totalTicksReceived++;
-            window.tickTimestamps.push(Date.now());
-            const tenSecondsAgo = Date.now() - 10000;
-            window.tickTimestamps = window.tickTimestamps.filter(ts => ts > tenSecondsAgo);
-            
-            addTickToQueue(tickData);
-            playAudioFeedback('TICK');
         }
         
         // Add tick to queue
