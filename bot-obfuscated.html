@@ -76,7 +76,6 @@
         .connection-badge-connecting {
             background: linear-gradient(90deg, #f59e0b, #d97706) !important;
         }
-        /* Account Toggle */
         .account-toggle-container {
             display: inline-flex;
             align-items: center;
@@ -165,7 +164,6 @@
             color: #f59e0b !important;
             font-weight: bold !important;
         }
-        /* Calculator Styles */
         .calculator-highlight {
             background: linear-gradient(135deg, #7c3aed, #8b5cf6) !important;
             border: 1px solid #a78bfa !important;
@@ -197,6 +195,44 @@
             background: linear-gradient(90deg, #f59e0b, #d97706) !important;
             animation: pulse-once 0.8s infinite;
         }
+        /* Digit Intelligence Engine Styles */
+        .engine-status-warmup {
+            background: linear-gradient(90deg, #f59e0b, #d97706) !important;
+            animation: pulse-once 0.8s infinite;
+        }
+        .engine-status-analyzing {
+            background: linear-gradient(90deg, #3b82f6, #1d4ed8) !important;
+            animation: pulse-once 0.8s infinite;
+        }
+        .engine-status-ready {
+            background: linear-gradient(90deg, #10b981, #059669) !important;
+        }
+        .engine-digit-score-high {
+            color: #10b981 !important;
+            font-weight: bold !important;
+        }
+        .engine-digit-score-medium {
+            color: #f59e0b !important;
+            font-weight: bold !important;
+        }
+        .engine-digit-score-low {
+            color: #ef4444 !important;
+            font-weight: bold !important;
+        }
+        .digit-analysis-panel {
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .digit-bar {
+            height: 20px;
+            border-radius: 4px;
+            margin: 2px 0;
+            transition: all 0.3s ease;
+        }
+        .digit-bar:hover {
+            transform: scale(1.02);
+            box-shadow: 0 0 10px rgba(255, 255, 255, 0.2);
+        }
     </style>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght400;600;700&display=swap" rel="stylesheet">
 </head>
@@ -210,6 +246,10 @@
                     🔴 DISCONNECTED
                 </span>
                 <span id="contract-type-badge" class="contract-type-badge bg-purple-600 text-white">DIGITMATCH</span>
+                <!-- Intelligence Engine Badge -->
+                <span id="engine-status-badge" class="ml-2 inline-flex items-center px-3 py-1 text-sm font-medium rounded-full engine-status-warmup text-white shadow-md">
+                    🔥 ENGINE: WARM-UP
+                </span>
                 <!-- Network Recovery Badge -->
                 <span id="network-recovery-badge" class="ml-2 inline-flex items-center px-3 py-1 text-sm font-medium rounded-full hidden network-recovery-badge text-white shadow-md">
                     🔄 AUTO-RECOVER
@@ -234,11 +274,16 @@
                     class="px-4 py-2 bg-yellow-600 text-white font-bold rounded-lg shadow hover:bg-yellow-700 transition">
                     🔄 Auto-Recovery: ON
                 </button>
+                <!-- Engine Control -->
+                <button id="engineToggle" onclick="toggleEngine()" 
+                    class="px-4 py-2 bg-purple-600 text-white font-bold rounded-lg shadow hover:bg-purple-700 transition">
+                    🧠 AI Engine: ON
+                </button>
             </div>
         </div>
         
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
-            <!-- LEFT COLUMN: SIMPLIFIED MARKET STATUS -->
+            <!-- LEFT COLUMN: MARKET STATUS & ENGINE ANALYSIS -->
             <div class="lg:col-span-1">
                 <div class="bg-gray-900 border border-gray-700 rounded-xl p-4 shadow-lg">
                     <h2 class="text-lg font-bold text-cyan-400 mb-4 pb-2 border-b border-gray-700">
@@ -268,14 +313,40 @@
                         </div>
                     </div>
                     
-                    <!-- Digit Display -->
-                    <div class="mb-4 p-3 bg-gray-800 rounded-lg border border-cyan-500/30">
-                        <h3 class="text-sm font-bold text-cyan-300 mb-3">Current Digit</h3>
+                    <!-- Digit Intelligence Engine Panel -->
+                    <div class="mb-4 p-3 bg-gray-800 rounded-lg border border-purple-500/50">
+                        <h3 class="text-sm font-bold text-purple-400 mb-3 flex items-center">
+                            🧠 DIGIT INTELLIGENCE ENGINE
+                            <span id="engine-warmup-progress" class="ml-auto text-xs bg-gray-700 px-2 py-1 rounded">
+                                0%
+                            </span>
+                        </h3>
                         
-                        <div id="prediction_box" class="p-3 bg-gray-800 rounded border border-cyan-500/50 text-sm">
-                            <div class="text-cyan-300 font-bold mb-1">Selected Digit:</div>
-                            <div class="text-2xl font-bold mb-2 text-center text-green-400">5</div>
-                            <div class="text-xs text-gray-300">Set digit in main controls</div>
+                        <!-- Engine Status -->
+                        <div class="mb-3 p-2 bg-gray-900 rounded border border-gray-700">
+                            <div class="text-xs font-semibold text-gray-300 mb-1">Status:</div>
+                            <div id="engine-status-text" class="text-sm font-bold text-yellow-400">Warming up...</div>
+                            <div id="engine-regime-status" class="text-xs text-gray-400 mt-1">Regime: Unknown</div>
+                        </div>
+                        
+                        <!-- Selected Digit -->
+                        <div class="mb-3 p-2 bg-gray-900 rounded border border-green-500/30">
+                            <div class="text-xs font-semibold text-green-400 mb-1">AI Recommended Digit:</div>
+                            <div id="ai-recommended-digit" class="text-2xl font-bold text-center text-green-400">-</div>
+                            <div id="ai-digit-score" class="text-xs text-gray-400 text-center">Score: -</div>
+                        </div>
+                        
+                        <!-- Digit Analysis (Collapsible) -->
+                        <div class="mt-2">
+                            <button onclick="toggleDigitAnalysis()" class="w-full text-xs bg-gray-700 hover:bg-gray-600 px-2 py-1 rounded mb-2">
+                                📊 Show Digit Analysis <span id="digit-analysis-toggle">▼</span>
+                            </button>
+                            <div id="digit-analysis-panel" class="digit-analysis-panel hidden p-2 bg-gray-900 rounded border border-gray-700">
+                                <div class="text-xs font-semibold text-gray-300 mb-2">Digit Statistics:</div>
+                                <div id="digit-analysis-content" class="text-xs text-gray-400">
+                                    Warming up engine...
+                                </div>
+                            </div>
                         </div>
                     </div>
                     
@@ -396,8 +467,15 @@
                         <label for="predictedDigit" class="block text-xs font-semibold text-gray-300 mb-1">
                             Current Digit
                         </label>
-                        <input type="number" id="predictedDigit" value="5" min="0" max="9" 
-                            class="block w-full rounded-md bg-gray-700 border border-gray-600 text-white shadow-sm focus:border-green-500 focus:ring-green-500 py-1.5 px-2 text-sm text-center">
+                        <div class="flex space-x-2">
+                            <input type="number" id="predictedDigit" value="5" min="0" max="9" 
+                                class="block w-full rounded-md bg-gray-700 border border-gray-600 text-white shadow-sm focus:border-green-500 focus:ring-green-500 py-1.5 px-2 text-sm text-center">
+                            <button onclick="useAIRecommendedDigit()" 
+                                class="px-2 py-1 bg-purple-600 text-white text-xs font-bold rounded hover:bg-purple-700 transition"
+                                title="Use AI Recommended Digit">
+                                🤖 AI
+                            </button>
+                        </div>
                     </div>
 
                     <!-- Contract Type -->
@@ -429,7 +507,7 @@
                             class="block w-full rounded-md bg-gray-700 border border-gray-600 text-white shadow-sm focus:border-green-500 focus:ring-green-500 py-1.5 px-2 text-sm">
                     </div>
                     
-                    <!-- Mode Toggle -->
+                    <!-- Mode Toggle - ONLY INSTANT AND AI AUTO -->
                     <div class="col-span-2 lg:col-span-3">
                         <label class="block text-xs font-semibold text-gray-300 mb-1">Execution Mode</label>
                         <div class="grid grid-cols-2 gap-2">
@@ -437,13 +515,13 @@
                                 class="px-4 py-2 bg-green-600 text-white font-bold rounded-lg hover:bg-green-700 transition">
                                 ⚡ INSTANT
                             </button>
-                            <button id="mode_smart" onclick="switchMode('smart')" 
-                                class="px-4 py-2 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 transition">
-                                🧠 SMART
+                            <button id="mode_ai" onclick="switchMode('ai')" 
+                                class="px-4 py-2 bg-purple-600 text-white font-bold rounded-lg hover:bg-purple-700 transition">
+                                🤖 AI AUTO
                             </button>
                         </div>
                         <p id="mode_description" class="text-xs text-gray-400 mt-1">
-                            ⚡ INSTANT: Trade on each tick
+                            ⚡ INSTANT: Trade on each tick with manual digit
                         </p>
                     </div>
                 </div>
@@ -512,11 +590,416 @@
 [00:00:00] 📊 Ready to connect to live market
 [00:00:00] 🧮 Martingale calculator ready
 [00:00:00] 🔄 Auto-recovery system ready
+[00:00:00] 🧠 Digit Intelligence Engine loaded
             </div>
         </div>
     </div>
 
     <script>
+        // ============================================================================
+        // DERIV DIGIT MATCH INTELLIGENCE ENGINE
+        // Warm-up (1000 ticks) → Live incremental → Regime + Smart digit selection
+        // ============================================================================
+        
+        // Engine State
+        window.digitIntelligenceEngine = {
+            enabled: true,
+            warmupDone: false,
+            warmupTicks: 0,
+            targetWarmupTicks: 1000,
+            tickIndex: 0,
+            
+            // Data structures
+            digitStats: Array(10).fill().map(() => ({
+                gaps: [],
+                lastSeen: null,
+                currentGap: 0,
+
+                avgGap: 0,
+                p75Gap: 0,
+                p90Gap: 0,
+                maxGap: 0,
+
+                coldHistory: [],
+                longestColdStreak: 0,
+                avgColdDuration: 0,
+
+                persistenceScore: 0,
+                consecutiveExtendingGaps: 0,
+                lastGap: null,
+
+                isUnstable: false,
+                count: 0
+            })),
+            
+            // Regime detector
+            regime: {
+                window: 200,
+                digits: [],
+                counts: Array(10).fill(0)
+            },
+            
+            // Current recommendation
+            currentRecommendation: null,
+            
+            // Initialize engine
+            init: function() {
+                this.reset();
+                log('🧠 Digit Intelligence Engine initialized', 'ENGINE');
+            },
+            
+            // Reset engine
+            reset: function() {
+                this.warmupDone = false;
+                this.warmupTicks = 0;
+                this.tickIndex = 0;
+                this.currentRecommendation = null;
+                
+                this.digitStats = Array(10).fill().map(() => ({
+                    gaps: [],
+                    lastSeen: null,
+                    currentGap: 0,
+                    avgGap: 0,
+                    p75Gap: 0,
+                    p90Gap: 0,
+                    maxGap: 0,
+                    coldHistory: [],
+                    longestColdStreak: 0,
+                    avgColdDuration: 0,
+                    persistenceScore: 0,
+                    consecutiveExtendingGaps: 0,
+                    lastGap: null,
+                    isUnstable: false,
+                    count: 0
+                }));
+                
+                this.regime = {
+                    window: 200,
+                    digits: [],
+                    counts: Array(10).fill(0)
+                };
+                
+                updateEngineStatus('Warming up...', 'WARMUP', 0);
+                log('🧠 Engine reset - ready for warm-up', 'ENGINE');
+            },
+            
+            // Process warm-up ticks
+            processWarmupTicks: function(prices) {
+                if (!this.enabled) return;
+                
+                for (let i = 0; i < prices.length; i++) {
+                    const digit = Number(String(prices[i]).slice(-1));
+                    
+                    this.updateRegime(digit);
+                    this.onNewDigit(digit);
+                    
+                    this.warmupTicks++;
+                    this.tickIndex++;
+                    
+                    // Update progress every 10 ticks
+                    if (this.warmupTicks % 10 === 0) {
+                        const progress = Math.min(100, Math.round((this.warmupTicks / this.targetWarmupTicks) * 100));
+                        updateEngineStatus(`Warming up... ${this.warmupTicks}/${this.targetWarmupTicks}`, 'WARMUP', progress);
+                    }
+                }
+                
+                if (this.warmupTicks >= this.targetWarmupTicks && !this.warmupDone) {
+                    this.warmupDone = true;
+                    log(`🧠 Warm-up complete! Analyzed ${this.warmupTicks} ticks`, 'ENGINE');
+                    updateEngineStatus('Analyzing market...', 'ANALYZING', 100);
+                    
+                    // Initial analysis
+                    setTimeout(() => {
+                        this.analyzeAndRecommend();
+                    }, 100);
+                }
+            },
+            
+            // Process live tick
+            processLiveTick: function(digit) {
+                if (!this.enabled || !this.warmupDone) return;
+                
+                this.updateRegime(digit);
+                this.onNewDigit(digit);
+                this.tickIndex++;
+                
+                // Update analysis every 50 ticks
+                if (this.tickIndex % 50 === 0) {
+                    this.analyzeAndRecommend();
+                }
+            },
+            
+            // Update regime statistics
+            updateRegime: function(digit) {
+                this.regime.digits.push(digit);
+                this.regime.counts[digit]++;
+                
+                if (this.regime.digits.length > this.regime.window) {
+                    const old = this.regime.digits.shift();
+                    this.regime.counts[old]--;
+                }
+            },
+            
+            // Compute regime status
+            computeRegimeStatus: function() {
+                const n = this.regime.digits.length;
+                if (n < 60) return { ok: false, label: "WARMING" };
+                
+                let H = 0;
+                for (let d = 0; d < 10; d++) {
+                    const p = this.regime.counts[d] / n;
+                    if (p > 0) H -= p * Math.log(p);
+                }
+                const entropy = H / Math.log(10);
+                
+                const expected = n / 10;
+                let chi2 = 0;
+                for (let d = 0; d < 10; d++) {
+                    const diff = this.regime.counts[d] - expected;
+                    chi2 += (diff * diff) / expected;
+                }
+                
+                const dominance = Math.max(...this.regime.counts) / n;
+                
+                const ok =
+                    entropy >= 0.90 &&
+                    chi2 <= 22 &&
+                    dominance <= 0.18;
+                
+                return { 
+                    ok, 
+                    entropy: entropy.toFixed(3), 
+                    chi2: chi2.toFixed(2), 
+                    dominance: dominance.toFixed(3),
+                    label: ok ? "STABLE" : "UNSTABLE"
+                };
+            },
+            
+            // Handle new digit
+            onNewDigit: function(digit) {
+                const s = this.digitStats[digit];
+                s.count++;
+                
+                // Update gap statistics
+                if (s.lastSeen !== null) {
+                    const gap = this.tickIndex - s.lastSeen - 1;
+                    if (gap >= 0) this.updateGapStats(digit, gap);
+                }
+                
+                s.lastSeen = this.tickIndex;
+                
+                // Update current gaps for all digits
+                for (let d = 0; d < 10; d++) {
+                    const st = this.digitStats[d];
+                    st.currentGap = (st.lastSeen === null)
+                        ? this.tickIndex
+                        : (this.tickIndex - st.lastSeen);
+                }
+            },
+            
+            // Update gap statistics
+            updateGapStats: function(digit, gap) {
+                const s = this.digitStats[digit];
+                
+                s.gaps.push(gap);
+                if (s.gaps.length > 300) s.gaps.shift();
+                
+                if (s.lastGap !== null) {
+                    if (gap > s.lastGap) s.consecutiveExtendingGaps++;
+                    else s.consecutiveExtendingGaps = 0;
+                }
+                s.lastGap = gap;
+                
+                if (s.gaps.length > 0) {
+                    const sorted = [...s.gaps].sort((a,b)=>a-b);
+                    s.avgGap = s.gaps.reduce((a,b)=>a+b,0) / s.gaps.length;
+                    s.p75Gap = sorted[Math.floor(0.75 * sorted.length)];
+                    s.p90Gap = sorted[Math.floor(0.90 * sorted.length)];
+                    s.maxGap = sorted[sorted.length - 1];
+                    
+                    if (gap > s.avgGap) {
+                        s.coldHistory.push(gap);
+                        if (s.coldHistory.length > 200) s.coldHistory.shift();
+                    }
+                    
+                    s.longestColdStreak = s.coldHistory.length ? Math.max(...s.coldHistory) : 0;
+                    s.avgColdDuration = s.coldHistory.length
+                        ? s.coldHistory.reduce((a,b)=>a+b,0) / s.coldHistory.length
+                        : 0;
+                    
+                    s.isUnstable = (s.p90Gap > s.avgGap * 3 + 1);
+                    
+                    this.computePersistenceScore(digit);
+                }
+            },
+            
+            // Compute persistence score
+            computePersistenceScore: function(digit) {
+                const s = this.digitStats[digit];
+                
+                if (s.gaps.length < 20) {
+                    s.persistenceScore = 40;
+                    return;
+                }
+                
+                const tailRatio = s.longestColdStreak / Math.max(s.avgColdDuration, 1);
+                const p90Ratio  = s.p90Gap / Math.max(s.avgGap * 3, 1);
+                
+                let score =
+                    40 * Math.min(tailRatio / 2, 1) +
+                    60 * Math.min(p90Ratio, 1);
+                
+                s.persistenceScore = Math.min(Math.round(score), 100);
+            },
+            
+            // Conditional return probability
+            conditionalReturnProb: function(digit, g, K = 10) {
+                const gaps = this.digitStats[digit].gaps;
+                if (gaps.length < 30) return 0.5;
+                
+                let denom = 0;
+                let numer = 0;
+                
+                for (const L of gaps) {
+                    if (L > g) {
+                        denom++;
+                        if (L <= g + K) numer++;
+                    }
+                }
+                
+                if (denom === 0) return 0.0;
+                return numer / denom;
+            },
+            
+            // Select best digit using AI logic
+            selectBestDigit: function() {
+                if (!this.warmupDone || !this.enabled) return null;
+                
+                const regimeStatus = this.computeRegimeStatus();
+                if (!regimeStatus.ok) {
+                    log(`🧠 Regime unstable: E=${regimeStatus.entropy}, χ²=${regimeStatus.chi2}, D=${regimeStatus.dominance}`, 'ENGINE');
+                    return null;
+                }
+                
+                let best = null;
+                
+                for (let d = 0; d < 10; d++) {
+                    const s = this.digitStats[d];
+                    const g = s.currentGap;
+                    
+                    const P5  = this.conditionalReturnProb(d, g, 5);
+                    const P10 = this.conditionalReturnProb(d, g, 10);
+                    
+                    // Filter conditions
+                    if (
+                        s.gaps.length < 30 ||
+                        g > s.p90Gap ||
+                        s.persistenceScore > 70 ||
+                        s.consecutiveExtendingGaps >= 3 ||
+                        s.isUnstable ||
+                        P10 < 0.65
+                    ) continue;
+                    
+                    // Calculate score
+                    const score =
+                        0.45 * P10 +
+                        0.25 * P5 +
+                        0.15 * (1 - g / Math.max(s.p90Gap,1)) +
+                        0.15 * (1 - s.persistenceScore / 100);
+                    
+                    if (score < 0.75) continue;
+                    
+                    if (!best || score > best.score) {
+                        best = { 
+                            digit: d, 
+                            score: score, 
+                            P10: P10,
+                            P5: P5,
+                            gap: g,
+                            persistenceScore: s.persistenceScore,
+                            isUnstable: s.isUnstable
+                        };
+                    }
+                }
+                
+                return best;
+            },
+            
+            // Analyze and recommend digit
+            analyzeAndRecommend: function() {
+                const regimeStatus = this.computeRegimeStatus();
+                
+                if (regimeStatus.ok) {
+                    const best = this.selectBestDigit();
+                    
+                    if (best) {
+                        this.currentRecommendation = best;
+                        
+                        // Update UI
+                        document.getElementById('ai-recommended-digit').textContent = best.digit;
+                        document.getElementById('ai-digit-score').textContent = `Score: ${(best.score * 100).toFixed(1)}% | P10: ${(best.P10 * 100).toFixed(1)}%`;
+                        
+                        // Color code based on score
+                        const scoreElem = document.getElementById('ai-digit-score');
+                        scoreElem.classList.remove('engine-digit-score-high', 'engine-digit-score-medium', 'engine-digit-score-low');
+                        if (best.score >= 0.85) scoreElem.classList.add('engine-digit-score-high');
+                        else if (best.score >= 0.75) scoreElem.classList.add('engine-digit-score-medium');
+                        else scoreElem.classList.add('engine-digit-score-low');
+                        
+                        log(`🧠 AI recommends digit ${best.digit} (Score: ${(best.score * 100).toFixed(1)}%, Gap: ${best.gap})`, 'ENGINE');
+                        
+                        // Update regime status display
+                        document.getElementById('engine-regime-status').textContent = 
+                            `Regime: ${regimeStatus.label} | E: ${regimeStatus.entropy} | D: ${regimeStatus.dominance}`;
+                        
+                        // Update engine status
+                        updateEngineStatus(`Ready | Digit ${best.digit} recommended`, 'READY', 100);
+                        
+                        // If in AI AUTO mode, update the digit automatically
+                        if (sessionState.mode === 'ai') {
+                            document.getElementById('predictedDigit').value = best.digit;
+                            sessionState.sessionDigit = best.digit;
+                            sessionState.sessionStarted = true;
+                            sessionState.manualOverride = false;
+                            updateSessionDisplay();
+                            log(`🤖 AI AUTO: Digit updated to ${best.digit}`, 'ENGINE');
+                        }
+                        
+                        return best;
+                    } else {
+                        log('🧠 No safe digit found - waiting for better opportunity', 'ENGINE');
+                        updateEngineStatus('Waiting for safe digit...', 'ANALYZING', 100);
+                        this.currentRecommendation = null;
+                        return null;
+                    }
+                } else {
+                    log(`🧠 Regime not stable yet (${regimeStatus.label})`, 'ENGINE');
+                    updateEngineStatus(`Regime: ${regimeStatus.label}`, 'ANALYZING', 100);
+                    this.currentRecommendation = null;
+                    return null;
+                }
+            },
+            
+            // Get digit statistics for display
+            getDigitStatsForDisplay: function() {
+                const stats = [];
+                for (let d = 0; d < 10; d++) {
+                    const s = this.digitStats[d];
+                    stats.push({
+                        digit: d,
+                        count: s.count,
+                        currentGap: s.currentGap,
+                        avgGap: s.avgGap.toFixed(1),
+                        p90Gap: s.p90Gap,
+                        persistenceScore: s.persistenceScore,
+                        isUnstable: s.isUnstable,
+                        isRecommended: this.currentRecommendation && this.currentRecommendation.digit === d
+                    });
+                }
+                return stats;
+            }
+        };
+        
         // ============================================================================
         // MARTINGALE CALCULATOR FUNCTIONS
         // ============================================================================
@@ -653,6 +1136,186 @@
         }
         
         // ============================================================================
+        // ENGINE UI FUNCTIONS
+        // ============================================================================
+        
+        function toggleEngine() {
+            window.digitIntelligenceEngine.enabled = !window.digitIntelligenceEngine.enabled;
+            updateEngineButton();
+            
+            log(`🧠 Digit Intelligence Engine ${window.digitIntelligenceEngine.enabled ? 'ENABLED' : 'DISABLED'}`, 'ENGINE');
+            
+            if (window.digitIntelligenceEngine.enabled && window.isBotRunning && window.ws && window.ws.readyState === WebSocket.OPEN) {
+                // Re-request warm-up if engine was re-enabled
+                requestWarmupTicks();
+            }
+        }
+        
+        function updateEngineButton() {
+            const button = document.getElementById('engineToggle');
+            if (button) {
+                button.textContent = window.digitIntelligenceEngine.enabled ? 
+                    '🧠 AI Engine: ON' : '🔌 AI Engine: OFF';
+                button.className = window.digitIntelligenceEngine.enabled ? 
+                    'px-4 py-2 bg-purple-600 text-white font-bold rounded-lg shadow hover:bg-purple-700 transition' :
+                    'px-4 py-2 bg-gray-600 text-white font-bold rounded-lg shadow hover:bg-gray-700 transition';
+            }
+        }
+        
+        function updateEngineStatus(text, status, progress) {
+            const badge = document.getElementById('engine-status-badge');
+            const statusText = document.getElementById('engine-status-text');
+            const progressElem = document.getElementById('engine-warmup-progress');
+            
+            if (badge) {
+                badge.classList.remove('engine-status-warmup', 'engine-status-analyzing', 'engine-status-ready');
+                
+                switch(status) {
+                    case 'WARMUP':
+                        badge.textContent = '🔥 ENGINE: WARM-UP';
+                        badge.classList.add('engine-status-warmup');
+                        break;
+                    case 'ANALYZING':
+                        badge.textContent = '🔍 ENGINE: ANALYZING';
+                        badge.classList.add('engine-status-analyzing');
+                        break;
+                    case 'READY':
+                        badge.textContent = '✅ ENGINE: READY';
+                        badge.classList.add('engine-status-ready');
+                        break;
+                }
+            }
+            
+            if (statusText) {
+                statusText.textContent = text;
+            }
+            
+            if (progressElem) {
+                progressElem.textContent = `${progress}%`;
+            }
+        }
+        
+        function toggleDigitAnalysis() {
+            const panel = document.getElementById('digit-analysis-panel');
+            const toggle = document.getElementById('digit-analysis-toggle');
+            
+            if (panel.classList.contains('hidden')) {
+                panel.classList.remove('hidden');
+                toggle.textContent = '▲';
+                updateDigitAnalysisDisplay();
+            } else {
+                panel.classList.add('hidden');
+                toggle.textContent = '▼';
+            }
+        }
+        
+        function updateDigitAnalysisDisplay() {
+            if (!window.digitIntelligenceEngine.warmupDone) {
+                document.getElementById('digit-analysis-content').innerHTML = `
+                    <div class="text-center py-4">
+                        <div class="text-yellow-400 mb-2">Engine warming up...</div>
+                        <div class="text-xs text-gray-500">${window.digitIntelligenceEngine.warmupTicks}/${window.digitIntelligenceEngine.targetWarmupTicks} ticks analyzed</div>
+                    </div>
+                `;
+                return;
+            }
+            
+            const stats = window.digitIntelligenceEngine.getDigitStatsForDisplay();
+            const regimeStatus = window.digitIntelligenceEngine.computeRegimeStatus();
+            
+            let html = `
+                <div class="mb-3">
+                    <div class="text-xs font-semibold text-gray-300 mb-1">Regime Status:</div>
+                    <div class="text-xs ${regimeStatus.ok ? 'text-green-400' : 'text-yellow-400'}">
+                        ${regimeStatus.label} | Entropy: ${regimeStatus.entropy} | Dominance: ${regimeStatus.dominance}
+                    </div>
+                </div>
+                <div class="grid grid-cols-1 gap-1">
+            `;
+            
+            stats.forEach(stat => {
+                const isRecommended = window.digitIntelligenceEngine.currentRecommendation && 
+                                     window.digitIntelligenceEngine.currentRecommendation.digit === stat.digit;
+                
+                const barWidth = Math.min(100, (stat.currentGap / 50) * 100);
+                const barColor = stat.isUnstable ? 'bg-red-500' : 
+                                stat.persistenceScore > 70 ? 'bg-yellow-500' : 
+                                stat.currentGap > stat.p90Gap ? 'bg-orange-500' : 'bg-blue-500';
+                
+                html += `
+                    <div class="p-1 ${isRecommended ? 'bg-green-900/30 rounded' : ''}">
+                        <div class="flex justify-between items-center mb-1">
+                            <span class="text-xs font-bold ${isRecommended ? 'text-green-400' : 'text-white'}">Digit ${stat.digit}</span>
+                            <span class="text-xs ${stat.isUnstable ? 'text-red-400' : 'text-gray-400'}">
+                                Gap: ${stat.currentGap} | Score: ${stat.persistenceScore}
+                            </span>
+                        </div>
+                        <div class="w-full bg-gray-700 rounded-full h-2">
+                            <div class="${barColor} h-2 rounded-full" style="width: ${barWidth}%"></div>
+                        </div>
+                        <div class="text-xs text-gray-500 mt-1">
+                            Count: ${stat.count} | Avg Gap: ${stat.avgGap} | P90: ${stat.p90Gap}
+                        </div>
+                    </div>
+                `;
+            });
+            
+            html += '</div>';
+            document.getElementById('digit-analysis-content').innerHTML = html;
+        }
+        
+        function useAIRecommendedDigit() {
+            if (!window.digitIntelligenceEngine.currentRecommendation) {
+                log('❌ No AI recommendation available yet', 'ENGINE');
+                alert('AI engine is still analyzing. Please wait for a recommendation.');
+                return;
+            }
+            
+            const recommendedDigit = window.digitIntelligenceEngine.currentRecommendation.digit;
+            document.getElementById('predictedDigit').value = recommendedDigit;
+            
+            if (sessionState.sessionStarted) {
+                const confirmChange = confirm(`AI recommends digit ${recommendedDigit}. Change current digit?`);
+                if (confirmChange) {
+                    sessionState.sessionDigit = recommendedDigit;
+                    sessionState.manualOverride = true;
+                    updateSessionDisplay();
+                    log(`✅ Digit changed to AI recommendation: ${recommendedDigit}`, 'ENGINE');
+                }
+            } else {
+                sessionState.sessionDigit = recommendedDigit;
+                sessionState.sessionStarted = true;
+                sessionState.manualOverride = true;
+                updateSessionDisplay();
+                log(`✅ Set digit to AI recommendation: ${recommendedDigit}`, 'ENGINE');
+            }
+        }
+        
+        // ============================================================================
+        // MODIFIED WEB SOCKET FUNCTIONS FOR ENGINE INTEGRATION
+        // ============================================================================
+        
+        function requestWarmupTicks() {
+            if (!window.ws || window.ws.readyState !== WebSocket.OPEN) return;
+            
+            const symbol = document.getElementById('symbol').value;
+            const count = window.digitIntelligenceEngine.targetWarmupTicks;
+            
+            // Reset engine before warm-up
+            window.digitIntelligenceEngine.reset();
+            
+            sendRequest({
+                ticks_history: symbol,
+                count: count,
+                end: "latest",
+                style: "ticks",
+                req_id: getNextReqId()
+            });
+            
+            log(`🧠 Requesting ${count} warm-up ticks for engine analysis`, 'ENGINE');
+        }
+        
+        // ============================================================================
         // CORE BOT FUNCTIONS - UPDATED FOR 10 SECOND PNL DISPLAY & NETWORK RECOVERY
         // ============================================================================
         
@@ -723,7 +1386,7 @@
         // Session State
         let sessionState = {
             active: false,
-            mode: 'instant',
+            mode: 'instant', // Only instant and ai modes now
             sessionDigit: null,
             sessionStarted: false,
             manualOverride: false
@@ -1105,17 +1768,18 @@
             document.getElementById('current_tick_rate').textContent = tickRate.toFixed(1) + '/s';
         }
         
-        // MODE MANAGEMENT
+        // MODE MANAGEMENT - ONLY INSTANT AND AI AUTO
         function switchMode(mode) {
             sessionState.mode = mode;
             
-            document.getElementById('mode_instant').classList.remove('bg-green-600', 'bg-blue-600');
-            document.getElementById('mode_smart').classList.remove('bg-green-600', 'bg-blue-600');
+            // Reset button colors
+            document.getElementById('mode_instant').classList.remove('bg-green-600', 'bg-purple-600');
+            document.getElementById('mode_ai').classList.remove('bg-green-600', 'bg-purple-600');
             
             if (mode === 'instant') {
                 document.getElementById('mode_instant').classList.add('bg-green-600');
-                document.getElementById('mode_smart').classList.add('bg-blue-600');
-                document.getElementById('mode_description').textContent = '⚡ INSTANT: Trade on each tick';
+                document.getElementById('mode_ai').classList.add('bg-purple-600');
+                document.getElementById('mode_description').textContent = '⚡ INSTANT: Trade on each tick with manual digit';
                 log('🔄 Switched to INSTANT mode', 'SYSTEM');
                 window.nextTradeAllowed = true;
                 
@@ -1129,28 +1793,45 @@
                         log(`🔒 Digit ${manualDigit} set manually for instant mode`, 'SESSION');
                     }
                 }
-            } else {
-                document.getElementById('mode_smart').classList.add('bg-green-600');
-                document.getElementById('mode_instant').classList.add('bg-blue-600');
-                document.getElementById('mode_description').textContent = '🧠 SMART: Analyze first, then trade';
-                log('🔄 Switched to SMART mode', 'SYSTEM');
+            } else if (mode === 'ai') {
+                document.getElementById('mode_ai').classList.add('bg-green-600');
+                document.getElementById('mode_instant').classList.add('bg-purple-600');
+                document.getElementById('mode_description').textContent = '🤖 AI AUTO: Let AI select and update digits automatically';
+                log('🔄 Switched to AI AUTO mode', 'SYSTEM');
                 
-                if (sessionState.sessionDigit !== null) {
-                    log(`🔒 Using locked digit ${sessionState.sessionDigit}`, 'SESSION');
+                // Check if engine is ready
+                if (window.digitIntelligenceEngine.warmupDone && window.digitIntelligenceEngine.currentRecommendation) {
+                    const recommendedDigit = window.digitIntelligenceEngine.currentRecommendation.digit;
+                    document.getElementById('predictedDigit').value = recommendedDigit;
+                    sessionState.sessionDigit = recommendedDigit;
+                    sessionState.sessionStarted = true;
+                    sessionState.manualOverride = false;
+                    updateSessionDisplay();
+                    log(`🤖 AI mode active - Using recommended digit: ${recommendedDigit}`, 'ENGINE');
+                } else {
+                    log('🤖 AI mode active - Waiting for engine recommendation...', 'ENGINE');
+                    updateTradeStatus('WAITING', 'AI engine analyzing...', 'Waiting for AI recommendation', 'normal');
                 }
             }
+            
+            updateExecutionLogic();
         }
         
         function updateExecutionLogic() {
-            if (sessionState.mode === 'smart' && !sessionState.sessionDigit) {
-                log('🧠 Waiting for digit selection...', 'SYSTEM');
+            if (sessionState.mode === 'ai' && !window.digitIntelligenceEngine.warmupDone) {
+                log('🧠 AI Engine still warming up...', 'ENGINE');
                 window.nextTradeAllowed = false;
-                updateTradeStatus('WAITING', 'No digit selected for smart mode', 'Set a digit to begin trading', 'normal');
-            } else if (sessionState.mode === 'smart' && sessionState.sessionDigit !== null) {
-                log(`🧠 Ready! Using locked digit: ${sessionState.sessionDigit}`, 'SESSION');
+                updateTradeStatus('WAITING', 'AI Engine warming up', 'Please wait for engine to analyze', 'normal');
+            } else if (sessionState.mode === 'ai' && window.digitIntelligenceEngine.currentRecommendation) {
+                const recommendedDigit = window.digitIntelligenceEngine.currentRecommendation.digit;
+                document.getElementById('predictedDigit').value = recommendedDigit;
+                sessionState.sessionDigit = recommendedDigit;
+                sessionState.sessionStarted = true;
+                sessionState.manualOverride = false;
+                updateSessionDisplay();
+                log(`🧠 Ready! Using AI recommended digit: ${recommendedDigit}`, 'ENGINE');
                 window.nextTradeAllowed = true;
-                document.getElementById('predictedDigit').value = sessionState.sessionDigit;
-                updateTradeStatus('READY', `Digit ${sessionState.sessionDigit} locked`, 'Ready to trade', 'normal');
+                updateTradeStatus('READY', `AI digit ${recommendedDigit} locked`, 'Ready to trade', 'normal');
             } else if (sessionState.mode === 'instant') {
                 window.nextTradeAllowed = true;
                 updateTradeStatus('READY', 'Instant mode active', 'Trading on each tick', 'normal');
@@ -1162,8 +1843,14 @@
             console.log('🤖 Bot initialized');
             initializeToggleState();
             
+            // Initialize intelligence engine
+            window.digitIntelligenceEngine.init();
+            
             // Initialize network recovery
             updateNetworkRecoveryButton();
+            
+            // Initialize engine button
+            updateEngineButton();
             
             if (!checkAuthToken()) {
                 document.getElementById('prediction_text').textContent = 'Please authenticate first';
@@ -1171,6 +1858,13 @@
             
             setInterval(calculateRates, 1000);
             startQueueProcessor();
+            
+            // Update digit analysis display periodically
+            setInterval(() => {
+                if (!document.getElementById('digit-analysis-panel').classList.contains('hidden')) {
+                    updateDigitAnalysisDisplay();
+                }
+            }, 2000);
             
             calculateMartingale();
             
@@ -1282,6 +1976,53 @@
             };
         }
         
+        // API RESPONSE HANDLER - MODIFIED FOR ENGINE INTEGRATION
+        function handleAPIResponse(data) {
+            if (data.error) {
+                log(`API Error: ${data.error.message}`, 'ERROR');
+                if (data.error.code === 'InvalidToken') {
+                    log('❌ Invalid API Token. Please check your authentication.', 'CRITICAL');
+                    stopBot();
+                }
+                return;
+            }
+        
+            if (data.msg_type === 'authorize') {
+                if (data.authorize) {
+                    log(`🔐 Authorized as ${data.authorize.loginid}`, 'SYSTEM');
+                    subscribeToTicks(document.getElementById('symbol').value);
+                    subscribeToBalance();
+                    
+                    // Request warm-up ticks for engine
+                    if (window.digitIntelligenceEngine.enabled) {
+                        setTimeout(() => {
+                            requestWarmupTicks();
+                        }, 1000);
+                    }
+                }
+            } else if (data.msg_type === 'history') {
+                // Process warm-up ticks for engine
+                if (window.digitIntelligenceEngine.enabled && data.history && data.history.prices) {
+                    window.digitIntelligenceEngine.processWarmupTicks(data.history.prices);
+                    log(`🧠 Processed ${data.history.prices.length} warm-up ticks`, 'ENGINE');
+                }
+            } else if (data.msg_type === 'tick') {
+                handleTick(data.tick);
+                
+                // Process tick in intelligence engine
+                if (window.digitIntelligenceEngine.enabled) {
+                    const digit = Number(String(data.tick.quote).slice(-1));
+                    window.digitIntelligenceEngine.processLiveTick(digit);
+                }
+            } else if (data.msg_type === 'proposal') {
+                handleProposalResponse(data.proposal, data.req_id);
+            } else if (data.msg_type === 'buy') {
+                handleBuyResponse(data.buy);
+            } else if (data.msg_type === 'balance') {
+                handleBalanceUpdate(data.balance);
+            }
+        }
+        
         // TICK HANDLER - CRITICAL: RESTORED TRADE EXECUTION
         function handleTick(tick) {
             if (!window.isBotRunning) return;
@@ -1333,7 +2074,9 @@
         function processTickImmediately(tick) {
             if (window.stopAfterWin) return;
             
-            if (sessionState.mode === 'smart' && !sessionState.sessionDigit) {
+            // In AI mode, wait for engine recommendation
+            if (sessionState.mode === 'ai' && (!window.digitIntelligenceEngine.warmupDone || !window.digitIntelligenceEngine.currentRecommendation)) {
+                log('🤖 Waiting for AI recommendation...', 'ENGINE');
                 return;
             }
             
@@ -1529,6 +2272,9 @@
             
             resetAllState();
             
+            // Initialize intelligence engine
+            window.digitIntelligenceEngine.init();
+            
             sessionState.sessionDigit = parseInt(document.getElementById('predictedDigit').value) || 5;
             sessionState.sessionStarted = true;
             sessionState.manualOverride = true;
@@ -1541,6 +2287,7 @@
             log(`📊 Max Trades: ${window.maxTrades}`, 'SYSTEM');
             log(`🔑 Using token: ${token.substring(0, 10)}...`, 'SYSTEM');
             log(`🌐 Network auto-recovery: ${window.networkRecoveryEnabled ? 'ENABLED' : 'DISABLED'}`, 'SYSTEM');
+            log(`🧠 Digit Intelligence Engine: ${window.digitIntelligenceEngine.enabled ? 'ENABLED' : 'DISABLED'}`, 'SYSTEM');
             
             updateTradeStatus('STARTING', 'Initializing bot...', 'Connecting to market', 'normal');
             updateStake('initial');
@@ -1580,6 +2327,9 @@
             window.tickSubscriptionSent = false;
             window.pendingProposals.clear();
             window.executionLock = false;
+            
+            // Reset engine status
+            updateEngineStatus('Inactive', 'WARMUP', 0);
             
             document.querySelectorAll('#symbol, #predictedDigit, #contractType, #baseStake, #multiplier, #maxTrades').forEach(control => {
                 control.disabled = false;
@@ -1691,6 +2441,7 @@
             if (type === 'SESSION') color = 'text-blue-300 font-bold';
             if (type === 'CALCULATOR') color = 'text-purple-300 font-bold';
             if (type === 'NETWORK') color = 'text-yellow-300 font-bold';
+            if (type === 'ENGINE') color = 'text-purple-300 font-bold';
             
             logArea.innerHTML += `\n[${timestamp}] <span class="${color}">${message}</span>`;
             logArea.scrollTop = logArea.scrollHeight;
@@ -1733,34 +2484,6 @@
         
         function getNextReqId() {
             return ++window.req_id;
-        }
-        
-        // API RESPONSE HANDLER - CRITICAL FOR TRADE EXECUTION
-        function handleAPIResponse(data) {
-            if (data.error) {
-                log(`API Error: ${data.error.message}`, 'ERROR');
-                if (data.error.code === 'InvalidToken') {
-                    log('❌ Invalid API Token. Please check your authentication.', 'CRITICAL');
-                    stopBot();
-                }
-                return;
-            }
-        
-            if (data.msg_type === 'authorize') {
-                if (data.authorize) {
-                    log(`🔐 Authorized as ${data.authorize.loginid}`, 'SYSTEM');
-                    subscribeToTicks(document.getElementById('symbol').value);
-                    subscribeToBalance();
-                }
-            } else if (data.msg_type === 'tick') {
-                handleTick(data.tick);
-            } else if (data.msg_type === 'proposal') {
-                handleProposalResponse(data.proposal, data.req_id);
-            } else if (data.msg_type === 'buy') {
-                handleBuyResponse(data.buy);
-            } else if (data.msg_type === 'balance') {
-                handleBalanceUpdate(data.balance);
-            }
         }
         
         function subscribeToBalance() {
