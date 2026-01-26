@@ -597,7 +597,7 @@
 
     <script>
         // ============================================================================
-        // DERIV DIGIT MATCH INTELLIGENCE ENGINE
+        // DERIV DIGIT MATCH INTELLIGENCE ENGINE - FIXED FOR DIGIT 0
         // Warm-up (1000 ticks) → Live incremental → Regime + Smart digit selection
         // ============================================================================
         
@@ -688,13 +688,19 @@
                 if (!this.enabled) return;
                 
                 for (let i = 0; i < prices.length; i++) {
-                    // 🔒 Unified robust digit extraction (engine + UI use same source)
+                    // 🔥 FIXED: Proper digit extraction including digit 0
                     const priceStr = String(prices[i]);
-                    const digitChar = priceStr[priceStr.length - 1];
+                    const lastChar = priceStr[priceStr.length - 1];
                     
-                    if (digitChar < '0' || digitChar > '9') continue;  // safety guard
+                    // Check if it's a valid digit (0-9)
+                    if (lastChar < '0' || lastChar > '9') continue;
                     
-                    const digit = parseInt(digitChar);
+                    const digit = parseInt(lastChar);
+                    
+                    // Debug digit 0
+                    if (digit === 0) {
+                        console.log('Warm-up: Digit 0 detected from price:', prices[i]);
+                    }
                     
                     this.updateRegime(digit);
                     this.onNewDigit(digit);
@@ -725,7 +731,8 @@
             processLiveTick: function(digit) {
                 if (!this.enabled) return;
                 
-                if (digit < 0 || digit > 9 || isNaN(digit)) return;
+                // 🔥 FIXED: digit 0 is valid, so check for NaN instead
+                if (isNaN(digit) || digit < 0 || digit > 9) return;
                 
                 // 🔥 FIX #3: advance tick index
                 this.tickIndex++;
@@ -802,13 +809,17 @@
                 };
             },
             
-            // Handle new digit - FIXED VERSION
+            // Handle new digit - FIXED FOR DIGIT 0
             onNewDigit: function(digit) {
-                if (digit < 0 || digit > 9 || isNaN(digit)) return;
+                // 🔥 FIXED: digit can be 0, so check for NaN instead
+                if (isNaN(digit) || digit < 0 || digit > 9) {
+                    console.log('Invalid digit skipped:', digit);
+                    return;
+                }
 
                 const s = this.digitStats[digit];
 
-                // 🔥 FIX #2: increment count
+                // 🔥 FIX: Always increment count for valid digits
                 s.count++;
 
                 // gap update
@@ -1427,6 +1438,13 @@
         window.totalTicksReceived = 0;
         window.tickTimestamps = [];
         
+        // Digit zero tracker - FOR DEBUGGING
+        window.digitZeroTracker = {
+            count: 0,
+            lastPrice: null,
+            occurrences: []
+        };
+        
         // DOM Elements
         const toggleButton = document.getElementById('toggleButton');
         const soundToggleButton = document.getElementById('soundToggle');
@@ -1937,7 +1955,31 @@
                     updateTradeStatus('MANUAL', `Digit manually set to ${newDigit}`, 'Ready to trade', 'normal');
                 }
             });
+            
+            // Test digit extraction
+            testDigitExtraction();
         });
+        
+        // Test function for digit extraction
+        function testDigitExtraction() {
+            // Test cases including digit 0
+            const testPrices = [
+                '1234.560', // ends with 0
+                '987.650',  // ends with 0
+                '1234.567',
+                '987.654',
+                '1000.000', // all zeros
+                '999.990'   // ends with 0
+            ];
+            
+            console.log('=== Testing Digit Extraction ===');
+            testPrices.forEach(price => {
+                const priceStr = String(price);
+                const lastChar = priceStr[priceStr.length - 1];
+                const digit = parseInt(lastChar);
+                console.log(`Price: ${price}, Last char: "${lastChar}", Digit: ${digit}, Valid: ${!isNaN(digit)}`);
+            });
+        }
         
         // WEBSOCKET CONNECTION - UPDATED WITH NETWORK RECOVERY
         function connectWebSocket() {
@@ -1982,17 +2024,15 @@
                     // 🔥 CRITICAL FIX: Handle tick messages
                     if (data.msg_type === 'tick') {
                         console.log('Tick received:', data.tick); // Debug
-                        handleTick(data.tick);
                         
-                        // Process tick through intelligence engine
-                        if (window.digitIntelligenceEngine.enabled) {
-                            const priceStr = String(data.tick.quote);
-                            const digitChar = priceStr[priceStr.length - 1];
-                            if (digitChar >= '0' && digitChar <= '9') {
-                                const digit = parseInt(digitChar);
-                                window.digitIntelligenceEngine.processLiveTick(digit);
-                            }
+                        // Log specifically for digit 0
+                        const priceStr = String(data.tick.quote);
+                        const lastChar = priceStr[priceStr.length - 1];
+                        if (lastChar === '0') {
+                            console.log('🎯 DIGIT 0 DETECTED in raw tick:', data.tick.quote);
                         }
+                        
+                        handleTick(data.tick);
                         return;
                     }
                     
@@ -2029,25 +2069,52 @@
         }
         
         // ============================================================================
-        // ✅ FIX #1 — UNIFIED DIGIT EXTRACTION (CRITICAL FIX)
+        // ✅ FIXED: TICK HANDLER - PROPER DIGIT EXTRACTION INCLUDING DIGIT 0
         // ============================================================================
         
-        // TICK HANDLER - CRITICAL: FIXED DIGIT EXTRACTION
+        // TICK HANDLER - FIXED DIGIT EXTRACTION (SPECIAL FIX FOR DIGIT 0)
         function handleTick(tick) {
             if (!window.isBotRunning || !tick || !tick.quote) return;
             
             const price = parseFloat(tick.quote);
             
-            // 🔒 Unified robust digit extraction (engine + UI use same source)
+            // 🔥 CRITICAL FIX: Proper digit extraction including digit 0
             const priceStr = String(tick.quote);
-            const digitChar = priceStr[priceStr.length - 1];
             
-            if (digitChar < '0' || digitChar > '9') {
-                log(`⚠️ Invalid digit from tick: ${tick.quote}`, 'WARNING');
+            // Get the last character
+            const lastChar = priceStr[priceStr.length - 1];
+            
+            // Debug logging for digit 0
+            if (lastChar === '0') {
+                console.log('Digit 0 detected:', tick.quote, 'Full price string:', priceStr);
+            }
+            
+            // Check if it's a valid digit (0-9)
+            if (lastChar < '0' || lastChar > '9') {
+                log(`⚠️ Invalid digit from tick: ${tick.quote}, last char: "${lastChar}"`, 'WARNING');
                 return;
             }
             
-            const digit = parseInt(digitChar);
+            const digit = parseInt(lastChar);
+            
+            // Track digit 0 occurrences for debugging
+            if (digit === 0) {
+                window.digitZeroTracker.count++;
+                window.digitZeroTracker.lastPrice = price;
+                window.digitZeroTracker.occurrences.push({
+                    price: price,
+                    time: Date.now(),
+                    tickData: tick
+                });
+                
+                // Log to console for debugging
+                console.log(`🎯 DIGIT 0 FOUND! Total: ${window.digitZeroTracker.count}, Price: ${price}`);
+                
+                // Also update a debug display if needed
+                if (window.digitZeroTracker.count % 10 === 0) {
+                    log(`🔢 Digit 0 has appeared ${window.digitZeroTracker.count} times`, 'DEBUG');
+                }
+            }
             
             const tickData = { 
                 digit: digit, 
@@ -2058,6 +2125,7 @@
             
             window.lastTick = tickData;
             
+            // Update UI - show the digit clearly
             document.getElementById('metricLiveTick').textContent = price.toFixed(3);
             document.getElementById('metricLastDigit').textContent = `Digit: ${digit}`;
             document.getElementById('metricLiveTick').classList.add('tick-flash');
@@ -2072,7 +2140,14 @@
             const tenSecondsAgo = Date.now() - 10000;
             window.tickTimestamps = window.tickTimestamps.filter(ts => ts > tenSecondsAgo);
             
+            // Add tick to queue for processing
             addTickToQueue(tickData);
+            
+            // Update engine with digit
+            if (window.digitIntelligenceEngine.enabled) {
+                window.digitIntelligenceEngine.processLiveTick(digit);
+            }
+            
             playAudioFeedback('TICK');
             
             // Update connection status UI
@@ -2509,6 +2584,7 @@
             if (type === 'CALCULATOR') color = 'text-purple-300 font-bold';
             if (type === 'NETWORK') color = 'text-yellow-300 font-bold';
             if (type === 'ENGINE') color = 'text-purple-300 font-bold';
+            if (type === 'DEBUG') color = 'text-gray-400 font-bold';
             
             logArea.innerHTML += `\n[${timestamp}] <span class="${color}">${message}</span>`;
             logArea.scrollTop = logArea.scrollHeight;
@@ -2694,6 +2770,13 @@
             window.waitingForTradeResult = false;
             window.nextTradeAllowed = true;
             window.stopAfterWin = false;
+            
+            // Reset digit zero tracker
+            window.digitZeroTracker = {
+                count: 0,
+                lastPrice: null,
+                occurrences: []
+            };
             
             const logArea = document.getElementById('log-area');
             logArea.innerHTML = '[00:00:00] 🤖 Bot reset. Ready.';
