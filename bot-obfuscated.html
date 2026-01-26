@@ -2081,20 +2081,7 @@
                     window.digitIntelligenceEngine.processWarmupTicks(data.history.prices);
                     log(`🧠 Processed ${data.history.prices.length} warm-up ticks`, 'ENGINE');
                 }
-            } else if (data.msg_type === 'tick') {
-                handleTick(data.tick);
-                
-                // Process tick in intelligence engine - with same unified digit extraction
-                if (window.digitIntelligenceEngine.enabled) {
-                    // 🔒 Use the same unified digit extraction method
-                    const priceStr = String(data.tick.quote);
-                    const digitChar = priceStr[priceStr.length - 1];
-                    
-                    if (digitChar >= '0' && digitChar <= '9') {
-                        const digit = parseInt(digitChar);
-                        window.digitIntelligenceEngine.processLiveTick(digit);
-                    }
-                }
+            
             } else if (data.msg_type === 'proposal') {
                 handleProposalResponse(data.proposal, data.req_id);
             } else if (data.msg_type === 'buy') {
