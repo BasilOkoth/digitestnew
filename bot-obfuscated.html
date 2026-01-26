@@ -1977,9 +1977,29 @@
             window.ws.onmessage = (msg) => {
                 try {
                     const data = JSON.parse(msg.data);
+                    console.log('API Response:', data.msg_type, data); // Debug logging
+                    
+                    // 🔥 CRITICAL FIX: Handle tick messages
+                    if (data.msg_type === 'tick') {
+                        console.log('Tick received:', data.tick); // Debug
+                        handleTick(data.tick);
+                        
+                        // Process tick through intelligence engine
+                        if (window.digitIntelligenceEngine.enabled) {
+                            const priceStr = String(data.tick.quote);
+                            const digitChar = priceStr[priceStr.length - 1];
+                            if (digitChar >= '0' && digitChar <= '9') {
+                                const digit = parseInt(digitChar);
+                                window.digitIntelligenceEngine.processLiveTick(digit);
+                            }
+                        }
+                        return;
+                    }
+                    
                     handleAPIResponse(data);
                 } catch (e) {
                     console.error('WebSocket message error:', e);
+                    log('❌ Error parsing WebSocket message', 'ERROR');
                 }
             };
             
@@ -2004,6 +2024,7 @@
             window.ws.onerror = (error) => {
                 console.error('WebSocket error:', error);
                 log('❌ WebSocket connection error', 'ERROR');
+                updateTradeStatus('ERROR', 'WebSocket connection failed', 'Check network connection', 'loss');
             };
         }
         
@@ -2013,7 +2034,7 @@
         
         // TICK HANDLER - CRITICAL: FIXED DIGIT EXTRACTION
         function handleTick(tick) {
-            if (!window.isBotRunning) return;
+            if (!window.isBotRunning || !tick || !tick.quote) return;
             
             const price = parseFloat(tick.quote);
             
@@ -2021,14 +2042,18 @@
             const priceStr = String(tick.quote);
             const digitChar = priceStr[priceStr.length - 1];
             
-            if (digitChar < '0' || digitChar > '9') return;  // safety guard
+            if (digitChar < '0' || digitChar > '9') {
+                log(`⚠️ Invalid digit from tick: ${tick.quote}`, 'WARNING');
+                return;
+            }
             
             const digit = parseInt(digitChar);
             
             const tickData = { 
                 digit: digit, 
                 price: price, 
-                time: Date.now() 
+                time: Date.now(),
+                raw: tick
             };
             
             window.lastTick = tickData;
@@ -2049,6 +2074,9 @@
             
             addTickToQueue(tickData);
             playAudioFeedback('TICK');
+            
+            // Update connection status UI
+            updateConnectionStatus();
         }
         
         // API RESPONSE HANDLER - MODIFIED FOR ENGINE INTEGRATION
@@ -2329,6 +2357,14 @@
                 control.disabled = true;
                 control.classList.add('opacity-50', 'cursor-not-allowed');
             });
+            
+            // Add connection verification
+            setTimeout(() => {
+                if (window.isBotRunning && (!window.ws || window.ws.readyState !== WebSocket.OPEN)) {
+                    log('❌ WebSocket failed to connect', 'ERROR');
+                    updateTradeStatus('ERROR', 'WebSocket connection failed', 'Check network and API token', 'loss');
+                }
+            }, 3000);
         }
         
         // STOP BOT - CRITICAL FUNCTION
@@ -2540,9 +2576,23 @@
         function subscribeToTicks(symbol) {
             if (window.tickSubscriptionSent) return;
             
-            sendRequest({ ticks: symbol, subscribe: 1, req_id: getNextReqId() });
+            // Request tick stream
+            sendRequest({ 
+                ticks: symbol, 
+                subscribe: 1, 
+                req_id: getNextReqId() 
+            });
+            
             window.tickSubscriptionSent = true;
             log(`✅ Subscribed to ${symbol} ticks`, 'SYSTEM');
+            
+            // Add verification
+            setTimeout(() => {
+                if (window.isBotRunning && window.totalTicksReceived === 0) {
+                    log('⚠️ No ticks received. Checking connection...', 'WARNING');
+                    updateConnectionStatus();
+                }
+            }, 2000);
         }
         
         function handleProposalResponse(proposal, req_id) {
