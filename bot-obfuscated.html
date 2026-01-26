@@ -687,15 +687,13 @@
             processWarmupTicks: function(prices) {
                 if (!this.enabled) return;
                 
+                
+                initTickFormatFromPrices(prices);
                 for (let i = 0; i < prices.length; i++) {
-                    // 🔥 FIXED: Proper digit extraction including digit 0
-                    const priceStr = String(prices[i]);
-                    const lastChar = priceStr[priceStr.length - 1];
-                    
-                    // Check if it's a valid digit (0-9)
-                    if (lastChar < '0' || lastChar > '9') continue;
-                    
-                    const digit = parseInt(lastChar);
+                    // Digit extraction using auto-detected decimals (preserves trailing zeros)
+                    updateTickFormatFromQuote(prices[i]);
+                    const digit = getLastDigitFromQuote(prices[i]);
+                    if (isNaN(digit) || digit < 0 || digit > 9) continue;
                     
                     // Debug digit 0
                     if (digit === 0) {
@@ -1444,6 +1442,68 @@
             lastPrice: null,
             occurrences: []
         };
+
+        // Tick decimal auto-detection (preserves trailing zeros for correct digit counting)
+        window.tickFormat = {
+            decimals: 3,
+            lastQuote: null,
+            minStep: Infinity,
+            symbol: null
+        };
+
+        function estimateDecimalsFromStep(step) {
+            if (!Number.isFinite(step) || step <= 0) return window.tickFormat.decimals;
+            const tolerance = 1e-6;
+            for (let dec = 0; dec <= 6; dec++) {
+                const scaled = step * Math.pow(10, dec);
+                if (Math.abs(scaled - Math.round(scaled)) < tolerance) return dec;
+            }
+            return 6;
+        }
+
+        function updateTickFormatFromQuote(quote) {
+            const q = Number(quote);
+            if (!Number.isFinite(q)) return;
+
+            if (window.tickFormat.lastQuote !== null) {
+                const diff = Math.abs(q - window.tickFormat.lastQuote);
+                if (diff > 0) {
+                    window.tickFormat.minStep = Math.min(window.tickFormat.minStep, diff);
+                    window.tickFormat.decimals = estimateDecimalsFromStep(window.tickFormat.minStep);
+                }
+            }
+            window.tickFormat.lastQuote = q;
+        }
+
+        function initTickFormatFromPrices(prices) {
+            let minStep = Infinity;
+            for (let i = 1; i < prices.length; i++) {
+                const a = Number(prices[i - 1]);
+                const b = Number(prices[i]);
+                if (!Number.isFinite(a) || !Number.isFinite(b)) continue;
+                const diff = Math.abs(b - a);
+                if (diff > 0) minStep = Math.min(minStep, diff);
+            }
+            if (Number.isFinite(minStep)) {
+                window.tickFormat.minStep = minStep;
+                window.tickFormat.decimals = estimateDecimalsFromStep(minStep);
+            }
+        }
+
+        function formatQuoteForDigit(quote) {
+            const q = Number(quote);
+            if (!Number.isFinite(q)) return null;
+            return q.toFixed(window.tickFormat.decimals);
+        }
+
+        function getLastDigitFromQuote(quote) {
+            const s = formatQuoteForDigit(quote);
+            if (!s) return NaN;
+            const lastChar = s[s.length - 1];
+            const d = Number.parseInt(lastChar, 10);
+            return Number.isNaN(d) ? NaN : d;
+        }
+
         
         // DOM Elements
         const toggleButton = document.getElementById('toggleButton');
@@ -2026,10 +2086,10 @@
                         console.log('Tick received:', data.tick); // Debug
                         
                         // Log specifically for digit 0
-                        const priceStr = String(data.tick.quote);
-                        const lastChar = priceStr[priceStr.length - 1];
-                        if (lastChar === '0') {
-                            console.log('🎯 DIGIT 0 DETECTED in raw tick:', data.tick.quote);
+                        updateTickFormatFromQuote(data.tick.quote);
+                        const digit = getLastDigitFromQuote(data.tick.quote);
+                        if (digit === 0) {
+                            console.log('🎯 DIGIT 0 DETECTED in formatted tick:', formatQuoteForDigit(data.tick.quote));
                         }
                         
                         handleTick(data.tick);
@@ -2078,24 +2138,19 @@
             
             const price = parseFloat(tick.quote);
             
-            // 🔥 CRITICAL FIX: Proper digit extraction including digit 0
-            const priceStr = String(tick.quote);
-            
-            // Get the last character
-            const lastChar = priceStr[priceStr.length - 1];
+            // Digit extraction using auto-detected decimals (preserves trailing zeros)
+            updateTickFormatFromQuote(tick.quote);
+            const digit = getLastDigitFromQuote(tick.quote);
             
             // Debug logging for digit 0
-            if (lastChar === '0') {
-                console.log('Digit 0 detected:', tick.quote, 'Full price string:', priceStr);
+            if (digit === 0) {
+                console.log('Digit 0 detected:', tick.quote, 'Formatted:', formatQuoteForDigit(tick.quote));
             }
             
-            // Check if it's a valid digit (0-9)
-            if (lastChar < '0' || lastChar > '9') {
-                log(`⚠️ Invalid digit from tick: ${tick.quote}, last char: "${lastChar}"`, 'WARNING');
+            if (isNaN(digit) || digit < 0 || digit > 9) {
+                log(`⚠️ Invalid digit from tick: ${tick.quote}`, 'WARNING');
                 return;
             }
-            
-            const digit = parseInt(lastChar);
             
             // Track digit 0 occurrences for debugging
             if (digit === 0) {
@@ -2651,6 +2706,11 @@
         
         function subscribeToTicks(symbol) {
             if (window.tickSubscriptionSent) return;
+            
+            window.tickFormat.symbol = symbol;
+            window.tickFormat.lastQuote = null;
+            window.tickFormat.minStep = Infinity;
+            window.tickFormat.decimals = window.tickFormat.decimals || 3;
             
             // Request tick stream
             sendRequest({ 
