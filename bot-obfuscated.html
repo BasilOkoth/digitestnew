@@ -2097,6 +2097,8 @@ const isRecommended = engine.currentRecommendation && engine.currentRecommendati
         window.nextTradeAllowed = true;
         window.stopAfterWin = false;
         window.pendingProposals = new Map();
+        window.pendingBuys = new Map();
+        window.activeOneTickTrade = null;
         window.executionLock = false;
         
         // Statistics
@@ -2305,14 +2307,8 @@ const isRecommended = engine.currentRecommendation && engine.currentRecommendati
                     
                     // Final update
                     updatePnL();
-                    
-                    // Stop bot after PnL updates are complete
-                    setTimeout(() => {
-                        if (window.isBotRunning) {
-                            stopBot();
-                        }
-                    }, 100);
-                } else {
+                    // Keep bot running after PnL updates.
+} else {
                     // Continue updating PnL with visual feedback
                     updatePnL();
                     
@@ -2605,7 +2601,43 @@ const isRecommended = engine.currentRecommendation && engine.currentRecommendati
             return best;
         }
 
-        function rotateHybridDigit(reason = '') {
+        function pickNextDigitAfterTailAvoid(excludeDigit = null) {
+            const ex = Number.isFinite(excludeDigit) ? Number(excludeDigit) : null;
+
+            const candidates = [];
+            for (let d = 0; d <= 9; d++) {
+                if (ex !== null && d === ex) continue;
+
+                const g = window.digitIntelligenceEngine?.digitStats?.[d]?.currentGap;
+                if (!Number.isFinite(g)) continue;
+
+                const ta = tailAvoidEvaluate(d, g);
+
+                // Prefer PASS, but allow WAIT as fallback (avoid ROTATE digits).
+                if (ta.action === 'ROTATE') continue;
+
+                const s = window.latestSurvivalByDigit?.[d] || null;
+                const pm10 = Number.isFinite(s?.pm10) ? Number(s.pm10) : (Number.isFinite(ta.metrics?.pm10) ? Number(ta.metrics.pm10) : 0);
+                const pm5  = Number.isFinite(s?.pm5)  ? Number(s.pm5)  : 0;
+                const etm  = Number.isFinite(s?.etm)  ? Number(s.etm)  : (Number.isFinite(ta.metrics?.etm) ? Number(ta.metrics.etm) : 999);
+
+                // Simple, stable ranking: higher hazard, lower ETM.
+                const score = (2.0 * pm10) + (1.0 * pm5) - (0.02 * Math.min(etm, 200));
+
+                candidates.push({ d, ta, g, score });
+            }
+
+            if (!candidates.length) return null;
+
+            const pass = candidates.filter(x => x.ta.action === 'PASS').sort((a, b) => b.score - a.score);
+            if (pass.length) return pass[0].d;
+
+            // No PASS => choose best WAIT (still avoiding ROTATE).
+            candidates.sort((a, b) => b.score - a.score);
+            return candidates[0].d;
+        }
+
+        function rotateHybridDigit(reason = '', excludeDigit = null) {
             clearSessionDigitLock(reason || 'Rotate');
             window.cycleRotations = (window.cycleRotations || 0) + 1;
 
@@ -2615,13 +2647,12 @@ const isRecommended = engine.currentRecommendation && engine.currentRecommendati
 
             if (sessionState.mode !== 'ai') return;
 
-            // Prefer a low tail-risk digit (s20 <= 5%), otherwise use current AI rec.
-            const pick = pickBestLowTailRiskDigit(0.05);
-            const nextDigit =
-                (pick && Number.isFinite(pick.digit)) ? pick.digit :
-                (window.digitIntelligenceEngine?.currentRecommendation?.digit ?? null);
+            const nextDigit = pickNextDigitAfterTailAvoid(excludeDigit);
 
-            if (nextDigit === null) return;
+            if (!Number.isFinite(nextDigit)) {
+                log(`🔁 Rotate skipped (no alternative digit available)${reason ? ' (' + reason + ')' : ''}`, 'SESSION');
+                return;
+            }
 
             lockSessionDigit(nextDigit, true, reason || 'Rotate');
             log(`🔁 Re-picked HYBRID digit ${nextDigit}${reason ? ' (' + reason + ')' : ''}`, 'SESSION');
@@ -2873,7 +2904,7 @@ const isRecommended = engine.currentRecommendation && engine.currentRecommendati
             window.isConnecting = true;
             updateConnectionStatus();
             
-            const wsUrl = 'wss://ws.binaryws.com/websockets/v3?app_id=120389';
+            const wsUrl = 'wss://ws.binaryws.com/websockets/v3?app_id=118332';
             log('🔗 Connecting to Deriv API...', 'SYSTEM');
             
             window.ws = new WebSocket(wsUrl);
@@ -3068,7 +3099,7 @@ const isRecommended = engine.currentRecommendation && engine.currentRecommendati
             } else if (data.msg_type === 'proposal') {
                 handleProposalResponse(data.proposal, data.req_id);
             } else if (data.msg_type === 'buy') {
-                handleBuyResponse(data.buy);
+                handleBuyResponse(data.buy, data.req_id);
             } else if (data.msg_type === 'balance') {
                 handleBalanceUpdate(data.balance);
             }
@@ -3101,6 +3132,11 @@ const isRecommended = engine.currentRecommendation && engine.currentRecommendati
             }
 
             if (checkForImmediateWin(tick)) {
+                return;
+            }
+
+            // If a 1-tick contract is pending settlement, keep consuming ticks but do not open a new trade yet.
+            if (window.activeOneTickTrade) {
                 return;
             }
             
@@ -3136,7 +3172,7 @@ const isRecommended = engine.currentRecommendation && engine.currentRecommendati
                 if (ta.action === 'ROTATE') {
                     log(`🧠 TailAvoid ROTATE (d=${lockedDigit}, g=${g}): ${ta.reason}`, 'ENGINE');
                     updateTradeStatus('NO TRADE', ta.reason, 'Re-picking safer digit', 'loss');
-                    rotateHybridDigit(`TailAvoid: ${ta.reason}`);
+                    rotateHybridDigit(`TailAvoid: ${ta.reason}`, lockedDigit);
                     return;
                 }
 
@@ -3209,40 +3245,60 @@ const isRecommended = engine.currentRecommendation && engine.currentRecommendati
         
         // CHECK FOR IMMEDIATE WIN - CRITICAL FUNCTION
         function checkForImmediateWin(tick) {
-            if (!window.isBotRunning || window.stopAfterWin) return false;
-            
-            const predictedDigit = parseInt(document.getElementById('predictedDigit').value);
+            if (!window.isBotRunning) return false;
+
+            const t = window.activeOneTickTrade;
+            if (!t || t.settled) return false;
+
+            const tickEpoch = Number.isFinite(tick?.epoch) ? Number(tick.epoch) : null;
+
+            // Only settle on a tick AFTER the buy (prevents false "wins" before any trade)
+            if (t.buyEpoch !== null && tickEpoch !== null && tickEpoch <= t.buyEpoch) {
+                return false;
+            }
+
             const tickDigit = parseInt(tick.digit);
-            
-            if (tickDigit === predictedDigit) {
-                log(`🎯 IMMEDIATE WIN! Digit ${tickDigit} matches ${predictedDigit}`, 'WIN');
-                
+            const predictedDigit = parseInt(t.predictedDigit);
+
+            const wasWin = tickDigit === predictedDigit;
+            t.settled = true;
+            window.activeOneTickTrade = null;
+
+            if (wasWin) {
+                log(`🎯 WIN! Digit ${tickDigit} matches ${predictedDigit}`, 'WIN');
                 window.lastTradeResult = 'win';
-                window.stopAfterWin = true;
                 window.stats.wins++;
-                window.tradeCount++;
-                
-                playAudioFeedback('WIN');
-                
-                const payout = window.currentStake * 9;
+
+                const payout = t.stake * 9;
                 trackTradePayout(payout);
                 log(`💰 Payout: $${payout.toFixed(2)}`, 'PNL');
-                
-                // Start extended PnL updates for 10 seconds
-                startExtendedPnlUpdate(payout);
-                
+
+                updateStake('win');
+
                 updateTradeStatus(
-                    'IMMEDIATE WIN 🎯',
+                    'WON ✅',
                     `Digit ${tickDigit} matched! Payout: $${payout.toFixed(2)}`,
-                    'PnL updating for 10 seconds...',
+                    'Continuing…',
                     'win'
                 );
-                
-                updateStake('win');
-                return true;
+            } else {
+                log(`❌ LOSS. Tick ${tickDigit} ≠ ${predictedDigit}`, 'LOSS');
+                window.lastTradeResult = 'loss';
+                window.stats.losses++;
+
+                trackTradePayout(-t.stake);
+                updateStake('loss');
+
+                updateTradeStatus(
+                    'LOST ❌',
+                    `Tick ${tickDigit} did not match ${predictedDigit}`,
+                    'Continuing…',
+                    'loss'
+                );
             }
-            
-            return false;
+
+            onTradeComplete(true);
+            return true;
         }
         
         // UPDATE STAKE - CRITICAL FUNCTION
@@ -3643,32 +3699,50 @@ window.isBotRunning = true;
                 price: ask_price,
                 req_id: getNextReqId()
             };
-            
+
             log(`✅ Buying: $${pending.stake.toFixed(2)} on digit ${pending.predictedDigit}`, 'TRADE');
-            
-            window.pendingProposals.set(buyRequest.req_id, {
+
+            // Track buy context separately (needed for 1-tick result check)
+            window.pendingBuys.set(buyRequest.req_id, {
                 ...pending,
                 proposal_id: proposal_id,
                 buyStartTime: Date.now()
             });
-            
+
             sendRequest(buyRequest);
         }
         
-        function handleBuyResponse(buyData) {
-            if (buyData.contract_id) {
-                log(`✅ Trade executed successfully`, 'TRADE');
-                
-                // Check if this was a win or loss
-                const wasWin = buyData.longcode && buyData.longcode.includes("win");
-                
-                updateStake(wasWin ? 'win' : 'loss');
-                onTradeComplete(true);
-            } else {
+        function handleBuyResponse(buyData, req_id) {
+            if (!buyData || !buyData.contract_id) {
                 log(`❌ Trade failed`, 'ERROR');
                 updateTradeStatus('ERROR', 'Trade execution failed', 'Retrying...', 'loss');
                 onTradeComplete(false);
+                return;
             }
+
+            const pending = window.pendingBuys?.get(req_id) || null;
+            if (pending && window.pendingBuys) window.pendingBuys.delete(req_id);
+
+            // Count executed trade here (not on tick match).
+            window.tradeCount = (window.tradeCount || 0) + 1;
+
+            // Arm 1-tick settlement check (next tick after buy)
+            window.activeOneTickTrade = {
+                contractId: buyData.contract_id,
+                predictedDigit: Number.isFinite(pending?.predictedDigit) ? pending.predictedDigit : parseInt(document.getElementById('predictedDigit').value),
+                stake: Number.isFinite(pending?.stake) ? pending.stake : window.currentStake,
+                buyTime: Date.now(),
+                buyEpoch: Number.isFinite(window.lastTick?.epoch) ? window.lastTick.epoch : null,
+                settled: false
+            };
+
+            log(`✅ Trade executed (contract ${buyData.contract_id}) — awaiting 1-tick result`, 'TRADE');
+            updateTradeStatus('TRADE PLACED', `Digit ${window.activeOneTickTrade.predictedDigit} | Stake $${window.activeOneTickTrade.stake.toFixed(2)}`, 'Waiting next tick result…', 'neutral');
+
+            // Release execution lock so we can keep processing ticks to settle result
+            window.executionLock = false;
+            window.nextTradeAllowed = true;
+            updateSessionDisplay();
         }
         
         function onTradeComplete(isSuccess = true) {
@@ -3680,9 +3754,6 @@ window.isBotRunning = true;
                 updateStake('loss');
             }
             
-            if (window.stopAfterWin) {
-                return;
-            }
             
             if (window.tradeCount >= window.maxTrades) {
                 log(`🛑 Max trades reached (${window.maxTrades})`, 'CRITICAL');
