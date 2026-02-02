@@ -687,7 +687,7 @@
     <script>
         // ============================================================================
         // DERIV DIGIT MATCH INTELLIGENCE ENGINE - FIXED FOR DIGIT 0
-        // Warm-up (1000 ticks) → Live incremental → Regime + Smart digit selection
+        // Warm-up (5000 ticks) → Live incremental → Regime + Smart digit selection
         // ============================================================================
         
         // Global AI thresholds (single source of truth)
@@ -838,7 +838,7 @@
             enabled: true,
             warmupDone: false,
             warmupTicks: 0,
-            targetWarmupTicks: 1000,
+            targetWarmupTicks: 5000,
             tickIndex: 0,
             
             // Data structures
@@ -2904,7 +2904,7 @@ const isRecommended = engine.currentRecommendation && engine.currentRecommendati
             window.isConnecting = true;
             updateConnectionStatus();
             
-            const wsUrl = 'wss://ws.binaryws.com/websockets/v3?app_id=120389';
+            const wsUrl = 'wss://ws.binaryws.com/websockets/v3?app_id=118332';
             log('🔗 Connecting to Deriv API...', 'SYSTEM');
             
             window.ws = new WebSocket(wsUrl);
