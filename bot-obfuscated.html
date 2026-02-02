@@ -744,7 +744,8 @@
             confirm_pm10_late: 0.55,          // g >= 0.95*P90 require PM10>=0.55
             late_confirm_ratio: 0.95,         // 0.95*P90 split
             etm_max: 18,                      // reject if ETM > 18
-            min_samples: 80                   // minimum gaps for stable stats
+            min_gaps_total: 80,            // minimum total gaps for stable percentiles
+            min_conditional_samples: 30   // minimum conditional samples (gap > g) for PM10/ETM
         };
 
         function percentileFromArray(values, p) {
@@ -761,7 +762,7 @@
         // PMk(d,g): P(hit within next k ticks | current gap = g)
         function pmkFromGaps(gaps, g, k) {
             const longer = gaps.filter(L => Number.isFinite(L) && L > g);
-            if (longer.length < window.TAIL_AVOID_CFG.min_samples) return null;
+            if (longer.length < window.TAIL_AVOID_CFG.min_conditional_samples) return null;
             const within = longer.filter(L => L <= g + k).length;
             return within / longer.length;
         }
@@ -769,7 +770,7 @@
         // ETM(d,g): E[ticks remaining | current gap = g]
         function etmFromGaps(gaps, g) {
             const longer = gaps.filter(L => Number.isFinite(L) && L > g);
-            if (longer.length < window.TAIL_AVOID_CFG.min_samples) return null;
+            if (longer.length < window.TAIL_AVOID_CFG.min_conditional_samples) return null;
             const remaining = longer.map(L => L - g);
             const sum = remaining.reduce((a, b) => a + b, 0);
             return sum / remaining.length;
@@ -778,7 +779,7 @@
         function tailAvoidEvaluate(d, g) {
             const st = window.digitIntelligenceEngine?.digitStats?.[d];
             const gaps = st?.gaps || [];
-            if (gaps.length < window.TAIL_AVOID_CFG.min_samples) {
+            if (gaps.length < window.TAIL_AVOID_CFG.min_gaps_total) {
                 return { action: 'WAIT', reason: 'TailAvoid warming up', metrics: null };
             }
 
