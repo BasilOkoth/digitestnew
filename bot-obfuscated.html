@@ -2099,7 +2099,9 @@ const isRecommended = engine.currentRecommendation && engine.currentRecommendati
         window.stopAfterWin = false;
         window.pendingProposals = new Map();
         window.pendingBuys = new Map();
-        window.activeOneTickTrade = null;
+        window.activeOneTickTrades = [];
+        window.maxOutstandingTrades = 3; // trades can pipeline with 1-tick settlement
+        window.pendingStopAfterWin = false;
         window.executionLock = false;
         
         // Statistics
@@ -2308,8 +2310,13 @@ const isRecommended = engine.currentRecommendation && engine.currentRecommendati
                     
                     // Final update
                     updatePnL();
-                    // Keep bot running after PnL updates.
-} else {
+
+                    // If we stopped because of a WIN, close the connection now.
+                    if (window.pendingStopAfterWin) {
+                        window.pendingStopAfterWin = false;
+                        stopBot(true);
+                    }
+                } else {
                     // Continue updating PnL with visual feedback
                     updatePnL();
                     
@@ -2905,7 +2912,7 @@ const isRecommended = engine.currentRecommendation && engine.currentRecommendati
             window.isConnecting = true;
             updateConnectionStatus();
             
-            const wsUrl = 'wss://ws.binaryws.com/websockets/v3?app_id=120389';
+            const wsUrl = 'wss://ws.binaryws.com/websockets/v3?app_id=118332';
             log('🔗 Connecting to Deriv API...', 'SYSTEM');
             
             window.ws = new WebSocket(wsUrl);
@@ -3118,7 +3125,11 @@ const isRecommended = engine.currentRecommendation && engine.currentRecommendati
         
         // PROCESS TICK IMMEDIATELY - CRITICAL TRADE EXECUTION FUNCTION
         function processTickImmediately(tick) {
-            if (window.stopAfterWin) return;
+            if (window.stopAfterWin) {
+                // Still settle any in-flight 1-tick trades, but do not place new ones.
+                settleOneTickTrades(tick);
+                return;
+            }
             
             // In AI mode, wait for engine recommendation
             if (sessionState.mode === 'ai' && (!window.digitIntelligenceEngine.warmupDone || !window.digitIntelligenceEngine.currentRecommendation)) {
@@ -3132,12 +3143,11 @@ const isRecommended = engine.currentRecommendation && engine.currentRecommendati
                 lockSessionDigit(d, true, 'AUTO start lock');
             }
 
-            if (checkForImmediateWin(tick)) {
-                return;
-            }
+                        // Settle any 1-tick trades due on this tick (this happens BEFORE placing a new trade)
+            settleOneTickTrades(tick);
 
-            // If a 1-tick contract is pending settlement, keep consuming ticks but do not open a new trade yet.
-            if (window.activeOneTickTrade) {
+            // If we just won, stop placing new trades immediately
+            if (window.stopAfterWin) {
                 return;
             }
             
@@ -3145,6 +3155,26 @@ const isRecommended = engine.currentRecommendation && engine.currentRecommendati
                 log(`🛑 Max trades reached (${window.maxTrades})`, 'CRITICAL');
                 updateTradeStatus('MAX TRADES', `Maximum trades reached (${window.maxTrades})`, 'Bot stopped', 'loss');
                 stopBot();
+                return;
+            }
+
+
+            // Keep the bot in tandem with the tick stream by allowing pipelining,
+            // but cap outstanding requests to avoid backlog if the network lags.
+            const inflightCount =
+                (window.pendingProposals ? window.pendingProposals.size : 0) +
+                (window.pendingBuys ? window.pendingBuys.size : 0) +
+                (Array.isArray(window.activeOneTickTrades) ? window.activeOneTickTrades.length : 0);
+
+            const maxOut = (window.maxOutstandingTrades || 3);
+
+            // Do not exceed maxTrades (executed trades + inflight)
+            if ((window.tradeCount || 0) + inflightCount >= window.maxTrades) {
+                return;
+            }
+
+            if (inflightCount >= maxOut) {
+                log(`⏳ In-flight cap reached (${inflightCount}/${maxOut}) — skipping this tick`, 'ENGINE');
                 return;
             }
 
@@ -3192,11 +3222,8 @@ const isRecommended = engine.currentRecommendation && engine.currentRecommendati
             
             try {
                 window.stats.tradesExecuted++;
-                window.tradeCount++;
-                document.getElementById('metricTradeCount').textContent = window.tradeCount;
-                
                 updateSessionDisplay();
-                log(`⚡ Trade #${window.tradeCount}: ${tick.price.toFixed(3)} (Digit ${tick.digit})`, 'TRADE');
+                log(`⚡ Trade request: ${tick.price.toFixed(3)} (Digit ${tick.digit})`, 'TRADE');
                 
                 updateTradeStatus(
                     'TRADING',
@@ -3252,65 +3279,81 @@ const isRecommended = engine.currentRecommendation && engine.currentRecommendati
         }
         
         // CHECK FOR IMMEDIATE WIN - CRITICAL FUNCTION
-        function checkForImmediateWin(tick) {
-            if (!window.isBotRunning) return false;
-
-            const t = window.activeOneTickTrade;
-            if (!t || t.settled) return false;
+        
+        // SETTLE 1-TICK TRADES (settle on the first tick AFTER buy)
+        function settleOneTickTrades(tick) {
+            if (!Array.isArray(window.activeOneTickTrades)) window.activeOneTickTrades = [];
 
             const tickEpoch = Number.isFinite(tick?.epoch) ? Number(tick.epoch) : null;
-
-            // Only settle on a tick AFTER the buy (prevents false "wins" before any trade)
-            if (t.buyEpoch !== null && tickEpoch !== null && tickEpoch <= t.buyEpoch) {
-                return false;
-            }
+            if (tickEpoch === null) return false;
 
             const tickDigit = parseInt(tick.digit);
-            const predictedDigit = parseInt(t.predictedDigit);
 
-            const wasWin = tickDigit === predictedDigit;
-            t.settled = true;
-            window.activeOneTickTrade = null;
+            let settledAny = false;
+            const stillOpen = [];
 
-            if (wasWin) {
-                log(`🎯 WIN! Digit ${tickDigit} matches ${predictedDigit}`, 'WIN');
-                window.lastTradeResult = 'win';
-                window.stats.wins++;
+            for (const t of window.activeOneTickTrades) {
+                if (!t || t.settled) continue;
 
-                const payout = t.stake * 9;
-                trackTradePayout(payout);
-                log(`💰 Payout: $${payout.toFixed(2)}`, 'PNL');
+                // Not due yet (must be strictly after buyEpoch)
+                if (t.buyEpoch !== null && tickEpoch <= t.buyEpoch) {
+                    stillOpen.push(t);
+                    continue;
+                }
 
-                updateStake('win');
+                const predictedDigit = parseInt(t.predictedDigit);
+                const wasWin = tickDigit === predictedDigit;
+                t.settled = true;
+                settledAny = true;
 
-                updateTradeStatus(
-                    'WON ✅',
-                    `Digit ${tickDigit} matched! Payout: $${payout.toFixed(2)}`,
-                    'Continuing…',
-                    'win'
-                );
-            } else {
-                log(`❌ LOSS. Tick ${tickDigit} ≠ ${predictedDigit}`, 'LOSS');
-                window.lastTradeResult = 'loss';
-                window.stats.losses++;
+                if (wasWin) {
+                    log(`🎯 WIN! Digit ${tickDigit} matches ${predictedDigit}`, 'WIN');
+                    window.lastTradeResult = 'win';
+                    window.stats.wins++;
 
-                trackTradePayout(-t.stake);
-                updateStake('loss');
+                    const payout = t.stake * 9;
+                    trackTradePayout(payout);
+                    log(`💰 Payout: $${payout.toFixed(2)}`, 'PNL');
 
-                updateTradeStatus(
-                    'LOST ❌',
-                    `Tick ${tickDigit} did not match ${predictedDigit}`,
-                    'Continuing…',
-                    'loss'
-                );
+                    updateStake('win');
+
+                    updateTradeStatus(
+                        'WON ✅',
+                        `Digit ${tickDigit} matched! Payout: $${payout.toFixed(2)}`,
+                        'Stopping after win…',
+                        'win'
+                    );
+
+                    // Stop placing NEW trades immediately after a win
+                    window.stopAfterWin = true;
+                    window.pendingStopAfterWin = true;
+
+                    // Extended PnL updates while still connected
+                    try { startExtendedPnlUpdate(payout); } catch (_) {}
+                } else {
+                    log(`❌ LOSS. Tick ${tickDigit} ≠ ${predictedDigit}`, 'LOSS');
+                    window.lastTradeResult = 'loss';
+                    window.stats.losses++;
+
+                    trackTradePayout(-t.stake);
+                    updateStake('loss');
+
+                    updateTradeStatus(
+                        'LOST ❌',
+                        `Tick ${tickDigit} did not match ${predictedDigit}`,
+                        'Continuing…',
+                        'loss'
+                    );
+                }
+
+                onTradeComplete(true);
             }
 
-            onTradeComplete(true);
-            return true;
+            window.activeOneTickTrades = stillOpen;
+            return settledAny;
         }
-        
-        // UPDATE STAKE - CRITICAL FUNCTION
-        function updateStake(winOrLoss) {
+
+function updateStake(winOrLoss) {
             window.baseStake = parseFloat(document.getElementById('baseStake').value) || 1.0;
             window.multiplier = parseFloat(document.getElementById('multiplier').value) || 1.15;
             window.maxTrades = parseInt(document.getElementById('maxTrades').value) || 10;
@@ -3452,8 +3495,8 @@ window.isBotRunning = true;
         }
         
         // STOP BOT - CRITICAL FUNCTION
-        function stopBot() {
-            if (!window.isBotRunning) return;
+        function stopBot(force = false) {
+            if (!force && !window.isBotRunning) return;
             
             window.isBotRunning = false;
             window.nextTradeAllowed = false;
@@ -3698,10 +3741,18 @@ window.isBotRunning = true;
             if (!pending) return;
         
             window.pendingProposals.delete(req_id);
+            if (window.stopAfterWin || window.pendingStopAfterWin) {
+                log('🛑 Skipping buy: stopping after win', 'ENGINE');
+                return;
+            }
             executeBuy(proposal.id, proposal.ask_price, pending);
         }
         
         function executeBuy(proposal_id, ask_price, pending) {
+            if (window.stopAfterWin || window.pendingStopAfterWin) {
+                log('🛑 Buy blocked: stopping after win', 'ENGINE');
+                return;
+            }
             const buyRequest = {
                 buy: proposal_id,
                 price: ask_price,
@@ -3733,19 +3784,21 @@ window.isBotRunning = true;
 
             // Count executed trade here (not on tick match).
             window.tradeCount = (window.tradeCount || 0) + 1;
+            document.getElementById('metricTradeCount').textContent = window.tradeCount;
 
             // Arm 1-tick settlement check (next tick after buy)
-            window.activeOneTickTrade = {
+            window.activeOneTickTrades.push({
                 contractId: buyData.contract_id,
                 predictedDigit: Number.isFinite(pending?.predictedDigit) ? pending.predictedDigit : parseInt(document.getElementById('predictedDigit').value),
                 stake: Number.isFinite(pending?.stake) ? pending.stake : window.currentStake,
                 buyTime: Date.now(),
                 buyEpoch: Number.isFinite(window.lastTick?.epoch) ? window.lastTick.epoch : null,
                 settled: false
-            };
+            });
 
             log(`✅ Trade executed (contract ${buyData.contract_id}) — awaiting 1-tick result`, 'TRADE');
-            updateTradeStatus('TRADE PLACED', `Digit ${window.activeOneTickTrade.predictedDigit} | Stake $${window.activeOneTickTrade.stake.toFixed(2)}`, 'Waiting next tick result…', 'neutral');
+                        const last = window.activeOneTickTrades[window.activeOneTickTrades.length - 1];
+            updateTradeStatus('TRADE PLACED', `Digit ${last.predictedDigit} | Stake $${last.stake.toFixed(2)}`, 'Waiting next tick result…', 'neutral');
 
             // Release execution lock so we can keep processing ticks to settle result
             window.executionLock = false;
