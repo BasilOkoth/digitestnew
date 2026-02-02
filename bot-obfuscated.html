@@ -1747,7 +1747,9 @@
         
         function syncCalculatorWithMain() {
             const baseStake = parseFloat(document.getElementById('baseStake').value) || 1.0;
-            const multiplier = parseFloat(document.getElementById('multiplier').value) || 1.15;
+            const multiplier = 1.15;
+            const multEl3 = document.getElementById('multiplier');
+            if (multEl3) multEl3.value = '1.15';
             const maxTrades = parseInt(document.getElementById('maxTrades').value) || 10;
             
             document.getElementById('calc_base_stake').value = baseStake.toFixed(2);
@@ -2100,7 +2102,6 @@ const isRecommended = engine.currentRecommendation && engine.currentRecommendati
         window.pendingProposals = new Map();
         window.pendingBuys = new Map();
         window.activeOneTickTrades = [];
-        window.maxOutstandingTrades = 3; // trades can pipeline with 1-tick settlement
         window.pendingStopAfterWin = false;
         window.executionLock = false;
         
@@ -3159,26 +3160,6 @@ const isRecommended = engine.currentRecommendation && engine.currentRecommendati
             }
 
 
-            // Keep the bot in tandem with the tick stream by allowing pipelining,
-            // but cap outstanding requests to avoid backlog if the network lags.
-            const inflightCount =
-                (window.pendingProposals ? window.pendingProposals.size : 0) +
-                (window.pendingBuys ? window.pendingBuys.size : 0) +
-                (Array.isArray(window.activeOneTickTrades) ? window.activeOneTickTrades.length : 0);
-
-            const maxOut = (window.maxOutstandingTrades || 3);
-
-            // Do not exceed maxTrades (executed trades + inflight)
-            if ((window.tradeCount || 0) + inflightCount >= window.maxTrades) {
-                return;
-            }
-
-            if (inflightCount >= maxOut) {
-                log(`⏳ In-flight cap reached (${inflightCount}/${maxOut}) — skipping this tick`, 'ENGINE');
-                return;
-            }
-
-
                         // 🧠 PRE-TRADE “TAIL AVOID” CHECKLIST (non-blocking)
             // Rule: once started, we ALWAYS trade each tick. TailAvoid may trigger a digit switch (never WAIT).
             if (sessionState.mode === 'ai' && window.isBotRunning) {
@@ -3357,7 +3338,9 @@ const isRecommended = engine.currentRecommendation && engine.currentRecommendati
 
 function updateStake(winOrLoss) {
             window.baseStake = parseFloat(document.getElementById('baseStake').value) || 1.0;
-            window.multiplier = parseFloat(document.getElementById('multiplier').value) || 1.15;
+            window.multiplier = 1.15;
+            const multEl = document.getElementById('multiplier');
+            if (multEl) multEl.value = '1.15';
             window.maxTrades = parseInt(document.getElementById('maxTrades').value) || 10;
             window.maxCycleTrades = parseInt(document.getElementById('maxCycleTrades')?.value) || 10;
             
