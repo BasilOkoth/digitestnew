@@ -3198,17 +3198,17 @@ const isRecommended = engine.currentRecommendation && engine.currentRecommendati
 
                 let cur = Number.isFinite(activeDigit) ? evalDigit(activeDigit) : { d: null, g: null, ta: { action: 'WAIT', reason: 'digit not ready', metrics: null } };
 
-                if (Number.isFinite(activeDigit) && cur.ta.action !== 'PASS') {
+                if (Number.isFinite(activeDigit) && cur.ta.action === 'ROTATE') {
                     const altDigit = pickNextDigitAfterTailAvoid(activeDigit);
 
                     if (Number.isFinite(altDigit) && altDigit !== activeDigit) {
-                        lockSessionDigit(altDigit, true, `Auto-switch: ${cur.ta.reason}`);
+                        lockSessionDigit(altDigit, true, `Auto-switch (ROTATE): ${cur.ta.reason}`);
                         activeDigit = altDigit;
                         cur = evalDigit(activeDigit);
-                        log(`🔀 Auto-switched to digit ${activeDigit} to keep trading (${cur.ta.action}: ${cur.ta.reason})`, 'SESSION');
+                        log(`🔀 Auto-switched to digit ${activeDigit} (ROTATE: ${cur.ta.reason})`, 'SESSION');
                     } else {
-                        // No safe alternative: trade current digit anyway (user requirement: never wait mid-run).
-                        log(`⚠️ TailAvoid ${cur.ta.action} for digit ${activeDigit} (${cur.ta.reason}) — trading anyway (no alternative)`, 'ENGINE');
+                        // No safe alternative: keep trading current digit (user requirement: trade every tick).
+                        log(`⚠️ TailAvoid ROTATE for digit ${activeDigit} (${cur.ta.reason}) — trading anyway (no alternative)`, 'ENGINE');
                     }
                 }
 
@@ -3247,7 +3247,9 @@ const isRecommended = engine.currentRecommendation && engine.currentRecommendati
         function executeTrade(tick) {
             const contractType = document.getElementById('contractType').value;
             const symbol = document.getElementById('symbol').value;
-            const predictedDigit = parseInt(document.getElementById('predictedDigit').value);
+            const predictedDigitRaw = parseInt(document.getElementById('predictedDigit').value);
+            const predictedDigit = Number.isFinite(sessionState.sessionDigit) ? sessionState.sessionDigit : predictedDigitRaw;
+            if (Number.isFinite(predictedDigit)) document.getElementById('predictedDigit').value = predictedDigit;
             
             let stake = window.currentStake;
             trackTradeInvestment(stake);
@@ -3826,12 +3828,10 @@ window.isBotRunning = true;
                     const taCur = Number.isFinite(gCur) ? tailAvoidEvaluate(curDigit, gCur) : { action: 'WAIT', reason: 'gap not ready', metrics: null };
                     const taBest = Number.isFinite(gBest) ? tailAvoidEvaluate(bestDigit, gBest) : { action: 'WAIT', reason: 'gap not ready', metrics: null };
 
-                    const shouldSwitch =
-                        (taCur.action === 'ROTATE') ||
-                        (taCur.action !== 'PASS' && taBest.action === 'PASS');
+                    const shouldSwitch = (taCur.action === 'ROTATE');
 
                     if (shouldSwitch) {
-                        lockSessionDigit(bestDigit, true, `Auto-switch: ${taCur.action}→${taBest.action}`);
+                        lockSessionDigit(bestDigit, true, `Auto-switch (ROTATE): ${taCur.reason}`);
                         document.getElementById('predictedDigit').value = bestDigit;
                         log(`🔁 Switched digit ${curDigit} → ${bestDigit} (${taCur.action}: ${taCur.reason} | best: ${taBest.reason})`, 'SESSION');
                     }
