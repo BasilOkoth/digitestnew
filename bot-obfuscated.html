@@ -710,27 +710,29 @@
             pressureZoneEnabled: true,
             // Looser default so you still get trades, but quality stays high.
             // 0.75 means "within last 25% of P90"
-            pressureZoneMinP90Ratio: 0.70,
+            pressureZoneMinP90Ratio: 0.85,
             pressureZoneMaxP90Ratio: 0.95,
                         // Hard floor: never recommend if gap is far from P90 (prevents "gap 4, p90 20" type picks)
-            pressureZoneMinFloorP90Ratio: 0.60,
+            pressureZoneMinFloorP90Ratio: 0.85,
 // Adaptive fallback: if no digit qualifies at the first tier, the engine progressively relaxes.
             // It will NEVER go below pressureZoneMinFloorP90Ratio.
-            pressureZoneFallbackMinP90Ratios: [0.70, 0.66, 0.63, 0.60]
+            pressureZoneFallbackMinP90Ratios: [0.85],
+            // SAFE ENTRY: reduce stake on first entry after passing tail rules
+            AI_ENTRY_STAKE_FACTOR: 0.50
         };
 
 
         // ============================================================================
         // SURVIVAL CURVE ENGINE CONFIG (Empirical conditional survival from historical gaps)
         // ============================================================================
-        window.SURVIVAL_WINDOW = 2000;   // rolling digits window (oldest -> newest)
+        window.SURVIVAL_WINDOW = 5000;   // rolling digits window (oldest -> newest)
         window.lastDigits = [];          // rolling buffer of last digits for SurvivalEngine
 
         // Ranking defaults (tweakable)
         window.SURVIVAL_CFG = {
             minPm5: 0.60,
             maxS20: 0.05,
-            maxETM: 12,
+            maxETM: 18,
             requirePressure: true
         };
 
@@ -739,7 +741,7 @@
             enabled: true,
             warmupDone: false,
             warmupTicks: 0,
-            targetWarmupTicks: 1000,
+            targetWarmupTicks: 5000,
             tickIndex: 0,
             
             // Data structures
@@ -1053,7 +1055,7 @@
             },
             
             // Select best digit using AI logic
-            selectBestDigit: function() {
+            selectBestDigit: function(survivalByDigit = null) {
                 if (!this.warmupDone || !this.enabled) return null;
                 
                 const regimeStatus = this.computeRegimeStatus();
@@ -1125,10 +1127,21 @@
                         // SAFETY
                         if (thresholds.require_g_lt_p90 && g >= p90) continue;
 
-                        // PRESSURE ZONE (adaptive): prefer digits close to P90, but relax if too strict.
+                                                // PRESSURE ZONE (adaptive): prefer digits close to P90, but relax if too strict.
                         if (thresholds.pressureZoneEnabled) {
                             if (p90Ratio < activeMinP90Ratio) continue;
                             if (p90Ratio >= thresholds.pressureZoneMaxP90Ratio) continue;
+                        }
+
+                        // Tail-early ruleset (before MATCH)
+                        if (survivalByDigit) {
+                            const surv = (typeof survivalByDigit.get === 'function')
+                                ? survivalByDigit.get(d)
+                                : survivalByDigit[d];
+                            if (surv) {
+                                const gate = tailEarlyRuleCheck(surv);
+                                if (!gate.ok) continue;
+                            }
                         }
 
                         // Cold-stickiness / persistence filters
@@ -1193,7 +1206,7 @@
                     return;
                 }
 
-                let best = this.selectBestDigit();
+                let best = null;
 
                 // -----------------------------
                 // Survival-curve overlay (always-on hybrid when data exists)
@@ -1248,6 +1261,9 @@
                 }
 
                 const hasSurvival = !!(survivalByDigit && survivalByDigit.size);
+
+                // Base engine selection (now tail-gated using SurvivalEngine metrics when available)
+                best = this.selectBestDigit(survivalByDigit);
 
                 // Expose latest survival stats for trading gates
                 try {
@@ -1474,10 +1490,9 @@
               const g = currentGaps[d];
 
               const p90 = percentile(gaps, 90);
-              const p95 = percentile(gaps, 95);
-              const p75 = percentile(gaps, 75);
+               const p95 = percentile(gaps, 95);
+               const p75 = percentile(gaps, 75);
               const avg = gaps.length ? (gaps.reduce((s,x)=>s+x,0)/gaps.length) : 0;
-              const support = gaps.length;
 
               const pm5  = pMatchWithin(gaps, g, 5);
               const pm10 = pMatchWithin(gaps, g, 10);
@@ -1487,9 +1502,9 @@
 
               const etm = expectedAdditionalTicks(gaps, g);
 
-              const inPressure = (p90 > 0) ? (g >= 0.70 * p90 && g < 0.95 * p90) : false;
+              const inPressure = (p90 > 0) ? (g >= 0.85 * p90 && g <= 0.95 * p90) : false;
 
-              out.push({ digit: d, gap: g, avgGap: avg, support, p75, p90, p95, inPressure, pm5, pm10, s10, s20, etm });
+              out.push({ digit: d, gap: g, avgGap: avg, p75, p90, p95, inPressure, pm5, pm10, s10, s20, etm });
             }
             return out;
           }
@@ -1505,8 +1520,31 @@
               if (x.pm5 < minPm5) return false;
               if (x.s20 > maxS20) return false;
               if (x.etm > maxETM) return false;
+
+              // Tail-early ruleset (pre-MATCH)
+              const p90 = Number(x.p90) || 0;
+              const p95 = Number(x.p95) || 0;
+              const g = Number(x.gap) || 0;
+              const pm10 = Number(x.pm10) || 0;
+              const etm = Number(x.etm);
+
+              // Step A — High pressure entry zone (candidate filter)
+              if (p90 > 0 && g < 0.85 * p90) return false;
+
+              // Step B — Early tail rejection
+              if (p95 > 0 && g >= 0.90 * p95) return false; // (1) Tail proximity
+              if (p90 > 0 && g >= 0.90 * p90 && pm10 < 0.45) return false; // (2) Pressure but low hazard
+              if (Number.isFinite(etm) && etm > 18) return false; // (3) ETM still long wait
+
+              // Step C — Confirm then enter (PM strengthens as pressure rises)
+              if (p90 > 0) {
+                  if (g >= 0.85 * p90 && g <= 0.95 * p90 && pm10 < 0.50) return false;
+                  if (g >= 0.95 * p90 && pm10 < 0.55) return false;
+              }
+
               return true;
             });
+
 
             candidates.forEach(x => {
               x.survivalScore =
@@ -2457,98 +2495,37 @@ const isRecommended = engine.currentRecommendation && engine.currentRecommendati
             return null;
         }
 
-
-        // =====================================================================
-        // TAIL EARLY RULE SET (pre-MATCH gate)
-        // =====================================================================
-        window.TAIL_EARLY_RULES = window.TAIL_EARLY_RULES || {
-            enabled: true,
-
-            // Step A — High pressure entry zone
-            pressureStartP90: 0.85,
-
-            // Step B — Early tail rejection
-            tailProximityP95: 0.90,
-            latePressureP90: 0.90,
-            trapPm10Max: 0.45,
-            etmMax: 18,
-
-            // Step C — Confirm then enter
-            confirmMidUpperP90: 0.95,
-            confirmPm10MidMin: 0.50,
-            confirmPm10HighMin: 0.55,
-
-            // Quality / stability
-            minSupport: 80,
-
-            // Optional safe sizing (only at martingaleStep 0)
-            stakeScaleEnabled: false,
-            stakeScaleMid: 0.85,
-            stakeScaleHigh: 0.75
-        };
-
-        function evaluateTailEarlyRules(lockedDigit, cfg = window.TAIL_EARLY_RULES) {
-            const d = Number(lockedDigit);
-            if (!cfg || !cfg.enabled) return { ok: true, code: 'DISABLED', message: 'Tail rules disabled', rotate: false, stakeScale: null };
-
-            const s = getSurvivalForDigit(d);
-            if (!s) return { ok: false, code: 'NO_DATA', message: 'Survival warming up', rotate: false, stakeScale: null };
+        function tailEarlyRuleCheck(s) {
+            if (!s) return { ok: false, reason: 'Survival N/A' };
 
             const g = Number(s.gap);
             const p90 = Number(s.p90);
             const p95 = Number(s.p95);
             const pm10 = Number(s.pm10);
             const etm = Number(s.etm);
-            const support = Number(s.support);
 
-            if (![g, p90, pm10, etm].every(Number.isFinite) || p90 <= 0) {
-                return { ok: false, code: 'BAD_DATA', message: 'Survival data not ready', rotate: false, stakeScale: null };
+            if (!Number.isFinite(g) || !Number.isFinite(p90) || p90 <= 0) {
+                return { ok: false, reason: 'Invalid gap/P90' };
             }
 
-            if (Number.isFinite(support) && support > 0 && support < (cfg.minSupport ?? 0)) {
-                return { ok: false, code: 'LOW_SUPPORT', message: `Not enough gap history (${support})`, rotate: false, stakeScale: null };
-            }
+            // Step A — High pressure entry zone
+            if (g < 0.85 * p90) return { ok: false, reason: 'Not in pressure zone (<0.85×P90)' };
 
-            const p90Start = cfg.pressureStartP90 * p90;
-            const p90MidUpper = cfg.confirmMidUpperP90 * p90;
+            // Step B — Early tail rejection
+            if (Number.isFinite(p95) && p95 > 0 && g >= 0.90 * p95) return { ok: false, reason: 'Tail proximity (≥0.90×P95)' };
+            if (g >= 0.90 * p90 && pm10 < 0.45) return { ok: false, reason: 'Pressure but low hazard (PM10<0.45)' };
+            if (Number.isFinite(etm) && etm > 18) return { ok: false, reason: 'ETM too high (>18)' };
 
-            // Step A
-            if (g < p90Start) {
-                return { ok: false, code: 'LOW_PRESSURE', message: `g=${g} < ${p90Start.toFixed(1)} (0.85*P90)`, rotate: false, stakeScale: null };
-            }
-
-            // Step B(1): Tail proximity
-            if (Number.isFinite(p95) && p95 > 0 && g >= cfg.tailProximityP95 * p95) {
-                return { ok: false, code: 'TAIL_P95', message: `g=${g} ≥ ${(cfg.tailProximityP95 * p95).toFixed(1)} (0.90*P95)`, rotate: true, stakeScale: null };
-            }
-
-            // Step B(2): Pressure but low hazard
-            if (g >= cfg.latePressureP90 * p90 && pm10 < cfg.trapPm10Max) {
-                return { ok: false, code: 'PRESSURE_LOW_HAZARD', message: `PM10 ${(pm10 * 100).toFixed(0)}% < ${(cfg.trapPm10Max * 100).toFixed(0)}%`, rotate: true, stakeScale: null };
-            }
-
-            // Step B(3): ETM still long
-            if (etm > cfg.etmMax) {
-                return { ok: false, code: 'ETM_LONG', message: `ETM ${etm.toFixed(1)} > ${cfg.etmMax}`, rotate: true, stakeScale: null };
-            }
-
-            // Step C: confirm then enter
-            let stakeScale = null;
-
-            if (g < p90MidUpper) {
-                if (pm10 < cfg.confirmPm10MidMin) {
-                    return { ok: false, code: 'CONFIRM_MID', message: `PM10 ${(pm10 * 100).toFixed(0)}% < ${(cfg.confirmPm10MidMin * 100).toFixed(0)}%`, rotate: false, stakeScale: null };
-                }
-                stakeScale = cfg.stakeScaleEnabled ? cfg.stakeScaleMid : null;
+            // Step C — Confirm then enter
+            if (g <= 0.95 * p90) {
+                if (pm10 < 0.50) return { ok: false, reason: 'PM10 not strong enough (<0.50)' };
             } else {
-                if (pm10 < cfg.confirmPm10HighMin) {
-                    return { ok: false, code: 'CONFIRM_HIGH', message: `PM10 ${(pm10 * 100).toFixed(0)}% < ${(cfg.confirmPm10HighMin * 100).toFixed(0)}%`, rotate: false, stakeScale: null };
-                }
-                stakeScale = cfg.stakeScaleEnabled ? cfg.stakeScaleHigh : null;
+                if (pm10 < 0.55) return { ok: false, reason: 'PM10 not strong enough (<0.55)' };
             }
 
-            return { ok: true, code: 'PASS', message: 'PASS', rotate: false, stakeScale };
+            return { ok: true, reason: 'PASS' };
         }
+
         function pickBestLowTailRiskDigit(maxS20 = 0.05) {
             if (!window.latestSurvivalByDigit) return null;
 
@@ -2559,6 +2536,10 @@ const isRecommended = engine.currentRecommendation && engine.currentRecommendati
 
                 const s20 = Number(s.s20);
                 if (!Number.isFinite(s20) || s20 > maxS20) continue;
+
+
+                const tail = tailEarlyRuleCheck(s);
+                if (!tail.ok) continue;
 
                 const raw =
                     (2.0 * (s.pm5 || 0)) +
@@ -2840,7 +2821,7 @@ const isRecommended = engine.currentRecommendation && engine.currentRecommendati
             window.isConnecting = true;
             updateConnectionStatus();
             
-            const wsUrl = 'wss://ws.binaryws.com/websockets/v3?app_id=120389';
+            const wsUrl = 'wss://ws.binaryws.com/websockets/v3?app_id=118332';
             log('🔗 Connecting to Deriv API...', 'SYSTEM');
             
             window.ws = new WebSocket(wsUrl);
@@ -3074,54 +3055,17 @@ const isRecommended = engine.currentRecommendation && engine.currentRecommendati
                 return;
             }
 
-            // 🧯 TAIL EARLY GATE (pre-MATCH) + safety tail-risk gate
+
+            // 🧱 HARD TAIL-RISK GATE (s20 <= 5%)
             if (sessionState.mode === 'ai' && window.isBotRunning) {
-                const lockedDigit =
-                    (sessionState.sessionDigit !== null)
-                        ? sessionState.sessionDigit
-                        : parseInt(document.getElementById('predictedDigit').value);
-
+                const lockedDigit = (sessionState.sessionDigit !== null) ? sessionState.sessionDigit : parseInt(document.getElementById('predictedDigit').value);
                 const s = getSurvivalForDigit(lockedDigit);
+
                 if (!s || !Number.isFinite(Number(s.s20))) {
-                    const w = window.digitIntelligenceEngine?.warmupTicks ?? 0;
-                    const t = window.digitIntelligenceEngine?.targetWarmupTicks ?? 0;
-                    const msg = (t > 0) ? `Waiting for more ticks (${w}/${t})` : 'Waiting for more ticks';
-                    log('🧯 Gate: Survival data not ready — no trade', 'ENGINE');
-                    updateTradeStatus('NO TRADE', 'Survival warming up', msg, 'loss');
+                    log('🧱 Tail-risk gate: Survival data not ready — no trade', 'ENGINE');
+                    updateTradeStatus('NO TRADE', 'Survival warming up', 'Waiting for more ticks', 'loss');
                     return;
                 }
-
-                const decision = evaluateTailEarlyRules(lockedDigit);
-                if (!decision.ok) {
-                    log(`🧯 Tail-early gate: ${decision.code} — ${decision.message}`, 'ENGINE');
-                    updateTradeStatus('NO TRADE', `Tail early: ${decision.code}`, decision.message, 'loss');
-
-                    if (decision.rotate) rotateHybridDigit(`Tail-early ${decision.code}`);
-                    return;
-                }
-
-                // Keep your original hard tail-risk guard (s20 <= 5%)
-                const s20 = Number(s.s20);
-                if (s20 > 0.05) {
-                    log(`🧱 Tail-risk gate: s20 ${(s20 * 100).toFixed(1)}% > 5% — re-picking`, 'ENGINE');
-                    updateTradeStatus('NO TRADE', `Tail risk too high (s20 ${(s20 * 100).toFixed(1)}%)`, 'Re-picking safer digit', 'loss');
-                    rotateHybridDigit('Tail-risk gate');
-                    return;
-                }
-
-                // Optional safe sizing: only at martingaleStep 0
-                if (decision.stakeScale && window.TAIL_EARLY_RULES?.stakeScaleEnabled && (window.martingaleStep || 0) === 0) {
-                    const prevStake = Number(window.currentStake) || 0;
-                    const scaledStake = Math.max(0.1, parseFloat((prevStake * decision.stakeScale).toFixed(2)));
-                    if (scaledStake > 0 && scaledStake < prevStake) {
-                        window.currentStake = scaledStake;
-                        const stakeElem = document.getElementById('metricCurrentStake');
-                        if (stakeElem) stakeElem.textContent = `$${window.currentStake.toFixed(2)}`;
-                        log(`🪙 Tail-safe entry: scaled stake ${prevStake.toFixed(2)} → ${window.currentStake.toFixed(2)}`, 'ENGINE');
-                    }
-                }
-            }
-
 
                 const s20 = Number(s.s20);
                 if (s20 > 0.05) {
@@ -3131,6 +3075,19 @@ const isRecommended = engine.currentRecommendation && engine.currentRecommendati
                     return;
                 }
             }
+
+
+                // 🧠 TAIL-EARLY GATE (before MATCH): pressure + PM10 + ETM + P95 proximity
+                const tail = tailEarlyRuleCheck(s);
+                window.lastTailRulePass = { ...tail, digit: lockedDigit, ts: Date.now() };
+
+                if (!tail.ok) {
+                    log(`🧠 Tail-early gate: ${tail.reason} — re-picking`, 'ENGINE');
+                    updateTradeStatus('NO TRADE', `Tail-early gate: ${tail.reason}`, 'Re-picking safer digit', 'loss');
+                    rotateHybridDigit('Tail-early gate');
+                    return;
+                }
+
             
             window.executionLock = true;
             window.nextTradeAllowed = false;
@@ -3168,6 +3125,15 @@ const isRecommended = engine.currentRecommendation && engine.currentRecommendati
             const predictedDigit = parseInt(document.getElementById('predictedDigit').value);
             
             let stake = window.currentStake;
+
+            // SAFE ENTRY: in AI mode, reduce size on first entry after passing tail rules
+            try {
+                const factor = Number(window.AI_THRESHOLDS?.AI_ENTRY_STAKE_FACTOR);
+                const gate = window.lastTailRulePass;
+                if (sessionState.mode === 'ai' && window.martingaleStep === 0 && gate && gate.ok && gate.digit === predictedDigit && Number.isFinite(factor) && factor > 0 && factor < 1) {
+                    stake = stake * factor;
+                }
+            } catch (_) {}
             trackTradeInvestment(stake);
             
             const proposalRequest = {
