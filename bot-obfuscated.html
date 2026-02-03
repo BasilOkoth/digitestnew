@@ -728,9 +728,9 @@
 
         // Ranking defaults (tweakable)
         window.SURVIVAL_CFG = {
-            minPm5: 0.60,
-            maxS20: 0.05,
-            maxETM: 12,
+            minPm5: 0.50,
+            minPm10: 0.58,
+            maxETM: 18,
             requirePressure: true
         };
 
@@ -1474,9 +1474,10 @@
               const g = currentGaps[d];
 
               const p85 = percentile(gaps, 85);
-              const p90 = percentile(gaps, 90);
-              const p95 = percentile(gaps, 95);
-              const p75 = percentile(gaps, 75);
+            const p90 = percentile(gaps, 90);
+            const p95 = percentile(gaps, 95);
+            const p75 = percentile(gaps, 75);
+            const p80 = percentile(gaps, 80);
               const avg = gaps.length ? (gaps.reduce((s,x)=>s+x,0)/gaps.length) : 0;
 
               const pm5  = pMatchWithin(gaps, g, 5);
@@ -1487,7 +1488,7 @@
 
               const etm = expectedAdditionalTicks(gaps, g);
 
-              const inPressure = (p90 > 0) ? (g >= 0.70 * p90 && g < 0.95 * p90) : false;
+              const inPressure = (p80 > 0 && p95 > 0) ? (g >= p80 && g < p95) : false;
 
               out.push({ digit: d, gap: g, avgGap: avg, p75, p85, p90, p95, inPressure, pm5, pm10, s10, s20, etm });
             }
@@ -1495,15 +1496,15 @@
           }
 
           function rank(stats, cfg = {}) {
-            const minPm5 = cfg.minPm5 ?? 0.60;
-            const maxS20 = cfg.maxS20 ?? 0.25;
-            const maxETM = cfg.maxETM ?? 12;
+            const minPm5 = cfg.minPm5 ?? 0.50;
+            const minPm10 = cfg.minPm10 ?? 0.58;
+            const maxETM = cfg.maxETM ?? 18;
             const requirePressure = cfg.requirePressure ?? true;
 
             const candidates = stats.filter(x => {
               if (requirePressure && !x.inPressure) return false;
               if (x.pm5 < minPm5) return false;
-              if (x.s20 > maxS20) return false;
+              if (x.pm10 < minPm10) return false;
               if (x.etm > maxETM) return false;
               return true;
             });
