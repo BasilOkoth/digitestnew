@@ -728,9 +728,9 @@
 
         // Ranking defaults (tweakable)
         window.SURVIVAL_CFG = {
-            minPm5: 0.50,
-            minPm10: 0.58,
-            maxETM: 18,
+            minPm5: 0.60,
+            maxS20: 0.05,
+            maxETM: 12,
             requirePressure: true
         };
 
@@ -1473,11 +1473,11 @@
               const gaps = gapsByDigit[d];
               const g = currentGaps[d];
 
+              const p75 = percentile(gaps, 75);
+              const p80 = percentile(gaps, 80);
               const p85 = percentile(gaps, 85);
-            const p90 = percentile(gaps, 90);
-            const p95 = percentile(gaps, 95);
-            const p75 = percentile(gaps, 75);
-            const p80 = percentile(gaps, 80);
+              const p90 = percentile(gaps, 90);
+              const p95 = percentile(gaps, 95);
               const avg = gaps.length ? (gaps.reduce((s,x)=>s+x,0)/gaps.length) : 0;
 
               const pm5  = pMatchWithin(gaps, g, 5);
@@ -1488,23 +1488,23 @@
 
               const etm = expectedAdditionalTicks(gaps, g);
 
-              const inPressure = (p80 > 0 && p95 > 0) ? (g >= p80 && g < p95) : false;
+              const inPressure = (p90 > 0) ? (g >= 0.70 * p90 && g < 0.95 * p90) : false;
 
-              out.push({ digit: d, gap: g, avgGap: avg, p75, p85, p90, p95, inPressure, pm5, pm10, s10, s20, etm });
+              out.push({ digit: d, gap: g, avgGap: avg, p75, p80, p85, p90, p95, inPressure, pm5, pm10, s10, s20, etm });
             }
             return out;
           }
 
           function rank(stats, cfg = {}) {
-            const minPm5 = cfg.minPm5 ?? 0.50;
-            const minPm10 = cfg.minPm10 ?? 0.58;
-            const maxETM = cfg.maxETM ?? 18;
+            const minPm5 = cfg.minPm5 ?? 0.60;
+            const maxS20 = cfg.maxS20 ?? 0.25;
+            const maxETM = cfg.maxETM ?? 12;
             const requirePressure = cfg.requirePressure ?? true;
 
             const candidates = stats.filter(x => {
               if (requirePressure && !x.inPressure) return false;
               if (x.pm5 < minPm5) return false;
-              if (x.pm10 < minPm10) return false;
+              if (x.s20 > maxS20) return false;
               if (x.etm > maxETM) return false;
               return true;
             });
@@ -1784,7 +1784,7 @@
                     ${survivalTop3.map((x, i) => `
                         <div class="text-[11px] text-gray-300 flex flex-wrap gap-x-3 gap-y-1">
                             <span class="text-cyan-200 font-bold">#${i + 1} Digit ${x.digit}</span>
-                            <span>gap:${x.gap}</span><span>p85:${Number.isFinite(x.p85) ? Math.round(x.p85) : "-"}</span><span>p90:${Number.isFinite(x.p90) ? Math.round(x.p90) : "-"}</span><span>p95:${Number.isFinite(x.p95) ? Math.round(x.p95) : "-"}</span>
+                            <span>gap:${x.gap}</span><span>p80:${Number.isFinite(x.p80) ? Math.round(x.p80) : "-"}</span><span>p85:${Number.isFinite(x.p85) ? Math.round(x.p85) : "-"}</span><span>p90:${Number.isFinite(x.p90) ? Math.round(x.p90) : "-"}</span><span>p95:${Number.isFinite(x.p95) ? Math.round(x.p95) : "-"}</span>
                             <span>pm5:${Math.round(x.pm5 * 100)}%</span>
                             <span>pm10:${Math.round(x.pm10 * 100)}%</span>
                             <span>s20:${Math.round(x.s20 * 100)}%</span>
@@ -2488,33 +2488,34 @@ const isRecommended = engine.currentRecommendation && engine.currentRecommendati
             return null;
         }
 
-        // GREEN ZONE ENTRY (P85 gate)
+        // GREEN DIGIT GATES (P80–P95 gate)
         // Entry allowed only if:
-        //   gap >= p85 AND gap < p90
-        //   pm5 >= 0.55
-        //   pm10 >= 0.60
-        //   etm <= 15
+        //   g >= p80 AND g < p95
+        //   pm5 >= 0.50
+        //   pm10 >= 0.58
+        //   etm <= 18
         function isGreenEntryDigit(digit) {
             const s = getSurvivalForDigit(digit);
             if (!s) return false;
 
             const g = Number(s.gap);
-            const p85 = Number(s.p85);
-            const p90 = Number(s.p90);
+            const p80 = Number(s.p80);
+            const p95 = Number(s.p95);
             const pm5 = Number(s.pm5);
             const pm10 = Number(s.pm10);
             const etm = Number(s.etm);
 
-            if (![g, p85, p90, pm5, pm10, etm].every(Number.isFinite)) return false;
+            if (![g, p80, p95, pm5, pm10, etm].every(Number.isFinite)) return false;
 
             return (
-                g >= p85 &&
-                g < p90 &&
-                pm5 >= 0.55 &&
-                pm10 >= 0.60 &&
-                etm <= 15
+                g >= p80 &&
+                g < p95 &&
+                pm5 >= 0.50 &&
+                pm10 >= 0.58 &&
+                etm <= 18
             );
         }
+
 
         // ABORT CONDITION (severe)
         function mustAbortDigit(digit) {
