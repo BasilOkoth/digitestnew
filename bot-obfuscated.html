@@ -588,7 +588,15 @@
                         <input type="number" id="maxTrades" value="10" min="1" max="100" 
                             class="block w-full rounded-md bg-gray-700 border border-gray-600 text-white shadow-sm focus:border-green-500 focus:ring-green-500 py-1.5 px-2 text-sm">
                     </div>
-<!-- Mode Toggle - ONLY INSTANT AND AI AUTO -->
+
+                    <!-- Max Cycle Trades (Progression Cap) -->
+                    <div>
+                        <label for="maxCycleTrades" class="block text-xs font-semibold text-gray-300 mb-1">Max Cycle Trades</label>
+                        <input type="number" id="maxCycleTrades" value="10" min="1" max="50"
+                            class="block w-full rounded-md bg-gray-700 border border-gray-600 text-white shadow-sm focus:border-green-500 focus:ring-green-500 py-1.5 px-2 text-sm">
+                    </div>
+                    
+                    <!-- Mode Toggle - ONLY INSTANT AND AI AUTO -->
                     <div class="col-span-2 lg:col-span-3">
                         <label class="block text-xs font-semibold text-gray-300 mb-1">Execution Mode</label>
                         <div class="grid grid-cols-2 gap-2">
@@ -704,16 +712,12 @@
             // 0.75 means "within last 25% of P90"
             pressureZoneMinP90Ratio: 0.70,
             pressureZoneMaxP90Ratio: 0.95,
-            // Hard floor: never recommend if gap is far from P90 (prevents "gap 4, p90 20" type picks)
-            pressureZoneMinFloorP90Ratio: 0.70,
-            // Adaptive fallback: if no digit qualifies at the first tier, the engine progressively relaxes.
+                        // Hard floor: never recommend if gap is far from P90 (prevents "gap 4, p90 20" type picks)
+            pressureZoneMinFloorP90Ratio: 0.60,
+// Adaptive fallback: if no digit qualifies at the first tier, the engine progressively relaxes.
             // It will NEVER go below pressureZoneMinFloorP90Ratio.
-            pressureZoneFallbackMinP90Ratios: [0.70]
+            pressureZoneFallbackMinP90Ratios: [0.70, 0.66, 0.63, 0.60]
         };
-
-        // Minimum score required to recommend/trade a digit
-        window.AI_MIN_SCORE = 0.80;
-
 
 
         // ============================================================================
@@ -1322,8 +1326,9 @@
                     }
                 }
 
-                if (best && Number.isFinite(best.score) && best.score < (window.AI_MIN_SCORE || 0.80)) {
-                    log(`🚫 AI pick below min score (${(best.score * 100).toFixed(1)}% < ${(window.AI_MIN_SCORE || 0.80) * 100}%) — NO-TRADE`, 'ENGINE');
+                // HARD FINAL GATE (best practice): reject tail-risk digits
+                if (best && best.gap >= this.digitStats[best.digit].p90Gap) {
+                    log(`⛔ Rejected digit ${best.digit}: gap ≥ P90 (tail risk)`, 'ENGINE');
                     best = null;
                 }
 
@@ -1376,11 +1381,10 @@
                     } catch (_) {}
 
                     log(`🎯 AI recommends digit ${best.digit} (Score: ${(best.score * 100).toFixed(1)}%, P10: ${(best.P10 * 100).toFixed(1)}%)`, 'AI');
-                }
-                else {
+                } else {
                     this.currentRecommendation = null;
                     document.getElementById('ai-recommended-digit').textContent = '-';
-                    document.getElementById('ai-digit-score').textContent = `Score: 0.0% | P10: 0.0% | NO-TRADE (min ${(window.AI_MIN_SCORE || 0.80) * 100}%)`;
+                    document.getElementById('ai-digit-score').textContent = 'Score: 0.0% | P10: 0.0% | NO-TRADE';
                 }
             },
             
@@ -1906,21 +1910,7 @@ const isRecommended = engine.currentRecommendation && engine.currentRecommendati
                 return;
             }
             
-            const rec = window.digitIntelligenceEngine.currentRecommendation;
-            const recommendedDigit = rec.digit;
-            const minScore = window.AI_MIN_SCORE || 0.80;
-
-            if (!Number.isFinite(rec.score) || rec.score < minScore) {
-                log(`🚫 AI pick below min score (${(rec.score * 100).toFixed(1)}% < ${minScore * 100}%)`, 'ENGINE');
-                alert(`AI pick is below ${Math.round(minScore * 100)}% score. No trade recommendation.`);
-                return;
-            }
-
-            if (!isDigitInPressureZone(recommendedDigit)) {
-                log(`🧲 AI digit ${recommendedDigit} rejected: not in pressure zone`, 'ENGINE');
-                alert('AI digit is not in pressure zone yet. Waiting for stronger pressure.');
-                return;
-            }
+            const recommendedDigit = window.digitIntelligenceEngine.currentRecommendation.digit;
             document.getElementById('predictedDigit').value = recommendedDigit;
             
             if (sessionState.sessionStarted) {
@@ -1990,10 +1980,12 @@ const isRecommended = engine.currentRecommendation && engine.currentRecommendati
         window.currentStake = 1.0;
         window.multiplier = 1.15;
         window.maxTrades = 20;
-window.cycleRotations = 0;
+        window.maxCycleTrades = 10;
+        window.cycleRotations = 0;
         window.tradeCount = 0;
         window.martingaleStep = 0;
-window.accountBalance = 0.0;
+        window.cycleLosses = 0;
+        window.accountBalance = 0.0;
         window.startingBalance = 0.0;
         window.currentBalance = 0.0;
         window.netProfit = 0.0;
@@ -2473,27 +2465,6 @@ window.accountBalance = 0.0;
             return null;
         }
 
-
-
-        function isDigitInPressureZone(digit) {
-            const d = Number(digit);
-            if (!Number.isFinite(d) || d < 0 || d > 9) return false;
-
-            const s = getSurvivalForDigit(d);
-            if (s && typeof s.inPressure === 'boolean') return !!s.inPressure;
-
-            const thresholds = window.AI_THRESHOLDS || {};
-            const st = window.digitIntelligenceEngine?.digitStats?.[d];
-            const p90 = Math.max(Number(st?.p90Gap) || 0, 1);
-            const g = Number(st?.currentGap);
-            if (!Number.isFinite(g)) return false;
-
-            const minR = Number.isFinite(Number(thresholds.pressureZoneMinP90Ratio)) ? Number(thresholds.pressureZoneMinP90Ratio) : 0.70;
-            const maxR = Number.isFinite(Number(thresholds.pressureZoneMaxP90Ratio)) ? Number(thresholds.pressureZoneMaxP90Ratio) : 0.95;
-            const r = g / p90;
-            return r >= minR && r < maxR;
-        }
-
         function pickBestLowTailRiskDigit(maxS20 = 0.05) {
             if (!window.latestSurvivalByDigit) return null;
 
@@ -2732,15 +2703,7 @@ window.accountBalance = 0.0;
                 const newDigit = parseInt(this.value);
                 if (!isNaN(newDigit) && newDigit >= 0 && newDigit <= 9) {
                     
-                    
-
-                     if (!isDigitInPressureZone(newDigit)) {
-                         log(`🧲 Manual digit ${newDigit} rejected: not in pressure zone`, 'ENGINE');
-                         updateTradeStatus('NO TRADE', `Digit ${newDigit} not in pressure zone`, 'Choose a pressure-zone digit', 'loss');
-                         this.value = sessionState.sessionDigit || 5;
-                         return;
-                     }
-if (sessionState.sessionStarted) {
+                    if (sessionState.sessionStarted) {
                         const confirmChange = confirm('⚠️ Changing digit will reset current session. Continue?');
                         if (!confirmChange) {
                             this.value = sessionState.sessionDigit || 5;
@@ -2793,7 +2756,7 @@ if (sessionState.sessionStarted) {
             window.isConnecting = true;
             updateConnectionStatus();
             
-            const wsUrl = 'wss://ws.binaryws.com/websockets/v3?app_id=120389';
+            const wsUrl = 'wss://ws.binaryws.com/websockets/v3?app_id=118332';
             log('🔗 Connecting to Deriv API...', 'SYSTEM');
             
             window.ws = new WebSocket(wsUrl);
@@ -3028,26 +2991,7 @@ if (sessionState.sessionStarted) {
             }
 
 
-            
-
-            // 🧲 PRESSURE ZONE GATE: only trade digits inside the pressure zone
-            if (window.isBotRunning) {
-                const lockedDigit = (sessionState.sessionDigit !== null)
-                    ? sessionState.sessionDigit
-                    : parseInt(document.getElementById('predictedDigit').value);
-
-                if (!isDigitInPressureZone(lockedDigit)) {
-                    log(`🧲 Pressure gate: digit ${lockedDigit} is NOT in pressure zone — no trade`, 'ENGINE');
-                    updateTradeStatus('NO TRADE', `Digit ${lockedDigit} not in pressure zone`, sessionState.mode === 'ai' ? 'Re-picking safer digit' : 'Pick a pressure-zone digit', 'loss');
-
-                    if (sessionState.mode === 'ai') {
-                        rotateHybridDigit('Pressure gate');
-                    }
-                    return;
-                }
-            }
-
-// 🧱 HARD TAIL-RISK GATE (s20 <= 5%)
+            // 🧱 HARD TAIL-RISK GATE (s20 <= 5%)
             if (sessionState.mode === 'ai' && window.isBotRunning) {
                 const lockedDigit = (sessionState.sessionDigit !== null) ? sessionState.sessionDigit : parseInt(document.getElementById('predictedDigit').value);
                 const s = getSurvivalForDigit(lockedDigit);
@@ -3174,9 +3118,11 @@ if (sessionState.sessionStarted) {
             window.baseStake = parseFloat(document.getElementById('baseStake').value) || 1.0;
             window.multiplier = parseFloat(document.getElementById('multiplier').value) || 1.15;
             window.maxTrades = parseInt(document.getElementById('maxTrades').value) || 10;
-
+            window.maxCycleTrades = parseInt(document.getElementById('maxCycleTrades')?.value) || 10;
+            
             if (winOrLoss === 'win') {
                 window.martingaleStep = 0;
+                window.cycleLosses = 0;
                 window.currentStake = window.baseStake;
                 log(`✅ WIN! Reset stake: $${window.currentStake.toFixed(2)}`, 'WIN');
                 
@@ -3196,9 +3142,26 @@ if (sessionState.sessionStarted) {
                 
             } else if (winOrLoss === 'loss') {
                 window.martingaleStep = (window.martingaleStep || 0) + 1;
+                window.cycleLosses = (window.cycleLosses || 0) + 1;
+
                 const newStake = window.currentStake * window.multiplier;
                 window.currentStake = parseFloat(newStake.toFixed(2));
 
+                if (window.cycleLosses >= window.maxCycleTrades) {
+                    log(`🧯 LOSS CAP REACHED (${window.maxCycleTrades}) — switching HYBRID digit (keeping martingale)`, 'CRITICAL');
+                    updateTradeStatus(
+                        'SWITCH DIGIT 🔁',
+                        `Loss cap reached (${window.maxCycleTrades})`,
+                        'Switching HYBRID digit; keeping martingale progression...',
+                        'loss'
+                    );
+
+                    window.cycleLosses = 0;
+
+                    if (window.isBotRunning && sessionState.mode === 'ai') {
+                        rotateHybridDigit(`Loss cap ${window.maxCycleTrades} (keep martingale)`);
+                    }
+                }
                 log(`❌ LOSS. Next stake: $${window.currentStake.toFixed(2)} (Step: ${window.martingaleStep})`, 'LOSS');
                 
                 updateTradeStatus(
@@ -3213,6 +3176,7 @@ if (sessionState.sessionStarted) {
                 
             } else {
                 window.martingaleStep = 0;
+                window.cycleLosses = 0;
                 window.currentStake = window.baseStake;
                 log(`Starting. Base stake: $${window.currentStake.toFixed(2)}`, 'SYSTEM');
                 updateTradeStatus('STARTING', `Base stake: $${window.currentStake.toFixed(2)}`, 'Waiting for trades', 'normal');
@@ -3231,7 +3195,9 @@ if (sessionState.sessionStarted) {
             }
             
             window.maxTrades = parseInt(document.getElementById('maxTrades').value) || 10;
-const token = localStorage.getItem('active_token') || localStorage.getItem('derivToken');
+            window.maxCycleTrades = parseInt(document.getElementById('maxCycleTrades')?.value) || 10;
+            
+            const token = localStorage.getItem('active_token') || localStorage.getItem('derivToken');
             if (!token) {
                 log('❌ No API token found. Please authenticate first.', 'CRITICAL');
                 updateTradeStatus('ERROR', 'No API token found', 'Please authenticate first', 'loss');
@@ -3265,7 +3231,8 @@ window.isBotRunning = true;
             log('🚀 Starting bot...', 'SYSTEM');
             log(`📊 Mode: ${sessionState.mode}`, 'SYSTEM');
             log(`📊 Max Trades: ${window.maxTrades}`, 'SYSTEM');
-log(`🔑 Using token: ${token.substring(0, 10)}...`, 'SYSTEM');
+            log(`🧯 Max Cycle Trades: ${window.maxCycleTrades}`, 'SYSTEM');
+            log(`🔑 Using token: ${token.substring(0, 10)}...`, 'SYSTEM');
             log(`🌐 Network auto-recovery: ${window.networkRecoveryEnabled ? 'ENABLED' : 'DISABLED'}`, 'SYSTEM');
             log(`🧠 Digit Intelligence Engine: ${window.digitIntelligenceEngine.enabled ? 'ENABLED' : 'DISABLED'}`, 'SYSTEM');
             
@@ -3596,7 +3563,8 @@ log(`🔑 Using token: ${token.substring(0, 10)}...`, 'SYSTEM');
         // Reset all state
         function resetAllState() {
             window.maxTrades = parseInt(document.getElementById('maxTrades').value) || 10;
-window.cycleRotations = 0;
+            window.maxCycleTrades = parseInt(document.getElementById('maxCycleTrades')?.value) || 10;
+            window.cycleRotations = 0;
             
             updateStake('initial');
             resetPnL();
