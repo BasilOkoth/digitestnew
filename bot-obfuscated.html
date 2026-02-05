@@ -935,9 +935,9 @@
                 const dominance = Math.max(...this.regime.counts) / n;
                 
                 const ok =
-                    entropy >= 0.88 &&
-                    chi2 <= 28 &&
-                    dominance <= 0.20;
+                    entropy >= 0.95 &&
+                    chi2 <= 22 &&
+                    dominance <= 0.18;
                 
                 return { 
                     ok, 
