@@ -560,6 +560,18 @@
                         </div>
                     </div>
 
+
+
+<!-- Max Extend Ratio -->
+<div>
+    <label for="maxExtendRatio" class="block text-xs font-semibold text-gray-300 mb-1">
+        Max ExtendRatio <span id="maxExtendRatioDisplay" class="text-gray-400 font-bold">(1.5)</span>
+    </label>
+    <input type="number" id="maxExtendRatio" value="1.5" min="1" step="0.1"
+        class="block w-full rounded-md bg-gray-700 border border-gray-600 text-white shadow-sm focus:border-green-500 focus:ring-green-500 py-1.5 px-2 text-sm text-center"
+        title="Hard gate: bot will not trade if extendRatio (currentGap/avgGap) exceeds this value">
+</div>
+
                     <!-- Contract Type -->
                     <div>
                         <label for="contractType" class="block text-xs font-semibold text-gray-300 mb-1">Contract Type</label>
@@ -718,6 +730,23 @@
             // It will NEVER go below pressureZoneMinFloorP90Ratio.
             pressureZoneFallbackMinP90Ratios: [0.70, 0.66, 0.63, 0.60]
         };
+
+// HARD RISK GATE: never execute trades if currentGap/avgGap exceeds this.
+// Bound to UI control #maxExtendRatio (persisted in localStorage as 'maxExtendRatio').
+window.MAX_EXTEND_RATIO = 1.5;
+
+function getExtendRatioForDigit(digit) {
+    const eng = window.digitIntelligenceEngine;
+    const s = eng?.digitStats?.[digit];
+    if (!s) return Infinity;
+
+    const g = Number(s.currentGap);
+    const avg = Number(s.avgGap);
+
+    if (!Number.isFinite(g) || !Number.isFinite(avg) || avg <= 0) return Infinity;
+    return g / avg;
+}
+
 
 
         // ============================================================================
@@ -1100,6 +1129,10 @@
                         const p90 = Math.max(s.p90Gap, 1);
                         const p90Ratio = g / p90;
                         const extendRatio = g / s.avgGap;
+
+                        // 🧱 HARD EXTEND-RATIO GATE (single source of truth)
+                        if (extendRatio > (window.MAX_EXTEND_RATIO ?? 1.5)) continue;
+
 
                         // 🔥 HARD TAIL BLOCK: extreme stretch vs history
                         if (extendRatio > 2.8) continue;
@@ -2655,6 +2688,37 @@ const isRecommended = engine.currentRecommendation && engine.currentRecommendati
         document.addEventListener('DOMContentLoaded', () => {
             console.log('🤖 Bot initialized');
             initializeToggleState();
+
+// Max ExtendRatio UI (hard trade gate)
+(() => {
+    const el = document.getElementById('maxExtendRatio');
+    const display = document.getElementById('maxExtendRatioDisplay');
+    if (!el) return;
+
+    const saved = localStorage.getItem('maxExtendRatio');
+    const initial = Number(saved ?? el.value);
+    const sane = (Number.isFinite(initial) && initial > 0) ? initial : 1.5;
+
+    el.value = String(sane);
+    window.MAX_EXTEND_RATIO = sane;
+    if (display) display.textContent = `(${sane})`;
+
+    const apply = () => {
+        const v = Number(el.value);
+        const next = (Number.isFinite(v) && v > 0) ? v : 1.5;
+        window.MAX_EXTEND_RATIO = next;
+        localStorage.setItem('maxExtendRatio', String(next));
+        if (display) display.textContent = `(${next})`;
+        log(`🧱 Max ExtendRatio set to ${next}`, 'ENGINE');
+    };
+
+    el.addEventListener('change', apply);
+    el.addEventListener('input', () => {
+        const v = Number(el.value);
+        if (display && Number.isFinite(v)) display.textContent = `(${v})`;
+    });
+})();
+
             
             // Initialize intelligence engine
             window.digitIntelligenceEngine.init();
@@ -3011,6 +3075,36 @@ const isRecommended = engine.currentRecommendation && engine.currentRecommendati
                 }
             }
             
+
+
+// 🧱 HARD EXTEND-RATIO GATE (extendRatio <= MAX_EXTEND_RATIO)
+if (window.isBotRunning) {
+    const lockedDigit =
+        (sessionState.sessionDigit !== null)
+            ? sessionState.sessionDigit
+            : parseInt(document.getElementById('predictedDigit').value);
+
+    const extendRatio = getExtendRatioForDigit(lockedDigit);
+
+    if (extendRatio > (window.MAX_EXTEND_RATIO ?? 1.5)) {
+        log(
+            `🧱 Extend-ratio gate: extendRatio ${extendRatio.toFixed(2)} > ${(window.MAX_EXTEND_RATIO ?? 1.5).toFixed(2)} — no trade`,
+            'ENGINE'
+        );
+        updateTradeStatus(
+            'NO TRADE',
+            `ExtendRatio too high (${extendRatio.toFixed(2)} > ${(window.MAX_EXTEND_RATIO ?? 1.5).toFixed(2)})`,
+            'Waiting for safer conditions',
+            'loss'
+        );
+
+        if (sessionState.mode === 'ai') {
+            try { rotateHybridDigit('Extend-ratio gate'); } catch (_) {}
+        }
+        return;
+    }
+}
+
             window.executionLock = true;
             window.nextTradeAllowed = false;
             
