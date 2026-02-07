@@ -702,7 +702,7 @@
             maxPersistenceStableRelax: 97,
             maxPersistenceUnstable: 93,    // still strict when unstable
 
-            diagnosticMaxExtend: 3,
+            maxExtend: 3,
             require_g_lt_p90: true
         ,
             // PRESSURE ZONE: only recommend digits whose current gap is close to P90
@@ -714,6 +714,9 @@
             pressureZoneMaxP90Ratio: 0.95,
                         // Hard floor: never recommend if gap is far from P90 (prevents "gap 4, p90 20" type picks)
             pressureZoneMinFloorP90Ratio: 0.60,
+// Adaptive fallback: if no digit qualifies at the first tier, the engine progressively relaxes.
+            // It will NEVER go below pressureZoneMinFloorP90Ratio.
+            pressureZoneFallbackMinP90Ratios: [0.70, 0.66, 0.63, 0.60]
         };
 
 
@@ -731,105 +734,7 @@
             requirePressure: true
         };
 
-        
-        // ============================================================================
-        // CORE DECISION GATE (DO NOT NEGOTIATE)
-        // ============================================================================
-
-        function evaluateDigit(d, regime) {
-          const {
-            gap: g,
-            p90Gap: P90,
-            avgGap,
-            P5,
-            P10,
-            s20,
-            etm,
-            persistenceScore,
-            score
-          } = d;
-
-          const extendRatio = g / Math.max(avgGap, 1);
-          const p90Ratio = g / Math.max(P90, 1);
-
-          let decision = "WAIT";
-          let reasons = [];
-
-          // 1. Regime gate
-          if (regime.entropy < 0.95 || regime.dominance > 0.18) {
-            reasons.push("REGIME_UNSTABLE");
-            return { decision: "WAIT", reasons, extendRatio };
-          }
-
-          // 2. HARD STRUCTURAL TAIL BLOCK
-          if (extendRatio > 1.5) {
-            reasons.push("EXTEND_RATIO_TOO_HIGH");
-            return { decision: "SKIP", reasons, extendRatio };
-          }
-
-          // 3. NEVER TRADE AT OR ABOVE P90
-          if (g >= P90) {
-            reasons.push("AT_OR_BEYOND_P90");
-            return { decision: "SKIP", reasons, extendRatio };
-          }
-
-          // 4. PRESSURE IS MANDATORY
-          if (p90Ratio < 0.78 || p90Ratio > 0.92) {
-            reasons.push("NO_PRESSURE");
-            return { decision: "WAIT", reasons, extendRatio };
-          }
-
-          // 5. EARLY SPEED CONFIRMATION
-          if (P5 < 0.42 || P10 < 0.66) {
-            reasons.push("WEAK_EARLY_PROBABILITY");
-            return { decision: "WAIT", reasons, extendRatio };
-          }
-
-          // 6. SURVIVAL SAFETY
-          if (s20 > 0.12) {
-            reasons.push("HIGH_TAIL_RISK_S20");
-            return { decision: "WAIT", reasons, extendRatio };
-          }
-
-          if (etm > 15) {
-            reasons.push("ETM_TOO_HIGH");
-            return { decision: "WAIT", reasons, extendRatio };
-          }
-
-          // 7. SCORE (QUALITY FILTER — LAST)
-          if (score < 50) {
-            reasons.push("LOW_SCORE");
-            return { decision: "WAIT", reasons, extendRatio };
-          }
-
-          decision = "TRADE";
-          reasons.push("CLEAN_ALIGNMENT");
-
-          return { decision, reasons, extendRatio };
-        }
-
-        // Diagnostic logger (metrics visible, no temptation)
-        function logDiagnostics(d, result) {
-          console.log(`
-STATE: ${result.decision}
-Reason(s): ${result.reasons.join(", ")}
-
-Diagnostics:
-• Digit: ${d.digit}
-• Gap: ${d.gap}
-• P90: ${d.p90Gap}
-• ExtendRatio: ${result.extendRatio.toFixed(2)}
-• Pressure: ${(d.gap / d.p90Gap).toFixed(2)}
-• p5: ${(d.P5 * 100).toFixed(1)}%
-• p10: ${(d.P10 * 100).toFixed(1)}%
-• s20: ${(d.s20 * 100).toFixed(1)}%
-• ETM: ${d.etm}
-• Score: ${d.score.toFixed(1)}%
--------------------------------
-`);
-        }
-
-// Engine State
+        // Engine State
         window.digitIntelligenceEngine = {
             enabled: true,
             warmupDone: false,
@@ -1035,10 +940,7 @@ Diagnostics:
                     dominance <= 0.18;
                 
                 return { 
-                    ok,
-                    entropyValue: entropy,
-                    chi2Value: chi2,
-                    dominanceValue: dominance,
+                    ok, 
                     entropy: entropy.toFixed(3), 
                     chi2: chi2.toFixed(2), 
                     dominance: dominance.toFixed(3),
@@ -1151,70 +1053,134 @@ Diagnostics:
             },
             
             // Select best digit using AI logic
-
-            // Select best digit using AI logic (STRICT: evaluateDigit is the final gate)
             selectBestDigit: function() {
                 if (!this.warmupDone || !this.enabled) return null;
-
+                
                 const regimeStatus = this.computeRegimeStatus();
-                const regime = {
-                    entropy: Number(regimeStatus.entropyValue ?? regimeStatus.entropy),
-                    dominance: Number(regimeStatus.dominanceValue ?? regimeStatus.dominance)
-                };
-
                 if (!regimeStatus.ok) {
                     log(`🧠 Regime unstable: E=${regimeStatus.entropy}, χ²=${regimeStatus.chi2}, D=${regimeStatus.dominance}`, 'ENGINE');
                     return null;
                 }
+                
+                let best = null;
 
-                const tradableDigits = [];
+                const thresholds = window.AI_THRESHOLDS;
 
-                for (let d = 0; d < 10; d++) {
-                    const s = this.digitStats[d];
-                    const g = s.currentGap;
-                    const p90Gap = Number(s.p90Gap) || 0;
+                const maxPersistence =
+                    regimeStatus.label === "STABLE"
+                        ? thresholds.maxPersistenceStable
+                        : thresholds.maxPersistenceUnstable;
 
-                    const P5 = this.conditionalReturnProb(d, g, 5);
-                    const P10 = this.conditionalReturnProb(d, g, 10);
+                const rawPressureTiers = (thresholds.pressureZoneEnabled &&
+                    Array.isArray(thresholds.pressureZoneFallbackMinP90Ratios) &&
+                    thresholds.pressureZoneFallbackMinP90Ratios.length)
+                    ? thresholds.pressureZoneFallbackMinP90Ratios
+                    : [thresholds.pressureZoneEnabled ? thresholds.pressureZoneMinP90Ratio : 0.0];
 
-                    const p90Ratio = g / Math.max(p90Gap, 1);
-                    const pressureScore = Math.max(0, 1 - (Math.abs(p90Ratio - 0.85) / 0.15));
+                const pressureFloor = (thresholds.pressureZoneEnabled && typeof thresholds.pressureZoneMinFloorP90Ratio === "number")
+                    ? thresholds.pressureZoneMinFloorP90Ratio
+                    : 0.0;
 
-                    const rawScore =
-                        (0.45 * P10) +
-                        (0.25 * P5) +
-                        (0.20 * pressureScore) +
-                        (0.10 * (1 - (s.persistenceScore || 0) / 100));
+                // Ensure tiers are sorted high→low, unique, and never drop below the floor.
+                const pressureTiers = Array.from(new Set(rawPressureTiers))
+                    .map(v => (typeof v === "number" ? v : 0.0))
+                    .filter(v => v >= pressureFloor && v < 1)
+                    .sort((a, b) => b - a);
 
-                    const survival = getSurvivalForDigit(d) || {};
-                    const s20 = Number.isFinite(Number(survival.s20)) ? Number(survival.s20) : 1.0;
-                    const etm = Number.isFinite(Number(survival.etm)) ? Number(survival.etm) : Infinity;
+                if (thresholds.pressureZoneEnabled && pressureTiers.length === 0) {
+                    pressureTiers.push(Math.max(0, Math.min(0.999, pressureFloor)));
+                }
 
-                    const digitObj = {
-                        digit: d,
-                        gap: g,
-                        p90Gap: p90Gap,
-                        avgGap: Number(s.avgGap) || 0,
-                        P5: P5,
-                        P10: P10,
-                        s20: s20,
-                        etm: etm,
-                        persistenceScore: Number(s.persistenceScore) || 0,
-                        score: rawScore * 100
-                    };
+                const runPass = (activeMinP90Ratio) => {
+                    let passBest = null;
 
-                    const result = evaluateDigit(digitObj, regime);
-                    logDiagnostics(digitObj, result);
+                    for (let d = 0; d < 10; d++) {
+                        const s = this.digitStats[d];
+                        const g = s.currentGap;
+                        const p90 = Math.max(s.p90Gap, 1);
+                        const p90Ratio = g / p90;
+                        const extendRatio = g / s.avgGap;
 
-                    if (result.decision === "TRADE") {
-                        tradableDigits.push({ ...digitObj, decision: result.decision, reasons: result.reasons });
+                        // 🔥 HARD TAIL BLOCK: extreme stretch vs history
+                        if (extendRatio > 2.8) continue;
+
+                        // 🔥 Biased regime + stretched digit = tail risk
+                        if (regimeStatus.entropy < 0.96 && extendRatio > 1.5) continue;
+
+                        // 🔥 Tail forming: suppressed digit + stretched gap
+                        if (s.persistenceScore > 90 && extendRatio > 1.8) continue;
+
+                        const P5  = this.conditionalReturnProb(d, g, 5);
+                        const P10 = this.conditionalReturnProb(d, g, 10);
+
+                        // Filter conditions
+                        if (s.gaps.length < thresholds.minSupport) continue;
+
+                        // STRONG EARLY FIRST (H5 primary gate)
+                        if (P5 < thresholds.minH5) continue;
+
+                        // MEDIUM EARLY SECOND
+                        if (P10 < thresholds.minP10) continue;
+
+                        // SAFETY
+                        if (thresholds.require_g_lt_p90 && g >= p90) continue;
+
+                        // PRESSURE ZONE (adaptive): prefer digits close to P90, but relax if too strict.
+                        if (thresholds.pressureZoneEnabled) {
+                            if (p90Ratio < activeMinP90Ratio) continue;
+                            if (p90Ratio >= thresholds.pressureZoneMaxP90Ratio) continue;
+                        }
+
+                        // Cold-stickiness / persistence filters
+                        const effectiveMaxPersistence = (
+                            regimeStatus.label === "STABLE" &&
+                            P10 >= (thresholds.minP10 + 0.05) &&
+                            extendRatio <= 1.3
+                        ) ? thresholds.maxPersistenceStableRelax : maxPersistence;
+
+                        if (s.persistenceScore > effectiveMaxPersistence) continue;
+                        if (s.consecutiveExtendingGaps > thresholds.maxExtend) continue;
+                        if (s.isUnstable) continue;
+
+                        // Calculate score (still strongly favors closest-to-P90)
+                        const denom = Math.max(1 - activeMinP90Ratio, 1e-6);
+                        const pressureScore = thresholds.pressureZoneEnabled
+                            ? Math.max(0, Math.min(1, (p90Ratio - activeMinP90Ratio) / denom))
+                            : Math.max(0, Math.min(1, g / p90));
+
+                        const score =
+                            0.45 * P10 +
+                            0.25 * P5 +
+                            0.20 * pressureScore +
+                            0.10 * (1 - s.persistenceScore / 100);
+
+                        if (!passBest || score > passBest.score) {
+                            passBest = {
+                                digit: d,
+                                score: score,
+                                P10: P10,
+                                P5: P5,
+                                gap: g,
+                                persistenceScore: s.persistenceScore,
+                                isUnstable: s.isUnstable
+                            };
+                        }
+                    }
+
+                    return passBest;
+                };
+
+                for (const activeMinP90Ratio of pressureTiers) {
+                    best = runPass(activeMinP90Ratio);
+                    if (best) {
+                        best.pressureMinP90Ratio = activeMinP90Ratio;
+                        break;
                     }
                 }
 
-                // pick best from tradable digits (by score)
-                return tradableDigits.sort((a, b) => b.score - a.score)[0] || null;
+                return best;
             },
-
+            
             // Analyze and recommend digit
             analyzeAndRecommend: function() {
                 const regimeStatus = this.computeRegimeStatus();
@@ -1815,7 +1781,7 @@ Diagnostics:
                         ${regimeStatus.label} | Entropy: ${regimeStatus.entropy} | Dominance: ${regimeStatus.dominance}
                     </div>
                     <div class="text-[11px] text-gray-500 mt-1">
-                        Gates — Support≥${thresholds.minSupport}, H5≥${thresholds.minH5}, P10≥${thresholds.minP10}, Pressure∈[${thresholds.pressureZoneMinP90Ratio}×P90, ${thresholds.pressureZoneMaxP90Ratio}×P90), ExtendStreak(diag)≤${thresholds.diagnosticMaxExtend},
+                        Gates — Support≥${thresholds.minSupport}, H5≥${thresholds.minH5}, P10≥${thresholds.minP10}, Pressure∈[${thresholds.pressureZoneMinP90Ratio}×P90, ${thresholds.pressureZoneMaxP90Ratio}×P90), Extend≤${thresholds.maxExtend},
                         Persistence≤${baseMaxPersistence} (relax→${thresholds.maxPersistenceStableRelax}), Score(rank)≥${(scoreCutoff * 100).toFixed(0)}%
                     </div>
                 </div>
@@ -1867,8 +1833,7 @@ Diagnostics:
                     p90Ratio < thresholds.pressureZoneMaxP90Ratio
                 );
                 const passPersistence = s.persistenceScore <= effectiveMaxPersistence;
-                const diagExtendOk = s.consecutiveExtendingGaps <= thresholds.diagnosticMaxExtend;
-                const passExtend = true; // diagnostic only (not a decision gate)
+                const passExtend = s.consecutiveExtendingGaps <= thresholds.maxExtend;
                 const passUnstable = !s.isUnstable;
                 const passP5 = P5 >= thresholds.minH5;
                 const passP10 = P10 >= thresholds.minP10;
@@ -1885,7 +1850,7 @@ const denom = Math.max(1 - thresholds.pressureZoneMinP90Ratio, 1e-6);
 const passScore = score >= scoreCutoff;
 
                 const passAll =
-                    passSupport && passP90 && passPressure && passPersistence && passUnstable && passP5 && passP10;
+                    passSupport && passP90 && passPressure && passPersistence && passExtend && passUnstable && passP5 && passP10;
 const isRecommended = engine.currentRecommendation && engine.currentRecommendation.digit === d;
 
                 const barWidth = Math.min(100, (g / 50) * 100);
@@ -1924,7 +1889,7 @@ const isRecommended = engine.currentRecommendation && engine.currentRecommendati
                         </div>
 
                         <div class="text-[11px] text-gray-500 mt-1">
-                            Pass: Support${flag(passSupport)} · P90${flag(passP90)} · Pressure${flag(passPressure)} · Persist${flag(passPersistence)} · Extend${flag(diagExtendOk)} · Stable${flag(passUnstable)} · H5${flag(passP5)} · P10${flag(passP10)} · Score${flag(passScore)}
+                            Pass: Support${flag(passSupport)} · P90${flag(passP90)} · Pressure${flag(passPressure)} · Persist${flag(passPersistence)} · Extend${flag(passExtend)} · Stable${flag(passUnstable)} · H5${flag(passP5)} · P10${flag(passP10)} · Score${flag(passScore)}
                         </div>
 
                         <div class="mt-1 bg-gray-700/40 rounded h-2">
