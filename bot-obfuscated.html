@@ -702,7 +702,7 @@
             maxPersistenceStableRelax: 97,
             maxPersistenceUnstable: 93,    // still strict when unstable
 
-            maxExtend: 3,
+            diagnosticMaxExtend: 3,
             require_g_lt_p90: true
         ,
             // PRESSURE ZONE: only recommend digits whose current gap is close to P90
@@ -714,9 +714,6 @@
             pressureZoneMaxP90Ratio: 0.95,
                         // Hard floor: never recommend if gap is far from P90 (prevents "gap 4, p90 20" type picks)
             pressureZoneMinFloorP90Ratio: 0.60,
-// Adaptive fallback: if no digit qualifies at the first tier, the engine progressively relaxes.
-            // It will NEVER go below pressureZoneMinFloorP90Ratio.
-            pressureZoneFallbackMinP90Ratios: [0.70, 0.66, 0.63, 0.60]
         };
 
 
@@ -1818,7 +1815,7 @@ Diagnostics:
                         ${regimeStatus.label} | Entropy: ${regimeStatus.entropy} | Dominance: ${regimeStatus.dominance}
                     </div>
                     <div class="text-[11px] text-gray-500 mt-1">
-                        Gates — Support≥${thresholds.minSupport}, H5≥${thresholds.minH5}, P10≥${thresholds.minP10}, Pressure∈[${thresholds.pressureZoneMinP90Ratio}×P90, ${thresholds.pressureZoneMaxP90Ratio}×P90), Extend≤${thresholds.maxExtend},
+                        Gates — Support≥${thresholds.minSupport}, H5≥${thresholds.minH5}, P10≥${thresholds.minP10}, Pressure∈[${thresholds.pressureZoneMinP90Ratio}×P90, ${thresholds.pressureZoneMaxP90Ratio}×P90), ExtendStreak(diag)≤${thresholds.diagnosticMaxExtend},
                         Persistence≤${baseMaxPersistence} (relax→${thresholds.maxPersistenceStableRelax}), Score(rank)≥${(scoreCutoff * 100).toFixed(0)}%
                     </div>
                 </div>
@@ -1870,7 +1867,8 @@ Diagnostics:
                     p90Ratio < thresholds.pressureZoneMaxP90Ratio
                 );
                 const passPersistence = s.persistenceScore <= effectiveMaxPersistence;
-                const passExtend = s.consecutiveExtendingGaps <= thresholds.maxExtend;
+                const diagExtendOk = s.consecutiveExtendingGaps <= thresholds.diagnosticMaxExtend;
+                const passExtend = true; // diagnostic only (not a decision gate)
                 const passUnstable = !s.isUnstable;
                 const passP5 = P5 >= thresholds.minH5;
                 const passP10 = P10 >= thresholds.minP10;
@@ -1887,7 +1885,7 @@ const denom = Math.max(1 - thresholds.pressureZoneMinP90Ratio, 1e-6);
 const passScore = score >= scoreCutoff;
 
                 const passAll =
-                    passSupport && passP90 && passPressure && passPersistence && passExtend && passUnstable && passP5 && passP10;
+                    passSupport && passP90 && passPressure && passPersistence && passUnstable && passP5 && passP10;
 const isRecommended = engine.currentRecommendation && engine.currentRecommendation.digit === d;
 
                 const barWidth = Math.min(100, (g / 50) * 100);
@@ -1926,7 +1924,7 @@ const isRecommended = engine.currentRecommendation && engine.currentRecommendati
                         </div>
 
                         <div class="text-[11px] text-gray-500 mt-1">
-                            Pass: Support${flag(passSupport)} · P90${flag(passP90)} · Pressure${flag(passPressure)} · Persist${flag(passPersistence)} · Extend${flag(passExtend)} · Stable${flag(passUnstable)} · H5${flag(passP5)} · P10${flag(passP10)} · Score${flag(passScore)}
+                            Pass: Support${flag(passSupport)} · P90${flag(passP90)} · Pressure${flag(passPressure)} · Persist${flag(passPersistence)} · Extend${flag(diagExtendOk)} · Stable${flag(passUnstable)} · H5${flag(passP5)} · P10${flag(passP10)} · Score${flag(passScore)}
                         </div>
 
                         <div class="mt-1 bg-gray-700/40 rounded h-2">
