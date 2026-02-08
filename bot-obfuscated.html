@@ -7,86 +7,87 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
     <style>
-        /* --- Compact responsive controls --- */
-        .sound-icon-btn{
-          display:inline-flex;
-          align-items:center;
-          justify-content:center;
-          width:34px;
-          height:30px;
-          padding:0;
-          border-radius:9999px;
-          border:1px solid rgba(148,163,184,0.35);
-          background:rgba(30,41,59,0.6);
-          color:#e2e8f0;
-          font-size:16px;
-          line-height:1;
-          transition:transform .05s ease, background .15s ease, border-color .15s ease;
-        }
-        .sound-icon-btn:hover{ background:rgba(30,41,59,0.85); border-color:rgba(148,163,184,0.55); }
-        .sound-icon-btn:active{ transform:scale(0.97); }
-        .sound-icon-btn:focus{ outline:none; box-shadow:0 0 0 3px rgba(59,130,246,0.25); }
 
-        .controls-wrap { max-width: 100%; }
-        .control-btn{
-          display:inline-flex;
-          align-items:center;
-          justify-content:center;
-          gap:.5rem;
-          padding:.55rem .9rem;
-          border-radius:9999px;
-          font-weight:700;
-          font-size:.9rem;
-          line-height:1;
-          color:#fff;
-          box-shadow: 0 6px 18px rgba(0,0,0,.18);
-          transition: transform .06s ease, filter .15s ease, opacity .15s ease;
-          white-space:nowrap;
-        }
-        .control-btn:active{ transform: scale(.99); }
-        .control-btn:hover{ filter: brightness(1.02); }
-        @media (min-width: 640px){
-          .control-btn{ padding:.45rem .8rem; font-size:.85rem; }
-        }
-        /* Make account toggle compact */
-        .account-toggle-container{ display:inline-flex; align-items:center; gap:.5rem; flex-wrap:nowrap; }
-        .account-label{ font-size:.8rem; font-weight:800; letter-spacing:.02em; opacity:.9; }
-        @media (max-width: 639px){
-          .account-toggle-container{ justify-content:flex-start; }
-        }
+/* --- Compact responsive controls --- */
+.sound-icon-btn{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  width:34px;
+  height:30px;
+  padding:0;
+  border-radius:9999px;
+  border:1px solid rgba(148,163,184,0.35);
+  background:rgba(30,41,59,0.6);
+  color:#e2e8f0;
+  font-size:16px;
+  line-height:1;
+  transition:transform .05s ease, background .15s ease, border-color .15s ease;
+}
+.sound-icon-btn:hover{ background:rgba(30,41,59,0.85); border-color:rgba(148,163,184,0.55); }
+.sound-icon-btn:active{ transform:scale(0.97); }
+.sound-icon-btn:focus{ outline:none; box-shadow:0 0 0 3px rgba(59,130,246,0.25); }
 
-                
-        /* --- Status indicators (non-clickable) --- */
-        .status-chip{
-          display:inline-flex;
-          align-items:center;
-          gap:.45rem;
-          padding:.40rem .70rem;
-          border-radius:9999px;
-          font-weight:800;
-          font-size:.78rem;
-          line-height:1;
-          background:#1f2937;
-          border:1px solid rgba(255,255,255,.12);
-          color:#e5e7eb;
-          user-select:none;
-        }
-        .status-dot{
-          width:.55rem;
-          height:.55rem;
-          border-radius:9999px;
-          background:#22c55e;
-          box-shadow:0 0 0 3px rgba(34,197,94,.16);
-        }
-        .status-chip.off .status-dot{
-          background:#ef4444;
-          box-shadow:0 0 0 3px rgba(239,68,68,.16);
-        }
-        .status-icon{ font-size:.95rem; line-height:1; }
-        @media (max-width: 360px){
-          .status-label{ display:none; }
-        }
-        #log-area::-webkit-scrollbar { width: 4px; }
+.controls-wrap { max-width: 100%; }
+.control-btn{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  gap:.5rem;
+  padding:.55rem .9rem;
+  border-radius:9999px;
+  font-weight:700;
+  font-size:.9rem;
+  line-height:1;
+  color:#fff;
+  box-shadow: 0 6px 18px rgba(0,0,0,.18);
+  transition: transform .06s ease, filter .15s ease, opacity .15s ease;
+  white-space:nowrap;
+}
+.control-btn:active{ transform: scale(.99); }
+.control-btn:hover{ filter: brightness(1.02); }
+@media (min-width: 640px){
+  .control-btn{ padding:.45rem .8rem; font-size:.85rem; }
+}
+/* Make account toggle compact */
+.account-toggle-container{ display:inline-flex; align-items:center; gap:.5rem; flex-wrap:nowrap; }
+.account-label{ font-size:.8rem; font-weight:800; letter-spacing:.02em; opacity:.9; }
+@media (max-width: 639px){
+  .account-toggle-container{ justify-content:flex-start; }
+}
+
+        
+/* --- Status indicators (non-clickable) --- */
+.status-chip{
+  display:inline-flex;
+  align-items:center;
+  gap:.45rem;
+  padding:.40rem .70rem;
+  border-radius:9999px;
+  font-weight:800;
+  font-size:.78rem;
+  line-height:1;
+  background:#1f2937;
+  border:1px solid rgba(255,255,255,.12);
+  color:#e5e7eb;
+  user-select:none;
+}
+.status-dot{
+  width:.55rem;
+  height:.55rem;
+  border-radius:9999px;
+  background:#22c55e;
+  box-shadow:0 0 0 3px rgba(34,197,94,.16);
+}
+.status-chip.off .status-dot{
+  background:#ef4444;
+  box-shadow:0 0 0 3px rgba(239,68,68,.16);
+}
+.status-icon{ font-size:.95rem; line-height:1; }
+@media (max-width: 360px){
+  .status-label{ display:none; }
+}
+#log-area::-webkit-scrollbar { width: 4px; }
         #log-area::-webkit-scrollbar-thumb { background: #4ade80; border-radius: 2px; }
         #log-area::-webkit-scrollbar-track { background: #374151; }
         body { font-family: 'Inter', sans-serif; background-color: #111827; }
@@ -312,19 +313,6 @@
             transform: scale(1.02);
             box-shadow: 0 0 10px rgba(255, 255, 255, 0.2);
         }
-        /* Early-trade specific styles */
-        .early-trade-indicator {
-            background: linear-gradient(90deg, #8b5cf6, #7c3aed) !important;
-            animation: pulse-once 0.8s infinite;
-        }
-        .pm2-high {
-            color: #10b981 !important;
-            font-weight: bold !important;
-        }
-        .pm2-low {
-            color: #ef4444 !important;
-            font-weight: bold !important;
-        }
     </style>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght400;600;700&display=swap" rel="stylesheet">
 </head>
@@ -348,10 +336,6 @@
                 <span id="network-recovery-badge" class="ml-2 inline-flex items-center px-3 py-1 text-sm font-medium rounded-full hidden network-recovery-badge text-white shadow-md">
                     🔄 AUTO-RECOVER
                 </span>
-                <!-- Early Trade Indicator -->
-                <span id="early-trade-indicator" class="ml-2 inline-flex items-center px-3 py-1 text-sm font-medium rounded-full hidden early-trade-indicator text-white shadow-md">
-                    🚀 EARLY-TRADE
-                </span>
                 <!-- Account toggle -->
                 <div class="account-toggle-container ml-3">
                     <span class="account-label account-label-demo">DEMO</span>
@@ -374,11 +358,6 @@
                             <span class="status-icon" aria-hidden="true">🧠</span>
                             <span class="status-dot" aria-hidden="true"></span>
                             <span class="status-label">AI Engine</span>
-                        </span>
-                        <span id="earlyTradeIndicator" class="status-chip on" title="Early-Trade Detection is ON">
-                            <span class="status-icon" aria-hidden="true">🚀</span>
-                            <span class="status-dot" aria-hidden="true"></span>
-                            <span class="status-label">Early-Trade</span>
                         </span>
                     </div>
                 </div>
@@ -437,7 +416,6 @@
                             <div class="text-xs font-semibold text-green-400 mb-1">AI Recommended Digit:</div>
                             <div id="ai-recommended-digit" class="text-2xl font-bold text-center text-green-400">-</div>
                             <div id="ai-digit-score" class="text-xs text-gray-400 text-center">Score: -</div>
-                            <div id="ai-early-trade-metrics" class="text-xs text-cyan-400 text-center mt-1"></div>
                         </div>
                         
                         <!-- Digit Analysis (Collapsible) -->
@@ -450,40 +428,6 @@
                                 <div id="digit-analysis-content" class="text-xs text-gray-400">
                                     Warming up engine...
                                 </div>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- Early Trade Metrics Panel -->
-                    <div class="mb-4 p-3 bg-gray-800 rounded-lg border border-cyan-500/50 hidden" id="early-trade-metrics-panel">
-                        <h3 class="text-sm font-bold text-cyan-400 mb-3 flex items-center">
-                            🚀 EARLY-TRADE METRICS
-                        </h3>
-                        <div class="space-y-2">
-                            <div class="grid grid-cols-3 gap-1 text-xs">
-                                <div class="text-gray-400">pm2:</div>
-                                <div id="early-pm2" class="text-right">-</div>
-                                <div id="early-pm2-status" class="text-right text-xs">-</div>
-                            </div>
-                            <div class="grid grid-cols-3 gap-1 text-xs">
-                                <div class="text-gray-400">p2–3:</div>
-                                <div id="early-p2to3" class="text-right">-</div>
-                                <div id="early-p2to3-status" class="text-right text-xs">-</div>
-                            </div>
-                            <div class="grid grid-cols-3 gap-1 text-xs">
-                                <div class="text-gray-400">p3–5:</div>
-                                <div id="early-p3to5" class="text-right">-</div>
-                                <div id="early-p3to5-status" class="text-right text-xs">-</div>
-                            </div>
-                            <div class="grid grid-cols-3 gap-1 text-xs">
-                                <div class="text-gray-400">wpm5:</div>
-                                <div id="early-wpm5" class="text-right">-</div>
-                                <div id="early-wpm5-status" class="text-right text-xs">-</div>
-                            </div>
-                            <div class="grid grid-cols-3 gap-1 text-xs">
-                                <div class="text-gray-400">Tail Risk:</div>
-                                <div id="early-tail-risk" class="text-right">-</div>
-                                <div id="early-tail-risk-status" class="text-right text-xs">-</div>
                             </div>
                         </div>
                     </div>
@@ -736,48 +680,53 @@
 [00:00:00] 🧮 Martingale calculator ready
 [00:00:00] 🔄 Auto-recovery system ready
 [00:00:00] 🧠 Digit Intelligence Engine loaded
-[00:00:00] 🚀 Early-trade detection activated
             </div>
         </div>
     </div>
 
     <script>
         // ============================================================================
-        // DERIV DIGIT MATCH INTELLIGENCE ENGINE WITH EARLY-TRADE DETECTION
-        // Enhanced with pm2, pm3, weighted pm5, and tail risk detection
+        // DERIV DIGIT MATCH INTELLIGENCE ENGINE - FIXED FOR DIGIT 0
+        // Warm-up (1000 ticks) → Live incremental → Regime + Smart digit selection
         // ============================================================================
         
-        // Global AI thresholds with early-trade detection
+        // Global AI thresholds (single source of truth)
         window.AI_THRESHOLDS = {
             minSupport: 22,
-            minH5: 0.42,
-            minP10: 0.66,
-            maxPersistenceStable: 97,
+
+            // EARLY PRESSURE (REALISTIC MODE)
+            minH5: 0.42,        // 🔥 KEY CHANGE (from 0.50 → 0.45)
+            minP10: 0.66,       // slightly relaxed
+
+            maxPersistenceStable: 97,      // allow more clean cold
             maxPersistenceStableRelax: 97,
-            maxPersistenceUnstable: 93,
+            maxPersistenceUnstable: 93,    // still strict when unstable
+
             maxExtend: 3,
-            require_g_lt_p90: true,
+            require_g_lt_p90: true
+        ,
+            // PRESSURE ZONE: only recommend digits whose current gap is close to P90
+            // Example: min=0.75 means "within last 15% of the P90 gap"
             pressureZoneEnabled: true,
+            // Looser default so you still get trades, but quality stays high.
+            // 0.75 means "within last 25% of P90"
             pressureZoneMinP90Ratio: 0.70,
             pressureZoneMaxP90Ratio: 0.95,
+                        // Hard floor: never recommend if gap is far from P90 (prevents "gap 4, p90 20" type picks)
             pressureZoneMinFloorP90Ratio: 0.60,
-            pressureZoneFallbackMinP90Ratios: [0.70, 0.66, 0.63, 0.60],
-            
-            // NEW: Early-trade detection thresholds
-            earlyTrade: {
-                minPm2: 0.20,      // Minimum probability to match within 2 ticks
-                minP2to3: 0.18,    // Minimum probability for 2-3 tick window
-                maxP3to5: 0.40,    // Maximum allowed probability for 3-5 tick window
-                maxExtendRatio: 1.2, // Maximum allowed gap extension ratio
-                maxS20: 0.12,      // Maximum survival probability at 20 ticks
-                tailRiskPm5Ratio: 0.5, // Ratio for tail detection (short/long pm5)
-                minPm5Weighted: 0.25 // Minimum weighted pm5 score
-            }
+// Adaptive fallback: if no digit qualifies at the first tier, the engine progressively relaxes.
+            // It will NEVER go below pressureZoneMinFloorP90Ratio.
+            pressureZoneFallbackMinP90Ratios: [0.70, 0.66, 0.63, 0.60]
         };
 
-        // Survival Curve Engine Config
-        window.SURVIVAL_WINDOW = 2000;
-        window.lastDigits = [];
+
+        // ============================================================================
+        // SURVIVAL CURVE ENGINE CONFIG (Empirical conditional survival from historical gaps)
+        // ============================================================================
+        window.SURVIVAL_WINDOW = 2000;   // rolling digits window (oldest -> newest)
+        window.lastDigits = [];          // rolling buffer of last digits for SurvivalEngine
+
+        // Ranking defaults (tweakable)
         window.SURVIVAL_CFG = {
             minPm5: 0.60,
             maxS20: 0.05,
@@ -785,209 +734,7 @@
             requirePressure: true
         };
 
-        // ============================================================================
-        // ENHANCED EARLY-TRADE FUNCTIONS
-        // ============================================================================
-
-        // Enhanced probability calculation
-        function pMatchWithin(gaps, g, k) {
-            const eligible = gaps.filter(x => x > g);
-            if (!eligible.length) return 0;
-            const hits = eligible.filter(x => x <= g + k);
-            return hits.length / eligible.length;
-        }
-
-        // Weighted pm5 calculation favoring early matches
-        function pm5Weighted(gaps, g) {
-            const eligible = gaps.filter(x => x > g);
-            if (!eligible.length) return 0;
-
-            let score = 0;
-            for (const x of eligible) {
-                const delta = x - g;
-                if (delta <= 5) {
-                    if (delta <= 2) score += 1.0;
-                    else if (delta <= 3) score += 0.8;
-                    else if (delta <= 4) score += 0.4;
-                    else if (delta <= 5) score += 0.2;
-                }
-            }
-            return score / eligible.length;
-        }
-
-        // Early trade validation function
-        function validateEarlyTrade(engine, digit) {
-            const s = engine.digitStats[digit];
-            const g = s.currentGap;
-            
-            if (s.gaps.length < 50) {
-                return { 
-                    valid: false, 
-                    reason: "Insufficient data", 
-                    details: { gapsCount: s.gaps.length } 
-                };
-            }
-            
-            // Get recent gaps for tail detection
-            const recentGaps = s.gaps.slice(-100);
-            const allGaps = s.gaps;
-            
-            // Calculate all probabilities
-            const pm2 = pMatchWithin(allGaps, g, 2);
-            const pm3 = pMatchWithin(allGaps, g, 3);
-            const pm5 = pMatchWithin(allGaps, g, 5);
-            const pm5_recent = recentGaps.length >= 20 ? pMatchWithin(recentGaps, g, 5) : pm5;
-            
-            // Calculate window-specific probabilities
-            const p2to3 = Math.max(0, pm3 - pm2);
-            const p3to5 = Math.max(0, pm5 - pm3);
-            
-            // Calculate weighted pm5
-            const pm5_weighted = pm5Weighted(allGaps, g);
-            
-            // Calculate extend ratio
-            const extendRatio = g / Math.max(s.avgGap, 1);
-            
-            // Get s20 from survival engine if available
-            let s20 = 0;
-            const survivalData = getSurvivalForDigit(digit);
-            if (survivalData && survivalData.s20 !== undefined) {
-                s20 = survivalData.s20;
-            }
-            
-            // Check pressure zone
-            const p90 = Math.max(s.p90Gap, 1);
-            const p90Ratio = g / p90;
-            
-            // Early trade validation gates
-            const reasons = [];
-            const thresholds = window.AI_THRESHOLDS.earlyTrade;
-            
-            // 1. Pressure gate
-            if (p90Ratio < 0.75 || p90Ratio >= 0.95) {
-                reasons.push(`Pressure: ${p90Ratio.toFixed(2)}×P90 outside [0.75, 0.95)`);
-            }
-            
-            // 2. Structure gates
-            if (extendRatio > thresholds.maxExtendRatio) {
-                reasons.push(`Extend ratio: ${extendRatio.toFixed(2)} > ${thresholds.maxExtendRatio}`);
-            }
-            
-            if (s20 > thresholds.maxS20) {
-                reasons.push(`s20: ${(s20 * 100).toFixed(1)}% > ${(thresholds.maxS20 * 100).toFixed(1)}%`);
-            }
-            
-            // 3. Early timing gates
-            if (pm2 < thresholds.minPm2) {
-                reasons.push(`pm2: ${(pm2 * 100).toFixed(1)}% < ${(thresholds.minPm2 * 100).toFixed(1)}%`);
-            }
-            
-            if (p2to3 < thresholds.minP2to3) {
-                reasons.push(`p2to3: ${(p2to3 * 100).toFixed(1)}% < ${(thresholds.minP2to3 * 100).toFixed(1)}%`);
-            }
-            
-            if (p3to5 > thresholds.maxP3to5) {
-                reasons.push(`p3to5: ${(p3to5 * 100).toFixed(1)}% > ${(thresholds.maxP3to5 * 100).toFixed(1)}%`);
-            }
-            
-            // 4. Tail detection
-            if (recentGaps.length >= 20) {
-                const pm5_ratio = pm5_recent / Math.max(pm5, 0.001);
-                if (pm5_ratio < thresholds.tailRiskPm5Ratio) {
-                    reasons.push(`Tail risk: pm5 ratio ${pm5_ratio.toFixed(2)} < ${thresholds.tailRiskPm5Ratio}`);
-                }
-            }
-            
-            // 5. Weighted pm5 check
-            if (pm5_weighted < thresholds.minPm5Weighted) {
-                reasons.push(`Weighted pm5: ${pm5_weighted.toFixed(2)} < ${thresholds.minPm5Weighted}`);
-            }
-            
-            // 6. Additional tail risk indicators
-            if (s.persistenceScore > 90 && extendRatio > 1.8) {
-                reasons.push(`High persistence (${s.persistenceScore}) with high extend ratio (${extendRatio.toFixed(2)})`);
-            }
-            
-            if (s.isUnstable) {
-                reasons.push(`Digit is unstable`);
-            }
-            
-            const valid = reasons.length === 0;
-            
-            return {
-                valid,
-                reason: valid ? "Early trade approved" : reasons.join("; "),
-                details: {
-                    digit,
-                    gap: g,
-                    pm2: pm2.toFixed(3),
-                    pm3: pm3.toFixed(3),
-                    pm5: pm5.toFixed(3),
-                    pm5_recent: pm5_recent.toFixed(3),
-                    p2to3: p2to3.toFixed(3),
-                    p3to5: p3to5.toFixed(3),
-                    pm5_weighted: pm5_weighted.toFixed(3),
-                    extendRatio: extendRatio.toFixed(2),
-                    p90Ratio: p90Ratio.toFixed(2),
-                    s20: s20.toFixed(3),
-                    persistenceScore: s.persistenceScore,
-                    isUnstable: s.isUnstable
-                }
-            };
-        }
-
-        // Update early trade UI metrics
-        function updateEarlyTradeMetrics(digit) {
-            const engine = window.digitIntelligenceEngine;
-            if (!engine || !engine.warmupDone) return;
-            
-            const validation = validateEarlyTrade(engine, digit);
-            const panel = document.getElementById('early-trade-metrics-panel');
-            
-            if (validation.valid) {
-                panel.classList.remove('hidden');
-                const thresholds = window.AI_THRESHOLDS.earlyTrade;
-                
-                // Update metric displays with status indicators
-                document.getElementById('early-pm2').textContent = `${(validation.details.pm2 * 100).toFixed(1)}%`;
-                document.getElementById('early-pm2-status').textContent = 
-                    validation.details.pm2 >= thresholds.minPm2 ? '✅' : '❌';
-                document.getElementById('early-pm2-status').className = 
-                    validation.details.pm2 >= thresholds.minPm2 ? 'text-right text-xs text-green-400' : 'text-right text-xs text-red-400';
-                
-                document.getElementById('early-p2to3').textContent = `${(validation.details.p2to3 * 100).toFixed(1)}%`;
-                document.getElementById('early-p2to3-status').textContent = 
-                    validation.details.p2to3 >= thresholds.minP2to3 ? '✅' : '❌';
-                document.getElementById('early-p2to3-status').className = 
-                    validation.details.p2to3 >= thresholds.minP2to3 ? 'text-right text-xs text-green-400' : 'text-right text-xs text-red-400';
-                
-                document.getElementById('early-p3to5').textContent = `${(validation.details.p3to5 * 100).toFixed(1)}%`;
-                document.getElementById('early-p3to5-status').textContent = 
-                    validation.details.p3to5 <= thresholds.maxP3to5 ? '✅' : '❌';
-                document.getElementById('early-p3to5-status').className = 
-                    validation.details.p3to5 <= thresholds.maxP3to5 ? 'text-right text-xs text-green-400' : 'text-right text-xs text-red-400';
-                
-                document.getElementById('early-wpm5').textContent = validation.details.pm5_weighted;
-                document.getElementById('early-wpm5-status').textContent = 
-                    validation.details.pm5_weighted >= thresholds.minPm5Weighted ? '✅' : '❌';
-                document.getElementById('early-wpm5-status').className = 
-                    validation.details.pm5_weighted >= thresholds.minPm5Weighted ? 'text-right text-xs text-green-400' : 'text-right text-xs text-red-400';
-                
-                const tailRiskRatio = validation.details.pm5_recent / Math.max(validation.details.pm5, 0.001);
-                document.getElementById('early-tail-risk').textContent = tailRiskRatio.toFixed(2);
-                document.getElementById('early-tail-risk-status').textContent = 
-                    tailRiskRatio >= thresholds.tailRiskPm5Ratio ? '✅' : '❌';
-                document.getElementById('early-tail-risk-status').className = 
-                    tailRiskRatio >= thresholds.tailRiskPm5Ratio ? 'text-right text-xs text-green-400' : 'text-right text-xs text-red-400';
-            } else {
-                panel.classList.add('hidden');
-            }
-        }
-
-        // ============================================================================
-        // ENHANCED INTELLIGENCE ENGINE WITH EARLY-TRADE DETECTION
-        // ============================================================================
-
+        // Engine State
         window.digitIntelligenceEngine = {
             enabled: true,
             warmupDone: false,
@@ -1000,16 +747,20 @@
                 gaps: [],
                 lastSeen: null,
                 currentGap: 0,
+
                 avgGap: 0,
                 p75Gap: 0,
                 p90Gap: 0,
                 maxGap: 0,
+
                 coldHistory: [],
                 longestColdStreak: 0,
                 avgColdDuration: 0,
+
                 persistenceScore: 0,
                 consecutiveExtendingGaps: 0,
                 lastGap: null,
+
                 isUnstable: false,
                 count: 0
             })),
@@ -1027,7 +778,7 @@
             // Initialize engine
             init: function() {
                 this.reset();
-                log('🧠 Digit Intelligence Engine with Early-Trade Detection initialized', 'ENGINE');
+                log('🧠 Digit Intelligence Engine initialized', 'ENGINE');
             },
             
             // Reset engine
@@ -1069,8 +820,10 @@
             processWarmupTicks: function(prices) {
                 if (!this.enabled) return;
                 
+                
                 initTickFormatFromPrices(prices);
                 for (let i = 0; i < prices.length; i++) {
+                    // Digit extraction using auto-detected decimals (preserves trailing zeros)
                     updateTickFormatFromQuote(prices[i]);
                     const digit = getLastDigitFromQuote(prices[i]);
                     if (isNaN(digit) || digit < 0 || digit > 9) continue;
@@ -1113,12 +866,14 @@
             processLiveTick: function(digit) {
                 if (!this.enabled) return;
                 
+                // 🔥 FIXED: digit 0 is valid, so check for NaN instead
                 if (isNaN(digit) || digit < 0 || digit > 9) return;
 
                 // SurvivalEngine rolling digits buffer
                 window.lastDigits.push(digit);
                 if (window.lastDigits.length > (window.SURVIVAL_WINDOW || 2000)) window.lastDigits.shift();
                 
+                // 🔥 FIX #3: advance tick index
                 this.tickIndex++;
                 
                 // Update warmup ticks if still in warmup phase
@@ -1144,11 +899,6 @@
                 // Update analysis every 50 ticks
                 if (this.tickIndex % 50 === 0) {
                     this.analyzeAndRecommend();
-                }
-                
-                // Update early trade metrics if we have a recommendation
-                if (this.currentRecommendation) {
-                    updateEarlyTradeMetrics(this.currentRecommendation.digit);
                 }
             },
             
@@ -1198,14 +948,17 @@
                 };
             },
             
-            // Handle new digit
+            // Handle new digit - FIXED FOR DIGIT 0
             onNewDigit: function(digit) {
+                // 🔥 FIXED: digit can be 0, so check for NaN instead
                 if (isNaN(digit) || digit < 0 || digit > 9) {
                     console.log('Invalid digit skipped:', digit);
                     return;
                 }
 
                 const s = this.digitStats[digit];
+
+                // 🔥 FIX: Always increment count for valid digits
                 s.count++;
 
                 // gap update
@@ -1299,7 +1052,7 @@
                 return numer / denom;
             },
             
-            // Enhanced selectBestDigit with early-trade validation
+            // Select best digit using AI logic
             selectBestDigit: function() {
                 if (!this.warmupDone || !this.enabled) return null;
                 
@@ -1309,18 +1062,33 @@
                     return null;
                 }
                 
-                const thresholds = window.AI_THRESHOLDS;
-                const maxPersistence = regimeStatus.label === "STABLE" 
-                    ? thresholds.maxPersistenceStable 
-                    : thresholds.maxPersistenceUnstable;
+                let best = null;
 
-                const pressureTiers = Array.from(new Set(thresholds.pressureZoneFallbackMinP90Ratios || []))
+                const thresholds = window.AI_THRESHOLDS;
+
+                const maxPersistence =
+                    regimeStatus.label === "STABLE"
+                        ? thresholds.maxPersistenceStable
+                        : thresholds.maxPersistenceUnstable;
+
+                const rawPressureTiers = (thresholds.pressureZoneEnabled &&
+                    Array.isArray(thresholds.pressureZoneFallbackMinP90Ratios) &&
+                    thresholds.pressureZoneFallbackMinP90Ratios.length)
+                    ? thresholds.pressureZoneFallbackMinP90Ratios
+                    : [thresholds.pressureZoneEnabled ? thresholds.pressureZoneMinP90Ratio : 0.0];
+
+                const pressureFloor = (thresholds.pressureZoneEnabled && typeof thresholds.pressureZoneMinFloorP90Ratio === "number")
+                    ? thresholds.pressureZoneMinFloorP90Ratio
+                    : 0.0;
+
+                // Ensure tiers are sorted high→low, unique, and never drop below the floor.
+                const pressureTiers = Array.from(new Set(rawPressureTiers))
                     .map(v => (typeof v === "number" ? v : 0.0))
-                    .filter(v => v >= thresholds.pressureZoneMinFloorP90Ratio && v < 1)
+                    .filter(v => v >= pressureFloor && v < 1)
                     .sort((a, b) => b - a);
 
                 if (thresholds.pressureZoneEnabled && pressureTiers.length === 0) {
-                    pressureTiers.push(Math.max(0, Math.min(0.999, thresholds.pressureZoneMinFloorP90Ratio)));
+                    pressureTiers.push(Math.max(0, Math.min(0.999, pressureFloor)));
                 }
 
                 const runPass = (activeMinP90Ratio) => {
@@ -1331,7 +1099,7 @@
                         const g = s.currentGap;
                         const p90 = Math.max(s.p90Gap, 1);
                         const p90Ratio = g / p90;
-                        const extendRatio = g / Math.max(s.avgGap, 1);
+                        const extendRatio = g / s.avgGap;
 
                         // 🔥 HARD TAIL BLOCK: extreme stretch vs history
                         if (extendRatio > 2.8) continue;
@@ -1342,26 +1110,25 @@
                         // 🔥 Tail forming: suppressed digit + stretched gap
                         if (s.persistenceScore > 90 && extendRatio > 1.8) continue;
 
-                        const P5 = this.conditionalReturnProb(d, g, 5);
+                        const P5  = this.conditionalReturnProb(d, g, 5);
                         const P10 = this.conditionalReturnProb(d, g, 10);
 
                         // Filter conditions
                         if (s.gaps.length < thresholds.minSupport) continue;
+
+                        // STRONG EARLY FIRST (H5 primary gate)
                         if (P5 < thresholds.minH5) continue;
+
+                        // MEDIUM EARLY SECOND
                         if (P10 < thresholds.minP10) continue;
+
+                        // SAFETY
                         if (thresholds.require_g_lt_p90 && g >= p90) continue;
 
-                        // PRESSURE ZONE (adaptive)
+                        // PRESSURE ZONE (adaptive): prefer digits close to P90, but relax if too strict.
                         if (thresholds.pressureZoneEnabled) {
                             if (p90Ratio < activeMinP90Ratio) continue;
                             if (p90Ratio >= thresholds.pressureZoneMaxP90Ratio) continue;
-                        }
-
-                        // EARLY-TRADE VALIDATION - NEW
-                        const earlyTradeCheck = validateEarlyTrade(this, d);
-                        if (!earlyTradeCheck.valid) {
-                            log(`Digit ${d} failed early-trade: ${earlyTradeCheck.reason}`, 'ENGINE-DETAIL');
-                            continue;
                         }
 
                         // Cold-stickiness / persistence filters
@@ -1375,24 +1142,17 @@
                         if (s.consecutiveExtendingGaps > thresholds.maxExtend) continue;
                         if (s.isUnstable) continue;
 
-                        // Calculate score with early-trade bonus
+                        // Calculate score (still strongly favors closest-to-P90)
                         const denom = Math.max(1 - activeMinP90Ratio, 1e-6);
                         const pressureScore = thresholds.pressureZoneEnabled
                             ? Math.max(0, Math.min(1, (p90Ratio - activeMinP90Ratio) / denom))
                             : Math.max(0, Math.min(1, g / p90));
 
-                        // Early-trade bonus based on pm2 and p2to3
-                        const earlyTradeBonus = Math.min(0.2, 
-                            (Math.max(0, earlyTradeCheck.details.pm2 - 0.2) * 0.5) +
-                            (Math.max(0, earlyTradeCheck.details.p2to3 - 0.18) * 0.3)
-                        );
-
                         const score =
-                            0.40 * P10 +
-                            0.20 * P5 +
-                            0.15 * pressureScore +
-                            0.10 * (1 - s.persistenceScore / 100) +
-                            0.15 * earlyTradeBonus;
+                            0.45 * P10 +
+                            0.25 * P5 +
+                            0.20 * pressureScore +
+                            0.10 * (1 - s.persistenceScore / 100);
 
                         if (!passBest || score > passBest.score) {
                             passBest = {
@@ -1402,9 +1162,7 @@
                                 P5: P5,
                                 gap: g,
                                 persistenceScore: s.persistenceScore,
-                                isUnstable: s.isUnstable,
-                                earlyTradeDetails: earlyTradeCheck.details,
-                                earlyTradeValid: true
+                                isUnstable: s.isUnstable
                             };
                         }
                     }
@@ -1412,7 +1170,6 @@
                     return passBest;
                 };
 
-                let best = null;
                 for (const activeMinP90Ratio of pressureTiers) {
                     best = runPass(activeMinP90Ratio);
                     if (best) {
@@ -1424,21 +1181,23 @@
                 return best;
             },
             
-            // Analyze and recommend digit with early-trade metrics
+            // Analyze and recommend digit
             analyzeAndRecommend: function() {
                 const regimeStatus = this.computeRegimeStatus();
 
                 if (!regimeStatus.ok) {
+                    // Keep UI consistent when regime is unstable
                     this.currentRecommendation = null;
                     document.getElementById('ai-recommended-digit').textContent = '-';
                     document.getElementById('ai-digit-score').textContent = 'Score: 0.0% | P10: 0.0% | NO-TRADE';
-                    document.getElementById('early-trade-metrics-panel').classList.add('hidden');
                     return;
                 }
 
                 let best = this.selectBestDigit();
-                
-                // Survival-curve overlay
+
+                // -----------------------------
+                // Survival-curve overlay (always-on hybrid when data exists)
+                // -----------------------------
                 const minDigits = (typeof window.SURVIVAL_MIN_DIGITS === 'number') ? window.SURVIVAL_MIN_DIGITS : 80;
                 const windowSize = window.SURVIVAL_WINDOW || 2000;
 
@@ -1452,6 +1211,7 @@
                         survivalStats = window.SurvivalEngine.analyze(window.lastDigits, { window: windowSize });
                         survivalByDigit = new Map(survivalStats.map(s => [s.digit, s]));
 
+                        // Try strict rank first (user cfg). If empty, fall back to global ranking (no "ignore" case).
                         let ranked = [];
                         try {
                             ranked = window.SurvivalEngine.rank(survivalStats, window.SURVIVAL_CFG || {});
@@ -1489,7 +1249,7 @@
 
                 const hasSurvival = !!(survivalByDigit && survivalByDigit.size);
 
-                // Expose latest survival stats
+                // Expose latest survival stats for trading gates
                 try {
                     window.latestSurvivalStats = Array.isArray(survivalStats) ? survivalStats : null;
                     window.latestSurvivalByDigit = Array.isArray(survivalStats)
@@ -1526,7 +1286,7 @@
                     return candidate;
                 };
 
-                // If base engine has no pick, use survival's best digit
+                // If base engine has no pick, use survival's best digit (still HYBRID)
                 if (!best && hasSurvival && survivalTop) {
                     best = {
                         digit: survivalTop.digit,
@@ -1543,7 +1303,7 @@
                     best = attachHybrid(best);
                 }
 
-                // Optional override: if survival strongly prefers another digit
+                // Optional override: if survival strongly prefers another digit, allow it to replace weak base picks.
                 if (best && hasSurvival && survivalTop && survivalTop.digit !== best.digit) {
                     const baseScore = Number.isFinite(best.score) ? best.score : 0;
                     const survTopNorm = survivalTop.survivalNorm ?? (1 / (1 + Math.exp(-(survivalTop.survivalScore || 0))));
@@ -1560,6 +1320,7 @@
                             survival: survivalTop
                         };
                     } else {
+                        // Ensure survival metrics are attached even if not overriding.
                         best.survival = best.survival || survivalByDigit.get(best.digit) || null;
                         best.source = 'HYBRID';
                     }
@@ -1572,14 +1333,13 @@
                     document.getElementById('ai-recommended-digit').textContent = best.digit;
 
                     const sourceLabel = best.source ? ` | ${best.source}` : '';
-                    const earlyTradeLabel = best.earlyTradeValid ? ' | 🚀 EARLY-TRADE' : '';
 
                     let survivalLabel = '';
                     if (hasSurvival) {
                         const s = best.survival || (survivalByDigit ? survivalByDigit.get(best.digit) : null);
                         if (s) {
                             survivalLabel =
-                                ` | pm5:${Math.round((s.pm5 || 0) * 100)}% pm10:${Math.round((s.pm10 || 0) * 100)}% s20:${Math.round((s.s20 || 0) * 100)}%`;
+                                ` | pm5:${Math.round((s.pm5 || 0) * 100)}% pm10:${Math.round((s.pm10 || 0) * 100)}% s20:${Math.round((s.s20 || 0) * 100)}% etm:${Number.isFinite(s.etm) ? s.etm.toFixed(1) : '∞'}`;
                         } else {
                             survivalLabel = ` | Survival: N/A`;
                         }
@@ -1589,22 +1349,7 @@
                     }
 
                     document.getElementById('ai-digit-score').textContent =
-                        `Score: ${(best.score * 100).toFixed(1)}% | P10: ${(best.P10 * 100).toFixed(1)}%${sourceLabel}${earlyTradeLabel}${survivalLabel}`;
-
-                    // Early trade metrics
-                    if (best.earlyTradeDetails) {
-                        const metrics = best.earlyTradeDetails;
-                        document.getElementById('ai-early-trade-metrics').innerHTML = 
-                            `pm2: ${(metrics.pm2 * 100).toFixed(0)}% | p2-3: ${(metrics.p2to3 * 100).toFixed(0)}% | wpm5: ${metrics.pm5_weighted}`;
-                        
-                        // Show early trade indicator
-                        document.getElementById('early-trade-indicator').classList.remove('hidden');
-                        updateEarlyTradeMetrics(best.digit);
-                    } else {
-                        document.getElementById('ai-early-trade-metrics').innerHTML = '';
-                        document.getElementById('early-trade-indicator').classList.add('hidden');
-                        document.getElementById('early-trade-metrics-panel').classList.add('hidden');
-                    }
+                        `Score: ${(best.score * 100).toFixed(1)}% | P10: ${(best.P10 * 100).toFixed(1)}%${sourceLabel}${survivalLabel}`;
 
                     // Color code based on score
                     const scoreElem = document.getElementById('ai-digit-score');
@@ -1613,7 +1358,7 @@
                     else if (best.score >= 0.75) scoreElem.classList.add('engine-digit-score-medium');
                     else scoreElem.classList.add('engine-digit-score-low');
 
-                    // Update survival panel
+                    // Update survival panel (top3)
                     try {
                         const panel = document.getElementById('survival-top3');
                         if (panel) {
@@ -1623,24 +1368,13 @@
                                 panel.textContent = 'Survival picks: N/A';
                             } else {
                                 panel.textContent = 'Top picks: ' + survivalTop3.map(x =>
-                                    `${x.digit} (pm5:${Math.round((x.pm5 || 0) * 100)}%, pm10:${Math.round((x.pm10 || 0) * 100)}%, s20:${Math.round((x.s20 || 0) * 100)}%)`
+                                    `${x.digit} (pm5:${Math.round((x.pm5 || 0) * 100)}%, pm10:${Math.round((x.pm10 || 0) * 100)}%, s20:${Math.round((x.s20 || 0) * 100)}%, etm:${Number.isFinite(x.etm) ? x.etm.toFixed(1) : '∞'})`
                                 ).join(' | ');
                             }
                         }
                     } catch (_) {}
 
                     log(`🎯 AI recommends digit ${best.digit} (Score: ${(best.score * 100).toFixed(1)}%, P10: ${(best.P10 * 100).toFixed(1)}%)`, 'AI');
-                    if (best.earlyTradeValid) {
-                        log(`🚀 Early-trade: pm2=${best.earlyTradeDetails.pm2}, p2to3=${best.earlyTradeDetails.p2to3}, wpm5=${best.earlyTradeDetails.pm5_weighted}`, 'ENGINE-DETAIL');
-                    }
-                } else {
-                    this.currentRecommendation = null;
-                    document.getElementById('ai-recommended-digit').textContent = '-';
-                    document.getElementById('ai-digit-score').textContent = 'Score: 0.0% | P10: 0.0% | NO-TRADE';
-                    document.getElementById('ai-early-trade-metrics').innerHTML = '';
-                    document.getElementById('early-trade-indicator').classList.add('hidden');
-                    document.getElementById('early-trade-metrics-panel').classList.add('hidden');
-                    log('🤖 No suitable digit found with early-trade criteria', 'ENGINE');
                 }
             },
             
@@ -1663,11 +1397,12 @@
                 return stats;
             }
         };
-
+        
+        
         // ============================================================================
         // SURVIVAL CURVE ENGINE v1
+        // Empirical conditional survival from historical gaps (rolling digits)
         // ============================================================================
-
         const SurvivalEngine = (() => {
           function clampDigit(x) {
             x = Number(x);
@@ -1788,196 +1523,10 @@
 
         window.SurvivalEngine = SurvivalEngine;
 
-        // ============================================================================
-        // ENHANCED DIGIT ANALYSIS DISPLAY WITH EARLY-TRADE METRICS
-        // ============================================================================
-
-        function updateDigitAnalysisDisplay() {
-            const engine = window.digitIntelligenceEngine;
-            const thresholds = window.AI_THRESHOLDS;
-            const scoreCutoff = 0.50;
-
-            if (!engine.warmupDone) {
-                document.getElementById('digit-analysis-content').innerHTML = `
-                    <div class="text-center py-4">
-                        <div class="text-yellow-400 mb-2">Engine warming up...</div>
-                        <div class="text-xs text-gray-500">${engine.warmupTicks}/${engine.targetWarmupTicks} ticks analyzed</div>
-                    </div>
-                `;
-                return;
-            }
-
-            const regimeStatus = engine.computeRegimeStatus();
-            const baseMaxPersistence = regimeStatus.label === "STABLE"
-                ? thresholds.maxPersistenceStable
-                : thresholds.maxPersistenceUnstable;
-
-            // SurvivalEngine top picks
-            let survivalTop3 = [];
-            try {
-                if (window.SurvivalEngine && Array.isArray(window.lastDigits) && window.lastDigits.length >= 200) {
-                    const sStats = window.SurvivalEngine.analyze(window.lastDigits, { window: window.SURVIVAL_WINDOW || 2000 });
-                    survivalTop3 = window.SurvivalEngine.rank(sStats, window.SURVIVAL_CFG || {}).slice(0, 3);
-                }
-            } catch (e) {
-                console.warn('SurvivalEngine display error:', e);
-            }
-
-            let html = `
-                <div class="mb-3">
-                    <div class="text-xs font-semibold text-gray-300 mb-1">Regime Status:</div>
-                    <div class="text-xs ${regimeStatus.ok ? 'text-green-400' : 'text-yellow-400'}">
-                        ${regimeStatus.label} | Entropy: ${regimeStatus.entropy} | Dominance: ${regimeStatus.dominance}
-                    </div>
-                    <div class="text-[11px] text-gray-500 mt-1">
-                        <strong>Early-trade gates:</strong><br>
-                        • pm2 ≥ ${(thresholds.earlyTrade.minPm2 * 100).toFixed(0)}% | p2–3 ≥ ${(thresholds.earlyTrade.minP2to3 * 100).toFixed(0)}%<br>
-                        • p3–5 ≤ ${(thresholds.earlyTrade.maxP3to5 * 100).toFixed(0)}% | s20 ≤ ${(thresholds.earlyTrade.maxS20 * 100).toFixed(0)}%<br>
-                        • Extend ≤ ${thresholds.earlyTrade.maxExtendRatio}x | Weighted pm5 ≥ ${(thresholds.earlyTrade.minPm5Weighted * 100).toFixed(0)}%
-                    </div>
-                </div>
-                ${survivalTop3.length ? `
-                <div class="mb-3 p-2 bg-gray-800/60 rounded border border-cyan-500/30">
-                    <div class="text-xs font-semibold text-cyan-300 mb-1">Survival Top Picks:</div>
-                    ${survivalTop3.map((x, i) => `
-                        <div class="text-[11px] text-gray-300 flex flex-wrap gap-x-3 gap-y-1">
-                            <span class="text-cyan-200 font-bold">#${i + 1} Digit ${x.digit}</span>
-                            <span>gap:${x.gap}</span>
-                            <span>pm5:${Math.round(x.pm5 * 100)}%</span>
-                            <span>pm10:${Math.round(x.pm10 * 100)}%</span>
-                            <span>s20:${Math.round(x.s20 * 100)}%</span>
-                        </div>
-                    `).join('')}
-                </div>
-                ` : `
-                <div class="mb-3 text-[11px] text-gray-500">
-                    Survival picks: none (need more history or no digit passes pm5/s20/etm + pressure).
-                </div>
-                `}
-                <div class="grid grid-cols-1 gap-1">
-            `;
-
-            for (let d = 0; d < 10; d++) {
-                const s = engine.digitStats[d];
-                const g = s.currentGap;
-                const support = s.gaps.length;
-
-                const P5 = engine.conditionalReturnProb(d, g, 5);
-                const P10 = engine.conditionalReturnProb(d, g, 10);
-
-                // Calculate early-trade probabilities
-                const pm2 = pMatchWithin(s.gaps, g, 2);
-                const pm3 = pMatchWithin(s.gaps, g, 3);
-                const pm5 = pMatchWithin(s.gaps, g, 5);
-                const p2to3 = Math.max(0, pm3 - pm2);
-                const p3to5 = Math.max(0, pm5 - pm3);
-                const pm5_weighted = pm5Weighted(s.gaps, g);
-                
-                const recentGaps = s.gaps.slice(-100);
-                const pm5_recent = recentGaps.length >= 20 ? pMatchWithin(recentGaps, g, 5) : pm5;
-                const tailRiskRatio = pm5_recent / Math.max(pm5, 0.001);
-
-                const extendRatio = (s.avgGap && s.avgGap > 0) ? (g / s.avgGap) : Infinity;
-                const effectiveMaxPersistence = (
-                    regimeStatus.label === "STABLE" &&
-                    P10 >= (thresholds.minP10 + 0.05) &&
-                    extendRatio <= 1.3
-                ) ? thresholds.maxPersistenceStableRelax : baseMaxPersistence;
-
-                const p90 = Math.max(s.p90Gap, 1);
-                const p90Ratio = g / p90;
-
-                // Early-trade validation
-                const earlyTradeValid = 
-                    support >= 50 &&
-                    pm2 >= thresholds.earlyTrade.minPm2 &&
-                    p2to3 >= thresholds.earlyTrade.minP2to3 &&
-                    p3to5 <= thresholds.earlyTrade.maxP3to5 &&
-                    pm5_weighted >= thresholds.earlyTrade.minPm5Weighted &&
-                    extendRatio <= thresholds.earlyTrade.maxExtendRatio &&
-                    tailRiskRatio >= thresholds.earlyTrade.tailRiskPm5Ratio;
-
-                const passSupport = support >= thresholds.minSupport;
-                const passP90 = !(thresholds.require_g_lt_p90 && g >= p90);
-                const passPressure = !thresholds.pressureZoneEnabled || (
-                    p90Ratio >= thresholds.pressureZoneMinP90Ratio &&
-                    p90Ratio < thresholds.pressureZoneMaxP90Ratio
-                );
-                const passPersistence = s.persistenceScore <= effectiveMaxPersistence;
-                const passExtend = s.consecutiveExtendingGaps <= thresholds.maxExtend;
-                const passUnstable = !s.isUnstable;
-                const passP5 = P5 >= thresholds.minH5;
-                const passP10 = P10 >= thresholds.minP10;
-
-                const denom = Math.max(1 - thresholds.pressureZoneMinP90Ratio, 1e-6);
-                const pressureScore = thresholds.pressureZoneEnabled
-                    ? Math.max(0, Math.min(1, (p90Ratio - thresholds.pressureZoneMinP90Ratio) / denom))
-                    : Math.max(0, Math.min(1, g / p90));
-
-                const score =
-                    0.45 * P10 +
-                    0.25 * P5 +
-                    0.20 * pressureScore +
-                    0.10 * (1 - s.persistenceScore / 100);
-
-                const passScore = score >= scoreCutoff;
-                const isRecommended = engine.currentRecommendation && engine.currentRecommendation.digit === d;
-
-                const barWidth = Math.min(100, (g / 50) * 100);
-                const barColor = !earlyTradeValid ? 'bg-red-500' :
-                                isRecommended ? 'bg-green-500' :
-                                s.persistenceScore > 70 ? 'bg-yellow-500' :
-                                g > s.p90Gap ? 'bg-orange-500' : 'bg-blue-500';
-
-                const flag = (ok) => ok ? '✅' : '❌';
-
-                html += `
-                    <div class="p-1 ${isRecommended ? 'bg-green-900/30 rounded' : ''}">
-                        <div class="flex justify-between items-center">
-                            <div class="text-xs font-semibold ${isRecommended ? 'text-green-400' : 'text-gray-200'}">
-                                Digit ${d} ${isRecommended ? '⭐' : ''}
-                            </div>
-                            <div class="text-[11px] text-gray-400">
-                                Gap: <span class="text-gray-200">${g}</span> | P90: <span class="text-gray-200">${s.p90Gap}</span>
-                            </div>
-                        </div>
-
-                        <div class="text-[11px] text-gray-400 mt-1 flex flex-wrap gap-x-3 gap-y-1">
-                            <span>Support: <span class="text-gray-200">${support}</span></span>
-                            <span>P2: <span class="${pm2 >= 0.2 ? 'text-green-300' : 'text-red-300'}">${(pm2 * 100).toFixed(0)}%</span></span>
-                            <span>P2-3: <span class="${p2to3 >= 0.18 ? 'text-green-300' : 'text-red-300'}">${(p2to3 * 100).toFixed(0)}%</span></span>
-                            <span>P3-5: <span class="${p3to5 <= 0.4 ? 'text-green-300' : 'text-red-300'}">${(p3to5 * 100).toFixed(0)}%</span></span>
-                            <span>Wpm5: <span class="${pm5_weighted >= 0.25 ? 'text-green-300' : 'text-red-300'}">${pm5_weighted.toFixed(2)}</span></span>
-                        </div>
-
-                        <div class="text-[11px] text-gray-400 mt-1 flex flex-wrap gap-x-3 gap-y-1">
-                            <span>H5(P5): <span class="text-gray-200">${P5.toFixed(2)}</span></span>
-                            <span>P10: <span class="text-gray-200">${P10.toFixed(2)}</span></span>
-                            <span>Persistence: <span class="text-gray-200">${s.persistenceScore}</span> / ${effectiveMaxPersistence}</span>
-                            <span>ExtendRatio: <span class="text-gray-200">${Number.isFinite(extendRatio) ? extendRatio.toFixed(2) : '∞'}</span></span>
-                            <span>Score: <span class="text-gray-200">${(score * 100).toFixed(1)}%</span></span>
-                        </div>
-
-                        <div class="text-[11px] text-gray-500 mt-1">
-                            Early-trade: ${flag(earlyTradeValid)} | Pass: Support${flag(passSupport)} · P90${flag(passP90)} · Pressure${flag(passPressure)} · Persist${flag(passPersistence)} · Extend${flag(passExtend)} · Stable${flag(passUnstable)} · H5${flag(passP5)} · P10${flag(passP10)} · Score${flag(passScore)}
-                        </div>
-
-                        <div class="mt-1 bg-gray-700/40 rounded h-2">
-                            <div class="${barColor} h-2 rounded-full" style="width: ${barWidth}%"></div>
-                        </div>
-                    </div>
-                `;
-            }
-
-            html += '</div>';
-            document.getElementById('digit-analysis-content').innerHTML = html;
-        }
-
-        // ============================================================================
-        // CORE BOT FUNCTIONS (REMAINING CODE)
+// ============================================================================
+        // MARTINGALE CALCULATOR FUNCTIONS
         // ============================================================================
         
-        // MARTINGALE CALCULATOR FUNCTIONS
         let calculatorExpanded = true;
         
         function toggleCalculator() {
@@ -2011,6 +1560,7 @@
                 let progression = [];
                 let finalStake = baseStake;
                 
+                // Calculate progression and totals
                 for (let i = 1; i <= maxTrades; i++) {
                     if (i === 1) {
                         currentStake = baseStake;
@@ -2018,6 +1568,7 @@
                         currentStake *= multiplier;
                     }
                     
+                    // Round to 2 decimal places
                     currentStake = Math.round(currentStake * 100) / 100;
                     totalRequired += currentStake;
                     finalStake = currentStake;
@@ -2029,17 +1580,23 @@
                     });
                 }
                 
+                // Round total required
                 totalRequired = Math.round(totalRequired * 100) / 100;
+                
+                // Calculate profit on win (DIGITMATCH pays 9x)
                 const profitOnWin = (finalStake * 9) - totalRequired;
                 
+                // Update main bot controls with calculated values
                 document.getElementById('baseStake').value = baseStake.toFixed(2);
                 document.getElementById('multiplier').value = multiplier.toFixed(2);
                 document.getElementById('maxTrades').value = maxTrades;
                 
+                // Update calculator results
                 document.getElementById('calc_total_required').textContent = `$${totalRequired.toFixed(2)}`;
                 document.getElementById('calc_final_stake').textContent = `$${finalStake.toFixed(2)}`;
                 document.getElementById('calc_profit_on_win').textContent = `$${profitOnWin.toFixed(2)}`;
                 
+                // Update bankroll status
                 const bankrollStatusElem = document.getElementById('calc_bankroll_status');
                 bankrollStatusElem.classList.remove('calculator-safe', 'calculator-warning', 'calculator-highlight');
                 
@@ -2054,6 +1611,7 @@
                     bankrollStatusElem.classList.add('calculator-warning');
                 }
                 
+                // Update progression display
                 const progressionElem = document.getElementById('calc_progression');
                 let progressionHTML = '<div class="grid grid-cols-4 gap-1 text-xs mb-1 font-semibold text-gray-300">';
                 progressionHTML += '<div>Trade #</div><div>Stake</div><div>Cumulative</div><div>Status</div>';
@@ -2073,6 +1631,7 @@
                 
                 progressionElem.innerHTML = progressionHTML;
                 
+                // Add pulse animation
                 document.getElementById('calc_total_required').classList.add('calculator-pulse');
                 setTimeout(() => {
                     document.getElementById('calc_total_required').classList.remove('calculator-pulse');
@@ -2095,6 +1654,7 @@
             document.getElementById('calc_multiplier').value = multiplier.toFixed(2);
             document.getElementById('calc_max_trades').value = maxTrades;
             
+            // Auto-calculate when main controls change
             calculateMartingale();
         }
         
@@ -2109,6 +1669,7 @@
             log(`🧠 Digit Intelligence Engine ${window.digitIntelligenceEngine.enabled ? 'ENABLED' : 'DISABLED'}`, 'ENGINE');
             
             if (window.digitIntelligenceEngine.enabled && window.isBotRunning && window.ws && window.ws.readyState === WebSocket.OPEN) {
+                // Re-request warm-up if engine was re-enabled
                 requestWarmupTicks();
             }
         }
@@ -2170,6 +1731,168 @@
             }
         }
         
+        function updateDigitAnalysisDisplay() {
+            const engine = window.digitIntelligenceEngine;
+            const thresholds = window.AI_THRESHOLDS;
+            const scoreCutoff = 0.50; // ranking hint only
+
+            if (!engine.warmupDone) {
+                document.getElementById('digit-analysis-content').innerHTML = `
+                    <div class="text-center py-4">
+                        <div class="text-yellow-400 mb-2">Engine warming up...</div>
+                        <div class="text-xs text-gray-500">${engine.warmupTicks}/${engine.targetWarmupTicks} ticks analyzed</div>
+                    </div>
+                `;
+                return;
+            }
+
+            const regimeStatus = engine.computeRegimeStatus();
+
+            const baseMaxPersistence =
+                regimeStatus.label === "STABLE"
+                    ? thresholds.maxPersistenceStable
+                    : thresholds.maxPersistenceUnstable;
+
+            // SurvivalEngine top picks (if enough history)
+            let survivalTop3 = [];
+            try {
+                if (window.SurvivalEngine && Array.isArray(window.lastDigits) && window.lastDigits.length >= 200) {
+                    const sStats = window.SurvivalEngine.analyze(window.lastDigits, { window: window.SURVIVAL_WINDOW || 2000 });
+                    survivalTop3 = window.SurvivalEngine.rank(sStats, window.SURVIVAL_CFG || {}).slice(0, 3);
+                }
+            } catch (e) {
+                console.warn('SurvivalEngine display error:', e);
+            }
+
+            let html = `
+                <div class="mb-3">
+                    <div class="text-xs font-semibold text-gray-300 mb-1">Regime Status:</div>
+                    <div class="text-xs ${regimeStatus.ok ? 'text-green-400' : 'text-yellow-400'}">
+                        ${regimeStatus.label} | Entropy: ${regimeStatus.entropy} | Dominance: ${regimeStatus.dominance}
+                    </div>
+                    <div class="text-[11px] text-gray-500 mt-1">
+                        Gates — Support≥${thresholds.minSupport}, H5≥${thresholds.minH5}, P10≥${thresholds.minP10}, Pressure∈[${thresholds.pressureZoneMinP90Ratio}×P90, ${thresholds.pressureZoneMaxP90Ratio}×P90), Extend≤${thresholds.maxExtend},
+                        Persistence≤${baseMaxPersistence} (relax→${thresholds.maxPersistenceStableRelax}), Score(rank)≥${(scoreCutoff * 100).toFixed(0)}%
+                    </div>
+                </div>
+                ${survivalTop3.length ? `
+                <div class="mb-3 p-2 bg-gray-800/60 rounded border border-cyan-500/30">
+                    <div class="text-xs font-semibold text-cyan-300 mb-1">Survival Top Picks (fast + low tail-risk):</div>
+                    ${survivalTop3.map((x, i) => `
+                        <div class="text-[11px] text-gray-300 flex flex-wrap gap-x-3 gap-y-1">
+                            <span class="text-cyan-200 font-bold">#${i + 1} Digit ${x.digit}</span>
+                            <span>gap:${x.gap}</span>
+                            <span>pm5:${Math.round(x.pm5 * 100)}%</span>
+                            <span>pm10:${Math.round(x.pm10 * 100)}%</span>
+                            <span>s20:${Math.round(x.s20 * 100)}%</span>
+                            <span>etm:${Number.isFinite(x.etm) ? x.etm.toFixed(1) : '∞'}</span>
+                            <span class="text-gray-500">score:${x.survivalScore.toFixed(2)}</span>
+                        </div>
+                    `).join('')}
+                </div>
+                ` : `
+                <div class="mb-3 text-[11px] text-gray-500">
+                    Survival picks: none (need more history or no digit passes pm5/s20/etm + pressure).
+                </div>
+                `}
+                <div class="grid grid-cols-1 gap-1">
+            `;
+
+            for (let d = 0; d < 10; d++) {
+                const s = engine.digitStats[d];
+                const g = s.currentGap;
+                const support = s.gaps.length;
+
+                const P5 = engine.conditionalReturnProb(d, g, 5);
+                const P10 = engine.conditionalReturnProb(d, g, 10);
+
+                const extendRatio = (s.avgGap && s.avgGap > 0) ? (g / s.avgGap) : Infinity;
+                const effectiveMaxPersistence = (
+                    regimeStatus.label === "STABLE" &&
+                    P10 >= (thresholds.minP10 + 0.05) &&
+                    extendRatio <= 1.3
+                ) ? thresholds.maxPersistenceStableRelax : baseMaxPersistence;
+
+                const p90 = Math.max(s.p90Gap, 1);
+                const p90Ratio = g / p90;
+
+                const passSupport = support >= thresholds.minSupport;
+                const passP90 = !(thresholds.require_g_lt_p90 && g >= p90);
+                const passPressure = !thresholds.pressureZoneEnabled || (
+                    p90Ratio >= thresholds.pressureZoneMinP90Ratio &&
+                    p90Ratio < thresholds.pressureZoneMaxP90Ratio
+                );
+                const passPersistence = s.persistenceScore <= effectiveMaxPersistence;
+                const passExtend = s.consecutiveExtendingGaps <= thresholds.maxExtend;
+                const passUnstable = !s.isUnstable;
+                const passP5 = P5 >= thresholds.minH5;
+                const passP10 = P10 >= thresholds.minP10;
+const denom = Math.max(1 - thresholds.pressureZoneMinP90Ratio, 1e-6);
+                const pressureScore = thresholds.pressureZoneEnabled
+                    ? Math.max(0, Math.min(1, (p90Ratio - thresholds.pressureZoneMinP90Ratio) / denom))
+                    : Math.max(0, Math.min(1, g / p90));
+
+                const score =
+                    0.45 * P10 +
+                    0.25 * P5 +
+                    0.20 * pressureScore +
+                    0.10 * (1 - s.persistenceScore / 100);
+const passScore = score >= scoreCutoff;
+
+                const passAll =
+                    passSupport && passP90 && passPressure && passPersistence && passExtend && passUnstable && passP5 && passP10;
+const isRecommended = engine.currentRecommendation && engine.currentRecommendation.digit === d;
+
+                const barWidth = Math.min(100, (g / 50) * 100);
+                const barColor = !passAll ? 'bg-red-500' :
+                                isRecommended ? 'bg-green-500' :
+                                s.persistenceScore > 70 ? 'bg-yellow-500' :
+                                g > s.p90Gap ? 'bg-orange-500' : 'bg-blue-500';
+
+                const flag = (ok) => ok ? '✅' : '❌';
+
+                html += `
+                    <div class="p-1 ${isRecommended ? 'bg-green-900/30 rounded' : ''}">
+                        <div class="flex justify-between items-center">
+                            <div class="text-xs font-semibold ${isRecommended ? 'text-green-400' : 'text-gray-200'}">
+                                Digit ${d} ${isRecommended ? '⭐' : ''}
+                            </div>
+                            <div class="text-[11px] text-gray-400">
+                                Gap: <span class="text-gray-200">${g}</span> | P90: <span class="text-gray-200">${s.p90Gap}</span>
+                            </div>
+                        </div>
+
+                        <div class="text-[11px] text-gray-400 mt-1 flex flex-wrap gap-x-3 gap-y-1">
+                            <span>Support: <span class="text-gray-200">${support}</span></span>
+                            <span>Count: <span class="text-gray-200">${s.count}</span></span>
+                            <span>AvgGap: <span class="text-gray-200">${s.avgGap.toFixed(1)}</span></span>
+                            <span>ExtendStreak: <span class="text-gray-200">${s.consecutiveExtendingGaps}</span></span>
+                            <span>Unstable: <span class="text-gray-200">${s.isUnstable ? 'YES' : 'NO'}</span></span>
+                        </div>
+
+                        <div class="text-[11px] text-gray-400 mt-1 flex flex-wrap gap-x-3 gap-y-1">
+                            <span>H5(P5): <span class="text-gray-200">${P5.toFixed(2)}</span></span>
+                            <span>P10: <span class="text-gray-200">${P10.toFixed(2)}</span></span>
+                            <span>Persistence: <span class="text-gray-200">${s.persistenceScore}</span> / ${effectiveMaxPersistence}</span>
+                            <span>ExtendRatio(g/avg): <span class="text-gray-200">${Number.isFinite(extendRatio) ? extendRatio.toFixed(2) : '∞'}</span></span>
+                            <span>Score: <span class="text-gray-200">${(score * 100).toFixed(1)}%</span></span>
+                        </div>
+
+                        <div class="text-[11px] text-gray-500 mt-1">
+                            Pass: Support${flag(passSupport)} · P90${flag(passP90)} · Pressure${flag(passPressure)} · Persist${flag(passPersistence)} · Extend${flag(passExtend)} · Stable${flag(passUnstable)} · H5${flag(passP5)} · P10${flag(passP10)} · Score${flag(passScore)}
+                        </div>
+
+                        <div class="mt-1 bg-gray-700/40 rounded h-2">
+                            <div class="${barColor} h-2 rounded-full" style="width: ${barWidth}%"></div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            html += '</div>';
+            document.getElementById('digit-analysis-content').innerHTML = html;
+        }
+        
         function useAIRecommendedDigit() {
             if (!window.digitIntelligenceEngine.currentRecommendation) {
                 log('❌ No AI recommendation available yet', 'ENGINE');
@@ -2195,9 +1918,6 @@
                 updateSessionDisplay();
                 log(`✅ Set digit to AI recommendation: ${recommendedDigit}`, 'ENGINE');
             }
-            
-            // Update early trade metrics
-            updateEarlyTradeMetrics(recommendedDigit);
         }
         
         // ============================================================================
@@ -2210,6 +1930,7 @@
             const symbol = document.getElementById('symbol').value;
             const count = window.digitIntelligenceEngine.targetWarmupTicks;
             
+            // Reset engine before warm-up
             window.digitIntelligenceEngine.reset();
             
             sendRequest({
@@ -2224,7 +1945,7 @@
         }
         
         // ============================================================================
-        // CORE BOT FUNCTIONS - UPDATED FOR EARLY-TRADE DETECTION
+        // CORE BOT FUNCTIONS - UPDATED FOR 10 SECOND PNL DISPLAY & NETWORK RECOVERY
         // ============================================================================
         
         // Global State
@@ -2259,7 +1980,7 @@
         window.currentBalance = 0.0;
         window.netProfit = 0.0;
         
-        // PnL Tracking
+        // PnL Tracking - UPDATED TO 10 SECONDS
         window.pnlTracker = {
             totalInvestment: 0.0,
             totalPayout: 0.0,
@@ -2267,10 +1988,10 @@
             trades: []
         };
         
-        // PnL Update Timer
+        // PnL Update Timer - INCREASED FROM 3 TO 10 SECONDS
         window.pnlUpdateInterval = null;
         window.pnlUpdateStartTime = 0;
-        window.pnlUpdateDuration = 10000;
+        window.pnlUpdateDuration = 10000; // 10 seconds instead of 3
         
         // Execution State
         window.lastTick = null;
@@ -2284,9 +2005,7 @@
             totalTicks: 0,
             tradesExecuted: 0,
             wins: 0,
-            losses: 0,
-            earlyWins: 0,
-            lateWins: 0
+            losses: 0
         };
         
         // Rate tracking
@@ -2299,24 +2018,24 @@
         // Session State
         let sessionState = {
             active: false,
-            mode: 'instant',
+            mode: 'instant', // Only instant and ai modes now
             sessionDigit: null,
             sessionStarted: false,
             manualOverride: false
         };
         
-        // Tick tracking
+        // Tick tracking for connection status
         window.totalTicksReceived = 0;
         window.tickTimestamps = [];
         
-        // Digit zero tracker
+        // Digit zero tracker - FOR DEBUGGING
         window.digitZeroTracker = {
             count: 0,
             lastPrice: null,
             occurrences: []
         };
 
-        // Tick decimal auto-detection
+        // Tick decimal auto-detection (preserves trailing zeros for correct digit counting)
         window.tickFormat = {
             decimals: 3,
             lastQuote: null,
@@ -2376,6 +2095,7 @@
             const d = Number.parseInt(lastChar, 10);
             return Number.isNaN(d) ? NaN : d;
         }
+
         
         // DOM Elements
         const toggleButton = document.getElementById('toggleButton');
@@ -2403,6 +2123,7 @@
                 networkRecoveryBadge.classList.remove('hidden');
             } else {
                 networkRecoveryBadge.classList.add('hidden');
+                // Clear any pending reconnection attempts
                 if (window.autoReconnectTimer) {
                     clearTimeout(window.autoReconnectTimer);
                     window.autoReconnectTimer = null;
@@ -2459,36 +2180,44 @@
         }
         
         // ============================================================================
-        // PnL UPDATE FUNCTIONS
+        // PnL UPDATE FUNCTIONS - UPDATED FOR 10 SECOND DISPLAY
         // ============================================================================
         
         function startExtendedPnlUpdate(payout) {
             window.pnlUpdateStartTime = Date.now();
             
+            // Clear any existing interval
             if (window.pnlUpdateInterval) {
                 clearInterval(window.pnlUpdateInterval);
             }
             
+            // Start with immediate update
             updatePnL();
             
+            // Start continuous updates for 10 seconds
             window.pnlUpdateInterval = setInterval(() => {
                 const elapsed = Date.now() - window.pnlUpdateStartTime;
                 
                 if (elapsed >= window.pnlUpdateDuration) {
+                    // Stop after 10 seconds
                     clearInterval(window.pnlUpdateInterval);
                     window.pnlUpdateInterval = null;
                     log('💰 PnL update sequence completed (10 seconds)', 'PNL');
                     
+                    // Final update
                     updatePnL();
                     
+                    // Stop bot after PnL updates are complete
                     setTimeout(() => {
                         if (window.isBotRunning) {
                             stopBot();
                         }
                     }, 100);
                 } else {
+                    // Continue updating PnL with visual feedback
                     updatePnL();
                     
+                    // Add visual pulse every 500ms
                     if (elapsed % 500 < 50) {
                         metricTotalProfit.classList.add('pnl-update-animation');
                         setTimeout(() => {
@@ -2496,12 +2225,13 @@
                         }, 500);
                     }
                     
+                    // Log progress every second
                     if (elapsed % 1000 < 50) {
                         const secondsLeft = Math.ceil((window.pnlUpdateDuration - elapsed) / 1000);
                         log(`💰 PnL updating... ${secondsLeft}s`, 'PNL');
                     }
                 }
-            }, 100);
+            }, 100); // Update every 100ms for smooth animation
         }
         
         function updatePnL() {
@@ -2699,10 +2429,6 @@
             document.getElementById('predictedDigit').value = digit;
             updateSessionDisplay();
             log(`🔒 Digit ${digit} locked for current session${reason ? ' (' + reason + ')' : ''}`, 'SESSION');
-            
-            // Update early trade metrics
-            updateEarlyTradeMetrics(digit);
-            
             return digit;
         }
 
@@ -2712,12 +2438,9 @@
             sessionState.manualOverride = false;
             updateSessionDisplay();
             if (reason) log(`🔓 Session digit lock cleared (${reason})`, 'SESSION');
-            
-            // Hide early trade metrics panel
-            document.getElementById('early-trade-metrics-panel').classList.add('hidden');
         }
 
-        // HYBRID UTILITIES
+        // HYBRID UTILITIES (tail-risk gate + cycle rotation)
         function getSurvivalForDigit(digit) {
             const d = Number(digit);
             if (!Number.isFinite(d) || d < 0 || d > 9) return null;
@@ -2743,11 +2466,6 @@
                 const s20 = Number(s.s20);
                 if (!Number.isFinite(s20) || s20 > maxS20) continue;
 
-                // Early-trade validation
-                const engine = window.digitIntelligenceEngine;
-                const earlyTradeCheck = validateEarlyTrade(engine, d);
-                if (!earlyTradeCheck.valid) continue;
-
                 const raw =
                     (2.0 * (s.pm5 || 0)) +
                     (1.0 * (s.pm10 || 0)) -
@@ -2755,7 +2473,7 @@
                     (0.05 * Math.min(Number.isFinite(s.etm) ? s.etm : 100, 100));
 
                 const norm = 1 / (1 + Math.exp(-raw));
-                if (!best || norm > best.norm) best = { digit: d, norm, s, earlyTradeCheck };
+                if (!best || norm > best.norm) best = { digit: d, norm, s };
             }
             return best;
         }
@@ -2764,13 +2482,13 @@
             clearSessionDigitLock(reason || 'Rotate');
             window.cycleRotations = (window.cycleRotations || 0) + 1;
 
-            // Reset progression
+            // Reset progression (cycle reset)
             window.martingaleStep = 0;
             window.currentStake = window.baseStake;
 
             if (sessionState.mode !== 'ai') return;
 
-            // Prefer a low tail-risk digit with early-trade validation
+            // Prefer a low tail-risk digit (s20 <= 5%), otherwise use current AI rec.
             const pick = pickBestLowTailRiskDigit(0.05);
             const nextDigit =
                 (pick && Number.isFinite(pick.digit)) ? pick.digit :
@@ -2782,7 +2500,9 @@
             log(`🔁 Re-picked HYBRID digit ${nextDigit}${reason ? ' (' + reason + ')' : ''}`, 'SESSION');
         }
 
-        // CONNECTION STATUS
+
+
+// CONNECTION STATUS
         function updateConnectionStatus() {
             const isConnected = window.ws && window.ws.readyState === WebSocket.OPEN;
             const isConnecting = window.isConnecting || false;
@@ -2819,7 +2539,7 @@
             document.getElementById('current_tick_rate').textContent = tickRate.toFixed(1) + '/s';
         }
         
-        // MODE MANAGEMENT
+        // MODE MANAGEMENT - ONLY INSTANT AND AI AUTO
         function switchMode(mode) {
             sessionState.mode = mode;
             
@@ -2921,9 +2641,9 @@
             }
         }
 
-        // DOM Ready
+// DOM Ready
         document.addEventListener('DOMContentLoaded', () => {
-            console.log('🤖 Bot with Early-Trade Detection initialized');
+            console.log('🤖 Bot initialized');
             initializeToggleState();
             
             // Initialize intelligence engine
@@ -2964,7 +2684,7 @@
                 document.getElementById('maxTrades').value = document.getElementById('calc_max_trades').value;
             });
             
-            log('🤖 Bot with Early-Trade Detection ready', 'SYSTEM');
+            log('🤖 Bot ready', 'SYSTEM');
             switchMode('instant');
             updatePnL();
             resetTradeStatus();
@@ -2987,9 +2707,6 @@
                     updateSessionDisplay();
                     log(`🔢 Digit manually set to ${newDigit}`, 'SESSION');
                     updateTradeStatus('MANUAL', `Digit manually set to ${newDigit}`, 'Ready to trade', 'normal');
-                    
-                    // Update early trade metrics
-                    updateEarlyTradeMetrics(newDigit);
                 }
             });
             
@@ -3018,7 +2735,7 @@
             });
         }
         
-        // WEBSOCKET CONNECTION
+        // WEBSOCKET CONNECTION - UPDATED WITH NETWORK RECOVERY
         function connectWebSocket() {
             if (window.ws) {
                 try {
@@ -3029,7 +2746,7 @@
             window.isConnecting = true;
             updateConnectionStatus();
             
-            const wsUrl = 'wss://ws.binaryws.com/websockets/v3?app_id=120389';
+            const wsUrl = 'wss://ws.binaryws.com/websockets/v3?app_id=118332';
             log('🔗 Connecting to Deriv API...', 'SYSTEM');
             
             window.ws = new WebSocket(wsUrl);
@@ -3056,11 +2773,13 @@
             window.ws.onmessage = (msg) => {
                 try {
                     const data = JSON.parse(msg.data);
-                    console.log('API Response:', data.msg_type, data);
+                    console.log('API Response:', data.msg_type, data); // Debug logging
                     
+                    // 🔥 CRITICAL FIX: Handle tick messages
                     if (data.msg_type === 'tick') {
-                        console.log('Tick received:', data.tick);
+                        console.log('Tick received:', data.tick); // Debug
                         
+                        // Log specifically for digit 0
                         updateTickFormatFromQuote(data.tick.quote);
                         const digit = getLastDigitFromQuote(data.tick.quote);
                         if (digit === 0) {
@@ -3103,13 +2822,17 @@
             };
         }
         
-        // TICK HANDLER
+        // ============================================================================
+        // ✅ FIXED: TICK HANDLER - PROPER DIGIT EXTRACTION INCLUDING DIGIT 0
+        // ============================================================================
+        
+        // TICK HANDLER - FIXED DIGIT EXTRACTION (SPECIAL FIX FOR DIGIT 0)
         function handleTick(tick) {
             if (!window.isBotRunning || !tick || !tick.quote) return;
             
             const price = parseFloat(tick.quote);
             
-            // Digit extraction using auto-detected decimals
+            // Digit extraction using auto-detected decimals (preserves trailing zeros)
             updateTickFormatFromQuote(tick.quote);
             const digit = getLastDigitFromQuote(tick.quote);
             
@@ -3133,8 +2856,10 @@
                     tickData: tick
                 });
                 
+                // Log to console for debugging
                 console.log(`🎯 DIGIT 0 FOUND! Total: ${window.digitZeroTracker.count}, Price: ${price}`);
                 
+                // Also update a debug display if needed
                 if (window.digitZeroTracker.count % 10 === 0) {
                     log(`🔢 Digit 0 has appeared ${window.digitZeroTracker.count} times`, 'DEBUG');
                 }
@@ -3149,7 +2874,7 @@
             
             window.lastTick = tickData;
             
-            // Update UI
+            // Update UI - show the digit clearly
             document.getElementById('metricLiveTick').textContent = price.toFixed(3);
             document.getElementById('metricLastDigit').textContent = `Digit: ${digit}`;
             document.getElementById('metricLiveTick').classList.add('tick-flash');
@@ -3178,7 +2903,7 @@
             updateConnectionStatus();
         }
         
-        // API RESPONSE HANDLER
+        // API RESPONSE HANDLER - MODIFIED FOR ENGINE INTEGRATION
         function handleAPIResponse(data) {
             if (data.error) {
                 log(`API Error: ${data.error.message}`, 'ERROR');
@@ -3228,7 +2953,7 @@
             return true;
         }
         
-        // PROCESS TICK IMMEDIATELY
+        // PROCESS TICK IMMEDIATELY - CRITICAL TRADE EXECUTION FUNCTION
         function processTickImmediately(tick) {
             if (window.stopAfterWin) return;
             
@@ -3238,7 +2963,7 @@
                 return;
             }
             
-            // AI AUTO: lock the CURRENT prediction for trading when the bot is running
+            // AI AUTO: lock the CURRENT prediction for trading when the bot is running (once per START)
             if (sessionState.mode === 'ai' && window.isBotRunning && (!sessionState.sessionStarted || sessionState.sessionDigit === null)) {
                 const d = window.digitIntelligenceEngine.currentRecommendation.digit;
                 lockSessionDigit(d, true, 'AUTO start lock');
@@ -3255,18 +2980,23 @@
                 return;
             }
 
-            // EARLY-TRADE TAIL-RISK GATE
+
+            // 🧱 HARD TAIL-RISK GATE (s20 <= 5%)
             if (sessionState.mode === 'ai' && window.isBotRunning) {
                 const lockedDigit = (sessionState.sessionDigit !== null) ? sessionState.sessionDigit : parseInt(document.getElementById('predictedDigit').value);
-                
-                // Validate early-trade criteria
-                const engine = window.digitIntelligenceEngine;
-                const earlyTradeCheck = validateEarlyTrade(engine, lockedDigit);
-                
-                if (!earlyTradeCheck.valid) {
-                    log(`🧱 Early-trade gate: ${earlyTradeCheck.reason} — re-picking`, 'ENGINE');
-                    updateTradeStatus('NO TRADE', earlyTradeCheck.reason, 'Re-picking safer digit', 'loss');
-                    rotateHybridDigit('Early-trade gate');
+                const s = getSurvivalForDigit(lockedDigit);
+
+                if (!s || !Number.isFinite(Number(s.s20))) {
+                    log('🧱 Tail-risk gate: Survival data not ready — no trade', 'ENGINE');
+                    updateTradeStatus('NO TRADE', 'Survival warming up', 'Waiting for more ticks', 'loss');
+                    return;
+                }
+
+                const s20 = Number(s.s20);
+                if (s20 > 0.05) {
+                    log(`🧱 Tail-risk gate: s20 ${(s20 * 100).toFixed(1)}% > 5% — re-picking`, 'ENGINE');
+                    updateTradeStatus('NO TRADE', `Tail risk too high (s20 ${(s20 * 100).toFixed(1)}%)`, 'Re-picking safer digit', 'loss');
+                    rotateHybridDigit('Tail-risk gate');
                     return;
                 }
             }
@@ -3300,7 +3030,7 @@
             }
         }
         
-        // EXECUTE TRADE
+        // EXECUTE TRADE - CRITICAL FUNCTION
         function executeTrade(tick) {
             const contractType = document.getElementById('contractType').value;
             const symbol = document.getElementById('symbol').value;
@@ -3335,7 +3065,7 @@
             sendRequest(proposalRequest);
         }
         
-        // CHECK FOR IMMEDIATE WIN WITH EARLY-TRADE TRACKING
+        // CHECK FOR IMMEDIATE WIN - CRITICAL FUNCTION
         function checkForImmediateWin(tick) {
             if (!window.isBotRunning || window.stopAfterWin) return false;
             
@@ -3344,21 +3074,6 @@
             
             if (tickDigit === predictedDigit) {
                 log(`🎯 IMMEDIATE WIN! Digit ${tickDigit} matches ${predictedDigit}`, 'WIN');
-                
-                // Check if this was an early-trade win
-                const engine = window.digitIntelligenceEngine;
-                const s = engine.digitStats[predictedDigit];
-                const g = s.currentGap;
-                
-                const pm2 = pMatchWithin(s.gaps, g, 2);
-                const pm3 = pMatchWithin(s.gaps, g, 3);
-                
-                if (pm2 >= 0.2 || pm3 >= 0.3) {
-                    window.stats.earlyWins++;
-                    log(`🚀 Early-trade WIN! Digit resolved quickly (pm2: ${(pm2*100).toFixed(1)}%, pm3: ${(pm3*100).toFixed(1)}%)`, 'ENGINE');
-                } else {
-                    window.stats.lateWins++;
-                }
                 
                 window.lastTradeResult = 'win';
                 window.stopAfterWin = true;
@@ -3388,7 +3103,7 @@
             return false;
         }
         
-        // UPDATE STAKE
+        // UPDATE STAKE - CRITICAL FUNCTION
         function updateStake(winOrLoss) {
             window.baseStake = parseFloat(document.getElementById('baseStake').value) || 1.0;
             window.multiplier = parseFloat(document.getElementById('multiplier').value) || 1.15;
@@ -3462,7 +3177,7 @@
             stakeElem.className = winOrLoss === 'win' ? 'text-lg font-bold text-green-400' : 'text-lg font-bold text-white';
         }
         
-        // START BOT
+        // START BOT - CRITICAL FUNCTION
         function startBot() {
             if (window.isBotRunning) {
                 stopBot();
@@ -3500,18 +3215,16 @@
                 sessionState.sessionDigit = null;
                 updateSessionDisplay();
             }
-            
-            window.isBotRunning = true;
+window.isBotRunning = true;
             updateButtonState();
             
-            log('🚀 Starting bot with Early-Trade Detection...', 'SYSTEM');
+            log('🚀 Starting bot...', 'SYSTEM');
             log(`📊 Mode: ${sessionState.mode}`, 'SYSTEM');
             log(`📊 Max Trades: ${window.maxTrades}`, 'SYSTEM');
             log(`🧯 Max Cycle Trades: ${window.maxCycleTrades}`, 'SYSTEM');
             log(`🔑 Using token: ${token.substring(0, 10)}...`, 'SYSTEM');
             log(`🌐 Network auto-recovery: ${window.networkRecoveryEnabled ? 'ENABLED' : 'DISABLED'}`, 'SYSTEM');
             log(`🧠 Digit Intelligence Engine: ${window.digitIntelligenceEngine.enabled ? 'ENABLED' : 'DISABLED'}`, 'SYSTEM');
-            log(`🚀 Early-Trade Detection: ACTIVE`, 'SYSTEM');
             
             updateTradeStatus('STARTING', 'Initializing bot...', 'Connecting to market', 'normal');
             updateStake('initial');
@@ -3532,7 +3245,7 @@
             }, 3000);
         }
         
-        // STOP BOT
+        // STOP BOT - CRITICAL FUNCTION
         function stopBot() {
             if (!window.isBotRunning) return;
             
@@ -3574,13 +3287,6 @@
             const finalPnL = updatePnL();
             log(`💰 Final PnL: ${finalPnL >= 0 ? '+' : ''}$${finalPnL.toFixed(2)}`, 'PNL');
             
-            // Log early-trade statistics
-            if (window.stats.earlyWins > 0 || window.stats.lateWins > 0) {
-                const totalWins = window.stats.wins;
-                const earlyWinRate = totalWins > 0 ? (window.stats.earlyWins / totalWins * 100).toFixed(1) : 0;
-                log(`📊 Early-trade stats: ${window.stats.earlyWins} early wins (${earlyWinRate}%) out of ${totalWins} total wins`, 'STATS');
-            }
-            
             updateTradeStatus(
                 'STOPPED',
                 `Final PnL: ${finalPnL >= 0 ? '+' : ''}$${finalPnL.toFixed(2)}`,
@@ -3590,10 +3296,6 @@
             
             sessionState.sessionStarted = false;
             sessionDisplay.classList.add('hidden');
-            
-            // Hide early trade metrics
-            document.getElementById('early-trade-metrics-panel').classList.add('hidden');
-            document.getElementById('early-trade-indicator').classList.add('hidden');
         }
         
         function toggleBot() {
@@ -3683,9 +3385,7 @@
             if (type === 'CALCULATOR') color = 'text-purple-300 font-bold';
             if (type === 'NETWORK') color = 'text-yellow-300 font-bold';
             if (type === 'ENGINE') color = 'text-purple-300 font-bold';
-            if (type === 'ENGINE-DETAIL') color = 'text-cyan-300 font-bold';
             if (type === 'DEBUG') color = 'text-gray-400 font-bold';
-            if (type === 'STATS') color = 'text-pink-300 font-bold';
             
             logArea.innerHTML += `\n[${timestamp}] <span class="${color}">${message}</span>`;
             logArea.scrollTop = logArea.scrollHeight;
@@ -3707,18 +3407,9 @@
             try { updateEngineButton(); } catch(e) {}
             try { updateNetworkRecoveryButton(); } catch(e) {}
             try { updateSoundButton(); } catch(e) {}
-            
-            // Update early trade indicator
-            const earlyTradeIndicator = document.getElementById('earlyTradeIndicator');
-            if (earlyTradeIndicator) {
-                const isOn = !!window.isBotRunning;
-                earlyTradeIndicator.classList.toggle('on', isOn);
-                earlyTradeIndicator.classList.toggle('off', !isOn);
-                earlyTradeIndicator.title = isOn ? 'Early-Trade Detection is ON' : 'Early-Trade Detection is OFF';
-            }
         }
         
-        // QUEUE PROCESSOR
+        // QUEUE PROCESSOR - CRITICAL FOR TRADE EXECUTION
         function startQueueProcessor() {
             setInterval(() => {
                 if (!window.isBotRunning || window.stopAfterWin) return;
@@ -3878,7 +3569,7 @@
             document.getElementById('metricLiveTick').textContent = '---';
             document.getElementById('metricLastDigit').textContent = 'Digit: ?';
             
-            window.stats = { totalTicks: 0, tradesExecuted: 0, wins: 0, losses: 0, earlyWins: 0, lateWins: 0 };
+            window.stats = { totalTicks: 0, tradesExecuted: 0, wins: 0, losses: 0 };
             window.tickQueue = [];
             window.lastTick = null;
             window.lastTradeResult = null;
