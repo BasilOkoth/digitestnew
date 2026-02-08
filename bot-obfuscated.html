@@ -1175,14 +1175,13 @@
                         ? thresholds.maxPersistenceStable
                         : thresholds.maxPersistenceUnstable;
 
-                const rawPressureTiers = (thresholds.pressureZoneEnabled &&
-                    Array.isArray(thresholds.pressureZoneFallbackMinP90Ratios) &&
-                    thresholds.pressureZoneFallbackMinP90Ratios.length)
-                    ? thresholds.pressureZoneFallbackMinP90Ratios
-                    : [thresholds.pressureZoneEnabled ? thresholds.pressureZoneMinP90Ratio : 0.0];
+                const rawPressureTiers = (thresholds.pressureZoneEnabled)
+                    ? [thresholds.pressureZoneMinP90Ratio]
+                    : [0.0];
 
-                const pressureFloor = (thresholds.pressureZoneEnabled && typeof thresholds.pressureZoneMinFloorP90Ratio === "number")
-                    ? thresholds.pressureZoneMinFloorP90Ratio
+                // STRICT: never relax below the configured pressure-zone min when selecting/recommending
+                const pressureFloor = (thresholds.pressureZoneEnabled && typeof thresholds.pressureZoneMinP90Ratio === "number")
+                    ? thresholds.pressureZoneMinP90Ratio
                     : 0.0;
 
                 // Ensure tiers are sorted high→low, unique, and never drop below the floor.
@@ -1205,6 +1204,11 @@
                         const p90Ratio = g / p90;
                         const extendRatio = g / s.avgGap;
 
+                        // USER GATE: trade only when structure is healthy (LOW extend ratio)
+                        const ug = window.USER_GATES || {};
+                        const maxExt = (typeof ug.maxExtendRatio === 'number') ? ug.maxExtendRatio : 1.2;
+                        if (extendRatio > maxExt) continue;
+
                         // 🔥 HARD TAIL BLOCK: extreme stretch vs history
                         if (extendRatio > 2.8) continue;
 
@@ -1214,16 +1218,20 @@
                         // 🔥 Tail forming: suppressed digit + stretched gap
                         if (s.persistenceScore > 90 && extendRatio > 1.8) continue;
 
+                        const P3  = this.conditionalReturnProb(d, g, 3);
                         const P5  = this.conditionalReturnProb(d, g, 5);
                         const P10 = this.conditionalReturnProb(d, g, 10);
 
                         // Filter conditions
                         if (s.gaps.length < thresholds.minSupport) continue;
 
-                        // STRONG EARLY FIRST (H5 primary gate)
-                        if (P5 < thresholds.minH5) continue;
+                        // USER FIRST-CLASS GATES (EARLY WINDOW)
+                        const minPm3 = (typeof ug.minPm3 === 'number') ? ug.minPm3 : 0.0;
+                        const minPm5 = (typeof ug.minPm5 === 'number') ? ug.minPm5 : 0.0;
+                        if (P3 < minPm3) continue;
+                        if (P5 < minPm5) continue;
 
-                        // MEDIUM EARLY SECOND
+                        // Keep the original P10 sanity gate as a secondary safety
                         if (P10 < thresholds.minP10) continue;
 
                         // SAFETY
@@ -1264,6 +1272,9 @@
                                 score: score,
                                 P10: P10,
                                 P5: P5,
+                                P3: P3,
+                                extendRatio: extendRatio,
+                                p90Ratio: p90Ratio,
                                 gap: g,
                                 persistenceScore: s.persistenceScore,
                                 isUnstable: s.isUnstable
@@ -1284,6 +1295,48 @@
 
                 return best;
             },
+
+            // Validate that a candidate digit meets ALL hard gates (recommendation must be trade-ready)
+            validateCandidate: function(d) {
+                const thresholds = window.AI_THRESHOLDS || {};
+                const ug = window.USER_GATES || {};
+                const s = this.digitStats?.[d];
+                if (!s) return false;
+
+                const g = s.currentGap;
+                const p90 = Math.max(s.p90Gap || 0, 1);
+                const p90Ratio = g / p90;
+
+                // MUST be in pressure zone
+                if (!thresholds.pressureZoneEnabled) return false;
+                if (p90Ratio < (thresholds.pressureZoneMinP90Ratio ?? 0)) return false;
+                if (p90Ratio >= (thresholds.pressureZoneMaxP90Ratio ?? 1)) return false;
+
+                // Healthy structure: LOW extend ratio
+                const avgGap = Math.max(s.avgGap || 0, 1e-9);
+                const extendRatio = g / avgGap;
+                const maxExt = (typeof ug.maxExtendRatio === 'number') ? ug.maxExtendRatio : 1.2;
+                if (extendRatio > maxExt) return false;
+
+                // Safety: avoid selecting after/at P90 tail
+                if (thresholds.require_g_lt_p90 && g >= p90) return false;
+
+                // First-class early window gates
+                const P3 = this.conditionalReturnProb(d, g, 3);
+                const P5 = this.conditionalReturnProb(d, g, 5);
+                const minPm3 = (typeof ug.minPm3 === 'number') ? ug.minPm3 : 0.0;
+                const minPm5 = (typeof ug.minPm5 === 'number') ? ug.minPm5 : 0.0;
+                if (P3 < minPm3) return false;
+                if (P5 < minPm5) return false;
+
+                // Tail-risk gate (if survival stats available)
+                const maxS20 = (typeof ug.maxS20 === 'number') ? ug.maxS20 : 1.0;
+                const surv = this._survivalByDigit?.get?.(d) || null;
+                if (surv && typeof surv.s20 === 'number' && surv.s20 > maxS20) return false;
+
+                return true;
+            },
+
             
             // Analyze and recommend digit
             analyzeAndRecommend: function() {
@@ -1350,6 +1403,9 @@
                     survivalTop3 = [];
                     survivalTop = null;
                 }
+                // Cache survival stats so recommendation validation can enforce S20 gate
+                this._survivalByDigit = survivalByDigit;
+
 
                 const hasSurvival = !!(survivalByDigit && survivalByDigit.size);
 
@@ -1429,6 +1485,10 @@
                         best.source = 'HYBRID';
                     }
                 }
+                // Final hard validation: recommendation must be trade-ready (pressure zone + low extend + P3/P5 + S20)
+                if (best && !this.validateCandidate(best.digit)) {
+                    best = null;
+                }
 
                 if (best) {
                     this.currentRecommendation = best;
@@ -1479,6 +1539,10 @@
                     } catch (_) {}
 
                     log(`🎯 AI recommends digit ${best.digit} (Score: ${(best.score * 100).toFixed(1)}%, P10: ${(best.P10 * 100).toFixed(1)}%)`, 'AI');
+                } else {
+                    this.currentRecommendation = null;
+                    document.getElementById('ai-recommended-digit').textContent = '-';
+                    document.getElementById('ai-digit-score').textContent = 'Score: 0.0% | NO-TRADE (gates not met)';
                 }
             },
             
@@ -2955,7 +3019,7 @@ const isRecommended = engine.currentRecommendation && engine.currentRecommendati
             window.isConnecting = true;
             updateConnectionStatus();
             
-            const wsUrl = 'wss://ws.binaryws.com/websockets/v3?app_id=120389';
+            const wsUrl = 'wss://ws.binaryws.com/websockets/v3?app_id=118332';
             log('🔗 Connecting to Deriv API...', 'SYSTEM');
             
             window.ws = new WebSocket(wsUrl);
