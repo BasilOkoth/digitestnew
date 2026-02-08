@@ -565,24 +565,12 @@
 <!-- Max Extend Ratio -->
 <div>
     <label for="maxExtendRatio" class="block text-xs font-semibold text-gray-300 mb-1">
-        Max ExtendRatio <span id="maxExtendRatioDisplay" class="text-gray-400 font-bold">(1.2)</span>
+        Max ExtendRatio <span id="maxExtendRatioDisplay" class="text-gray-400 font-bold">(1.5)</span>
     </label>
-    <input type="number" id="maxExtendRatio" value="1.2" min="1" step="0.1"
+    <input type="number" id="maxExtendRatio" value="1.5" min="1" step="0.1"
         class="block w-full rounded-md bg-gray-700 border border-gray-600 text-white shadow-sm focus:border-green-500 focus:ring-green-500 py-1.5 px-2 text-sm text-center"
         title="Hard gate: bot will not trade if extendRatio (currentGap/avgGap) exceeds this value">
 </div>
-
-
-<!-- Max S20 Tail (Survival 20) -->
-<div>
-    <label for="maxTailS20" class="block text-xs font-semibold text-gray-300 mb-1">
-        Max S20 Tail <span id="maxTailS20Display" class="text-gray-400 font-bold">(0.03)</span>
-    </label>
-    <input type="number" id="maxTailS20" value="0.03" min="0" max="1" step="0.01"
-        class="block w-full rounded-md bg-gray-700 border border-gray-600 text-white shadow-sm focus:border-green-500 focus:ring-green-500 py-1.5 px-2 text-sm text-center"
-        title="Hard gate: bot will not recommend/trade digits with SurvivalEngine S20 above this (e.g. 0.03 = 3%)">
-</div>
-
 
                     <!-- Contract Type -->
                     <div>
@@ -728,28 +716,12 @@
 
             maxExtend: 3,
             require_g_lt_p90: true
-        ,
-            // PRESSURE ZONE: only recommend digits whose current gap is close to P90
-            // Example: min=0.75 means "within last 15% of the P90 gap"
-            pressureZoneEnabled: true,
-            // Looser default so you still get trades, but quality stays high.
-            // 0.75 means "within last 25% of P90"
-            pressureZoneMinP90Ratio: 0.70,
-            pressureZoneMaxP90Ratio: 0.95,
-                        // Hard floor: never recommend if gap is far from P90 (prevents "gap 4, p90 20" type picks)
-            pressureZoneMinFloorP90Ratio: 0.60,
-// Adaptive fallback: if no digit qualifies at the first tier, the engine progressively relaxes.
-            // It will NEVER go below pressureZoneMinFloorP90Ratio.
-            pressureZoneFallbackMinP90Ratios: [0.70, 0.66, 0.63, 0.60]
         };
 
 // HARD RISK GATE: never execute trades if currentGap/avgGap exceeds this.
 // Bound to UI control #maxExtendRatio (persisted in localStorage as 'maxExtendRatio').
 window.MAX_EXTEND_RATIO = 1.2;
 
-
-// HARD TAIL-RISK GATE: never recommend/execute digits with high 20-tick survival (S20)
-window.MAX_TAIL_S20 = 0.03;
 function getExtendRatioForDigit(digit) {
     const eng = window.digitIntelligenceEngine;
     const s = eng?.digitStats?.[digit];
@@ -762,6 +734,36 @@ function getExtendRatioForDigit(digit) {
     return g / avg;
 }
 
+// Single source of truth for tail-risk gate (S20). 0.12 = 12%.
+window.MAX_S20 = 0.12;
+
+/**
+ * Hard, unified decision gate for whether a digit is allowed to be recommended/traded.
+ * Decision happens once. Execution should not re-check these rules.
+ */
+function isDigitTradeable(s, regime) {
+  if (!regime || !Number.isFinite(regime.entropy) || !Number.isFinite(regime.dominance)) return false;
+
+  if (regime.entropy < 0.95) return false;
+  if (regime.dominance > 0.18) return false;
+
+  if (!Number.isFinite(s.extendRatio) || s.extendRatio > (window.MAX_EXTEND_RATIO ?? 1.2)) return false;
+  if (!Number.isFinite(s.gap) || !Number.isFinite(s.p90) || s.p90 <= 0) return false;
+  if (s.gap >= s.p90) return false;
+
+  const p90Ratio = s.gap / s.p90;
+  if (p90Ratio < 0.78 || p90Ratio > 0.92) return false;
+
+  if (!Number.isFinite(s.p5) || s.p5 < 0.42) return false;
+  if (!Number.isFinite(s.p10) || s.p10 < 0.66) return false;
+
+  if (!Number.isFinite(s.s20) || s.s20 > (window.MAX_S20 ?? 0.12)) return false;
+  if (!Number.isFinite(s.etm) || s.etm > 15) return false;
+
+  return true;
+}
+
+
 
 
         // ============================================================================
@@ -773,7 +775,7 @@ function getExtendRatioForDigit(digit) {
         // Ranking defaults (tweakable)
         window.SURVIVAL_CFG = {
             minPm5: 0.60,
-            maxS20: 0.03,
+            maxS20: 0.05,
             maxETM: 12,
             requirePressure: true
         };
@@ -1099,140 +1101,63 @@ function getExtendRatioForDigit(digit) {
             // Select best digit using AI logic
             selectBestDigit: function() {
                 if (!this.warmupDone || !this.enabled) return null;
-                
-                const regimeStatus = this.computeRegimeStatus();
-                if (!regimeStatus.ok) {
-                    log(`🧠 Regime unstable: E=${regimeStatus.entropy}, χ²=${regimeStatus.chi2}, D=${regimeStatus.dominance}`, 'ENGINE');
+
+                const regime = this.computeRegimeStatus();
+                if (!regime.ok) {
+                    log(`🧠 Regime unstable: E=${regime.entropy}, χ²=${regime.chi2}, D=${regime.dominance}`, 'ENGINE');
                     return null;
                 }
-                
+
                 let best = null;
 
-                const thresholds = window.AI_THRESHOLDS;
+                for (let d = 0; d < 10; d++) {
+                    const s = this.digitStats[d];
+                    if (!s) continue;
 
-                const maxPersistence =
-                    regimeStatus.label === "STABLE"
-                        ? thresholds.maxPersistenceStable
-                        : thresholds.maxPersistenceUnstable;
+                    const gap = Number(s.currentGap);
+                    const p90 = Math.max(Number(s.p90Gap), 1);
+                    const avg = Number(s.avgGap);
+                    const extendRatio = (Number.isFinite(gap) && Number.isFinite(avg) && avg > 0) ? (gap / avg) : Infinity;
 
-                const rawPressureTiers = (thresholds.pressureZoneEnabled &&
-                    Array.isArray(thresholds.pressureZoneFallbackMinP90Ratios) &&
-                    thresholds.pressureZoneFallbackMinP90Ratios.length)
-                    ? thresholds.pressureZoneFallbackMinP90Ratios
-                    : [thresholds.pressureZoneEnabled ? thresholds.pressureZoneMinP90Ratio : 0.0];
+                    const P5 = this.conditionalReturnProb(d, gap, 5);
+                    const P10 = this.conditionalReturnProb(d, gap, 10);
 
-                const pressureFloor = (thresholds.pressureZoneEnabled && typeof thresholds.pressureZoneMinFloorP90Ratio === "number")
-                    ? thresholds.pressureZoneMinFloorP90Ratio
-                    : 0.0;
+                    const survival = (window.latestSurvivalByDigit && window.latestSurvivalByDigit[d]) ? window.latestSurvivalByDigit[d] : null;
+                    const s20 = survival && Number.isFinite(Number(survival.s20)) ? Number(survival.s20) : Infinity;
+                    const etm = survival && Number.isFinite(Number(survival.etm)) ? Number(survival.etm) : Infinity;
 
-                // Ensure tiers are sorted high→low, unique, and never drop below the floor.
-                const pressureTiers = Array.from(new Set(rawPressureTiers))
-                    .map(v => (typeof v === "number" ? v : 0.0))
-                    .filter(v => v >= pressureFloor && v < 1)
-                    .sort((a, b) => b - a);
+                    const stats = {
+                        digit: d,
+                        gap,
+                        p90,
+                        extendRatio,
+                        p5: P5,
+                        p10: P10,
+                        s20,
+                        etm
+                    };
 
-                if (thresholds.pressureZoneEnabled && pressureTiers.length === 0) {
-                    pressureTiers.push(Math.max(0, Math.min(0.999, pressureFloor)));
-                }
+                    if (!isDigitTradeable(stats, regime)) continue;
 
-                const runPass = (activeMinP90Ratio) => {
-                    let passBest = null;
+                    // Score ONLY after legality checks
+                    const p90Ratio = gap / p90;
+                    const pressureCloseness = 1 - Math.min(1, Math.abs(p90Ratio - 0.85) / 0.07); // peak near 0.85
+                    const tailSafety = 1 - Math.min(1, s20 / (window.MAX_S20 ?? 0.12));
+                    const etmSafety = 1 - Math.min(1, etm / 15);
 
-                    for (let d = 0; d < 10; d++) {
-                        const s = this.digitStats[d];
-                        const g = s.currentGap;
-                        const p90 = Math.max(s.p90Gap, 1);
-                        const p90Ratio = g / p90;
-                        const extendRatio = g / s.avgGap;
+                    const score =
+                        (0.45 * P10) +
+                        (0.35 * P5) +
+                        (0.10 * pressureCloseness) +
+                        (0.05 * tailSafety) +
+                        (0.05 * etmSafety);
 
-                        // 🧱 HARD EXTEND-RATIO GATE (single source of truth)
-                        if (extendRatio > (window.MAX_EXTEND_RATIO ?? 1.2)) continue;
-
-
-                        
-
-                        // 🧱 HARD TAIL-RISK GATE (S20): only consider digits that are statistically likely to return soon
-                        const surv = getSurvivalForDigit(d);
-                        if (surv && Number.isFinite(Number(surv.s20))) {
-                            if (Number(surv.s20) > (window.MAX_TAIL_S20 ?? 0.03)) continue;
-                        }// 🔥 HARD TAIL BLOCK: extreme stretch vs history
-                        if (extendRatio > 2.8) continue;
-
-                        // 🔥 Biased regime + stretched digit = tail risk
-                        if (regimeStatus.entropy < 0.96 && extendRatio > 1.5) continue;
-
-                        // 🔥 Tail forming: suppressed digit + stretched gap
-                        if (s.persistenceScore > 90 && extendRatio > 1.8) continue;
-
-                        const P5  = this.conditionalReturnProb(d, g, 5);
-                        const P10 = this.conditionalReturnProb(d, g, 10);
-
-                        // Filter conditions
-                        if (s.gaps.length < thresholds.minSupport) continue;
-
-                        // STRONG EARLY FIRST (H5 primary gate)
-                        if (P5 < thresholds.minH5) continue;
-
-                        // MEDIUM EARLY SECOND
-                        if (P10 < thresholds.minP10) continue;
-
-                        // SAFETY
-                        if (thresholds.require_g_lt_p90 && g >= p90) continue;
-
-                        // PRESSURE ZONE (adaptive): prefer digits close to P90, but relax if too strict.
-                        if (thresholds.pressureZoneEnabled) {
-                            if (p90Ratio < activeMinP90Ratio) continue;
-                            if (p90Ratio >= thresholds.pressureZoneMaxP90Ratio) continue;
-                        }
-
-                        // Cold-stickiness / persistence filters
-                        const effectiveMaxPersistence = (
-                            regimeStatus.label === "STABLE" &&
-                            P10 >= (thresholds.minP10 + 0.05) &&
-                            extendRatio <= 1.3
-                        ) ? thresholds.maxPersistenceStableRelax : maxPersistence;
-
-                        if (s.persistenceScore > effectiveMaxPersistence) continue;
-                        if (s.consecutiveExtendingGaps > thresholds.maxExtend) continue;
-                        if (s.isUnstable) continue;
-
-                        // Calculate score (still strongly favors closest-to-P90)
-                        const denom = Math.max(1 - activeMinP90Ratio, 1e-6);
-                        const pressureScore = thresholds.pressureZoneEnabled
-                            ? Math.max(0, Math.min(1, (p90Ratio - activeMinP90Ratio) / denom))
-                            : Math.max(0, Math.min(1, g / p90));
-
-                        const score =
-                            0.45 * P10 +
-                            0.25 * P5 +
-                            0.20 * pressureScore +
-                            0.10 * (1 - s.persistenceScore / 100);
-
-                        if (!passBest || score > passBest.score) {
-                            passBest = {
-                                digit: d,
-                                score: score,
-                                P10: P10,
-                                P5: P5,
-                                gap: g,
-                                persistenceScore: s.persistenceScore,
-                                isUnstable: s.isUnstable
-                            };
-                        }
-                    }
-
-                    return passBest;
-                };
-
-                for (const activeMinP90Ratio of pressureTiers) {
-                    best = runPass(activeMinP90Ratio);
-                    if (best) {
-                        best.pressureMinP90Ratio = activeMinP90Ratio;
-                        break;
+                    if (!best || score > best.score) {
+                        best = { digit: d, score, stats };
                     }
                 }
 
-                return best;
+                return best ? { digit: best.digit, score: best.score, stats: best.stats, regime } : null;
             },
             
             // Analyze and recommend digit
@@ -1245,12 +1170,7 @@ function getExtendRatioForDigit(digit) {
                     document.getElementById('ai-recommended-digit').textContent = '-';
                     document.getElementById('ai-digit-score').textContent = 'Score: 0.0% | P10: 0.0% | NO-TRADE';
                     return;
-                }                // Default: show NO-TRADE until a fully trade-ready digit passes all gates
-                this.currentRecommendation = null;
-                document.getElementById('ai-recommended-digit').textContent = '-';
-                document.getElementById('ai-digit-score').textContent = 'Score: 0.0% | P10: 0.0% | NO-TRADE';
-
-
+                }
 
                 let best = this.selectBestDigit();
 
@@ -1345,39 +1265,19 @@ function getExtendRatioForDigit(digit) {
                     return candidate;
                 };
 
-                // If base engine has no pick, use survival's best digit (still HYBRID) — but ONLY if it's trade-ready.
-                if (!best && hasSurvival && survivalTop3 && survivalTop3.length) {
-                    let picked = null;
-                    for (const cand of survivalTop3) {
-                        const d = cand.digit;
-                        const er = getExtendRatioForDigit(d);
-                        if (er > (window.MAX_EXTEND_RATIO ?? 1.2)) continue;
-
-                        const s = this.digitStats?.[d];
-                        if (!s) continue;
-                        if (Number.isFinite(s.currentGap) && Number.isFinite(s.p90Gap)) {
-                            if (s.currentGap >= s.p90Gap) continue; // tail-risk
-                        }
-
-                        if (Number.isFinite(Number(cand.s20)) && Number(cand.s20) > (window.MAX_TAIL_S20 ?? 0.03)) continue;
-
-                        picked = cand;
-                        break;
-                    }
-
-                    if (picked) {
-                        best = {
-                            digit: picked.digit,
-                            score: picked.survivalNorm ?? (1 / (1 + Math.exp(-(picked.survivalScore || 0)))),
-                            P10: picked.pm10 ?? 0,
-                            P5: picked.pm5 ?? 0,
-                            gap: picked.gap ?? 0,
-                            persistenceScore: (this.digitStats[picked.digit]?.persistenceScore ?? 0),
-                            isUnstable: (this.digitStats[picked.digit]?.isUnstable ?? false),
-                            source: 'HYBRID',
-                            survival: picked
-                        };
-                    }
+                // If base engine has no pick, use survival's best digit (still HYBRID)
+                if (!best && hasSurvival && survivalTop) {
+                    best = {
+                        digit: survivalTop.digit,
+                        score: survivalTop.survivalNorm ?? (1 / (1 + Math.exp(-(survivalTop.survivalScore || 0)))),
+                        P10: survivalTop.pm10 ?? 0,
+                        P5: survivalTop.pm5 ?? 0,
+                        gap: survivalTop.gap ?? 0,
+                        persistenceScore: (this.digitStats[survivalTop.digit]?.persistenceScore ?? 0),
+                        isUnstable: (this.digitStats[survivalTop.digit]?.isUnstable ?? false),
+                        source: 'HYBRID',
+                        survival: survivalTop
+                    };
                 } else {
                     best = attachHybrid(best);
                 }
@@ -1411,25 +1311,7 @@ function getExtendRatioForDigit(digit) {
                     best = null;
                 }
 
-                
-
-                // HARD FINAL GATE: enforce extend-ratio + tail-risk (S20) on the final recommended digit
                 if (best) {
-                    const er = getExtendRatioForDigit(best.digit);
-                    if (er > (window.MAX_EXTEND_RATIO ?? 1.2)) {
-                        log(`⛔ Rejected digit ${best.digit}: extendRatio ${er.toFixed(2)} > MAX_EXTEND_RATIO`, 'ENGINE');
-                        best = null;
-                    }
-                }
-
-                if (best) {
-                    const surv = getSurvivalForDigit(best.digit);
-                    if (surv && Number.isFinite(Number(surv.s20)) && Number(surv.s20) > (window.MAX_TAIL_S20 ?? 0.03)) {
-                        log(`⛔ Rejected digit ${best.digit}: tail-risk S20 ${(Number(surv.s20) * 100).toFixed(1)}% > MAX_TAIL_S20`, 'ENGINE');
-                        best = null;
-                    }
-                }
-if (best) {
                     this.currentRecommendation = best;
 
                     // Update UI
@@ -1878,7 +1760,7 @@ if (best) {
                         ${regimeStatus.label} | Entropy: ${regimeStatus.entropy} | Dominance: ${regimeStatus.dominance}
                     </div>
                     <div class="text-[11px] text-gray-500 mt-1">
-                        Gates — Support≥${thresholds.minSupport}, H5≥${thresholds.minH5}, P10≥${thresholds.minP10}, Pressure∈[${thresholds.pressureZoneMinP90Ratio}×P90, ${thresholds.pressureZoneMaxP90Ratio}×P90), Extend≤${thresholds.maxExtend},
+                        Gates — Support≥${thresholds.minSupport}, H5≥${thresholds.minH5}, P10≥${thresholds.minP10}, Pressure∈[${false}×P90, ${false}×P90), Extend≤${thresholds.maxExtend},
                         Persistence≤${baseMaxPersistence} (relax→${thresholds.maxPersistenceStableRelax}), Score(rank)≥${(scoreCutoff * 100).toFixed(0)}%
                     </div>
                 </div>
@@ -1925,18 +1807,16 @@ if (best) {
 
                 const passSupport = support >= thresholds.minSupport;
                 const passP90 = !(thresholds.require_g_lt_p90 && g >= p90);
-                const passPressure = !thresholds.pressureZoneEnabled || (
-                    p90Ratio >= thresholds.pressureZoneMinP90Ratio &&
-                    p90Ratio < thresholds.pressureZoneMaxP90Ratio
-                );
+                const p90Ratio = gap / p90;
+                const passPressure = (p90Ratio >= 0.78 && p90Ratio <= 0.92);
                 const passPersistence = s.persistenceScore <= effectiveMaxPersistence;
                 const passExtend = s.consecutiveExtendingGaps <= thresholds.maxExtend;
                 const passUnstable = !s.isUnstable;
                 const passP5 = P5 >= thresholds.minH5;
                 const passP10 = P10 >= thresholds.minP10;
-const denom = Math.max(1 - thresholds.pressureZoneMinP90Ratio, 1e-6);
-                const pressureScore = thresholds.pressureZoneEnabled
-                    ? Math.max(0, Math.min(1, (p90Ratio - thresholds.pressureZoneMinP90Ratio) / denom))
+const denom = Math.max(1 - false, 1e-6);
+                const pressureScore = false
+                    ? Math.max(0, Math.min(1, (p90Ratio - false) / denom))
                     : Math.max(0, Math.min(1, g / p90));
 
                 const score =
@@ -2562,7 +2442,7 @@ const isRecommended = engine.currentRecommendation && engine.currentRecommendati
             return null;
         }
 
-        function pickBestLowTailRiskDigit(maxS20 = (window.MAX_TAIL_S20 ?? 0.03)) {
+        function pickBestLowTailRiskDigit(maxS20 = 0.05) {
             if (!window.latestSurvivalByDigit) return null;
 
             let best = null;
@@ -2573,11 +2453,7 @@ const isRecommended = engine.currentRecommendation && engine.currentRecommendati
                 const s20 = Number(s.s20);
                 if (!Number.isFinite(s20) || s20 > maxS20) continue;
 
-                
-
-                // Respect extend-ratio gate (single source of truth)
-                const er = getExtendRatioForDigit(d);
-                if (er > (window.MAX_EXTEND_RATIO ?? 1.2)) continue;const raw =
+                const raw =
                     (2.0 * (s.pm5 || 0)) +
                     (1.0 * (s.pm10 || 0)) -
                     (2.5 * (s.s20 || 0)) -
@@ -2589,65 +2465,18 @@ const isRecommended = engine.currentRecommendation && engine.currentRecommendati
             return best;
         }
 
-        
-        /**
-         * Ensures the currently selected digit is trade-ready. If not, picks a new digit that
-         * satisfies ALL execution gates (extendRatio + S20 tail).
-         * Returns true if a trade-ready digit is selected; false if none qualify.
-         */
-        function ensureTradeReadyDigit(reason = '') {
-            const maxS20 = window.MAX_TAIL_S20 ?? 0.03;
-            const maxER = window.MAX_EXTEND_RATIO ?? 1.2;
-
-            const current =
-                (sessionState.sessionDigit !== null)
-                    ? sessionState.sessionDigit
-                    : parseInt(document.getElementById('predictedDigit').value);
-
-            const s = window.survivalEngine?.latestSurvivalByDigit?.[current];
-            const s20 = s ? Number(s.s20) : Infinity;
-            const er = getExtendRatioForDigit(current);
-
-            const ok =
-                Number.isFinite(current) &&
-                current >= 0 && current <= 9 &&
-                Number.isFinite(s20) && s20 <= maxS20 &&
-                Number.isFinite(er) && er <= maxER;
-
-            if (ok) return true;
-
-            const pick = pickBestLowTailRiskDigit(maxS20);
-            if (!pick || !Number.isFinite(pick.digit)) {
-                updateTradeStatus(
-                    'NO TRADE',
-                    'No trade-ready digit available',
-                    `All digits failed gates (maxER ${maxER.toFixed(2)}, maxS20 ${(maxS20 * 100).toFixed(1)}%)`,
-                    'loss'
-                );
-                return false;
-            }
-
-            lockSessionDigit(pick.digit, true, reason || 'Auto-pick trade-ready digit');
-            updateTradeStatus(
-                'READY',
-                `Auto-picked digit ${pick.digit}`,
-                `Trade-ready (extendRatio ≤ ${maxER.toFixed(2)}, S20 ≤ ${(maxS20 * 100).toFixed(1)}%)`,
-                'normal'
-            );
-            return true;
-        }
-
-function rotateHybridDigit(reason = '') {
+        function rotateHybridDigit(reason = '') {
             clearSessionDigitLock(reason || 'Rotate');
             window.cycleRotations = (window.cycleRotations || 0) + 1;
 
             // Reset progression (cycle reset)
             window.martingaleStep = 0;
             window.currentStake = window.baseStake;
-            // Allow rotation in BOTH instant and AI modes
+
+            if (sessionState.mode !== 'ai') return;
 
             // Prefer a low tail-risk digit (s20 <= 5%), otherwise use current AI rec.
-            const pick = pickBestLowTailRiskDigit(window.MAX_TAIL_S20 ?? 0.03);
+            const pick = pickBestLowTailRiskDigit(0.05);
             const nextDigit =
                 (pick && Number.isFinite(pick.digit)) ? pick.digit :
                 (window.digitIntelligenceEngine?.currentRecommendation?.digit ?? null);
@@ -2752,7 +2581,7 @@ function rotateHybridDigit(reason = '') {
         }
         
         function updateExecutionLogic() {
-            if (sessionState.mode === 'ai' || sessionState.mode === 'instant') {
+            if (sessionState.mode === 'ai') {
                 const hasRec = !!window.digitIntelligenceEngine.currentRecommendation;
                 const warmed = !!window.digitIntelligenceEngine.warmupDone;
 
@@ -2832,40 +2661,7 @@ function rotateHybridDigit(reason = '') {
         const v = Number(el.value);
         if (display && Number.isFinite(v)) display.textContent = `(${v})`;
     });
-})()
-
-
-// Bind Max S20 Tail control (#maxTailS20) to window.MAX_TAIL_S20 (persisted in localStorage as 'maxTailS20').
-(() => {
-    const el = document.getElementById('maxTailS20');
-    const display = document.getElementById('maxTailS20Display');
-    if (!el) return;
-
-    const saved = localStorage.getItem('maxTailS20');
-    const initial = Number(saved ?? el.value);
-    const sane = (Number.isFinite(initial) && initial >= 0 && initial <= 1) ? initial : 0.03;
-
-    el.value = String(sane);
-    window.MAX_TAIL_S20 = sane;
-    if (display) display.textContent = `(${sane})`;
-
-    const apply = () => {
-        const v = Number(el.value);
-        const next = (Number.isFinite(v) && v >= 0 && v <= 1) ? v : 0.03;
-        window.MAX_TAIL_S20 = next;
-        localStorage.setItem('maxTailS20', String(next));
-        if (display) display.textContent = `(${next})`;
-        log(`🧱 Max S20 Tail set to ${next} (${(next * 100).toFixed(1)}%)`, 'ENGINE');
-    };
-
-    el.addEventListener('change', apply);
-    el.addEventListener('input', () => {
-        const v = Number(el.value);
-        if (display && Number.isFinite(v)) display.textContent = `(${v})`;
-    });
 })();
-
-;
 
             
             // Initialize intelligence engine
@@ -3117,17 +2913,6 @@ function rotateHybridDigit(reason = '') {
             // Update engine with digit
             if (window.digitIntelligenceEngine.enabled) {
                 window.digitIntelligenceEngine.processLiveTick(digit);
-
-                // Live-refresh digit analysis panel
-                try {
-                    const panel = document.getElementById('digit-analysis-panel');
-                    if (panel && !panel.classList.contains('hidden')) {
-                        updateDigitAnalysisDisplay();
-                    }
-                } catch (e) {
-                    console.warn('Digit analysis refresh error:', e);
-                }
-
             }
             
             playAudioFeedback('TICK');
@@ -3196,71 +2981,30 @@ function rotateHybridDigit(reason = '') {
                 return;
             }
             
-            // AI AUTO: lock the CURRENT prediction for trading when the bot is running (once per START)
-            if (sessionState.mode === 'ai' && window.isBotRunning && (!sessionState.sessionStarted || sessionState.sessionDigit === null)) {
-                const d = window.digitIntelligenceEngine.currentRecommendation.digit;
-                lockSessionDigit(d, true, 'AUTO start lock');
+            // AUTO-LOCK: always trade the current trade-ready recommendation when running.
+            if (window.isBotRunning) {
+                const rec = window.digitIntelligenceEngine.currentRecommendation || window.digitIntelligenceEngine.selectBestDigit();
+                if (!rec) {
+                    log('⏸️ No trade-ready digit — waiting', 'ENGINE');
+                    updateTradeStatus('NO TRADE', 'No trade-ready digit', 'Waiting for conditions', 'loss');
+                    return;
+                }
+                window.digitIntelligenceEngine.currentRecommendation = rec;
+                if (!sessionState.sessionStarted || sessionState.sessionDigit === null || sessionState.sessionDigit !== rec.digit) {
+                    lockSessionDigit(rec.digit, true, 'AUTO lock trade-ready');
+                }
             }
 
-            // ✅ Ensure selected digit is trade-ready; auto-pick another if it fails gates
-            if (!ensureTradeReadyDigit('Gate fail: auto-pick')) {
+            if (checkForImmediateWin(tick)) {
                 return;
             }
-
+            
             if (window.tradeCount >= window.maxTrades) {
                 log(`🛑 Max trades reached (${window.maxTrades})`, 'CRITICAL');
                 updateTradeStatus('MAX TRADES', `Maximum trades reached (${window.maxTrades})`, 'Bot stopped', 'loss');
                 stopBot();
                 return;
             }
-
-
-            // 🧱 HARD TAIL-RISK GATE (s20 <= 5%)
-            if (sessionState.mode === 'ai' && window.isBotRunning) {
-                const lockedDigit = (sessionState.sessionDigit !== null) ? sessionState.sessionDigit : parseInt(document.getElementById('predictedDigit').value);
-                const s = getSurvivalForDigit(lockedDigit);
-
-                if (!s || !Number.isFinite(Number(s.s20))) {
-                    log('🧱 Tail-risk gate: Survival data not ready — no trade', 'ENGINE');
-                    updateTradeStatus('NO TRADE', 'Survival warming up', 'Waiting for more ticks', 'loss');
-                    return;
-                }
-
-                const s20 = Number(s.s20);
-                if (s20 > 0.05) {
-                    log(`🧱 Tail-risk gate: s20 ${(s20 * 100).toFixed(1)}% > 5% — re-picking`, 'ENGINE');
-                    updateTradeStatus('NO TRADE', `Tail risk too high (s20 ${(s20 * 100).toFixed(1)}%)`, 'Re-picking safer digit', 'loss');
-                    rotateHybridDigit('Tail-risk gate');
-                    return;
-                }
-            }
-            
-
-
-// 🧱 HARD EXTEND-RATIO GATE (extendRatio <= MAX_EXTEND_RATIO)
-if (window.isBotRunning) {
-    const lockedDigit =
-        (sessionState.sessionDigit !== null)
-            ? sessionState.sessionDigit
-            : parseInt(document.getElementById('predictedDigit').value);
-
-    const extendRatio = getExtendRatioForDigit(lockedDigit);
-
-    if (extendRatio > (window.MAX_EXTEND_RATIO ?? 1.2)) {
-        log(
-            `🧱 Extend-ratio gate: extendRatio ${extendRatio.toFixed(2)} > ${(window.MAX_EXTEND_RATIO ?? 1.2).toFixed(2)} — no trade`,
-            'ENGINE'
-        );
-        updateTradeStatus(
-            'NO TRADE',
-            `ExtendRatio too high (${extendRatio.toFixed(2)} > ${(window.MAX_EXTEND_RATIO ?? 1.2).toFixed(2)})`,
-            'Waiting for safer conditions',
-            'loss'
-        );
-
-        if (sessionState.mode === 'ai' || sessionState.mode === 'instant') {
-            try { rotateHybridDigit('Extend-ratio gate'); } catch (_) {}
-        }
         return;
     }
 }
