@@ -664,10 +664,16 @@
         </div>
         
         <!-- START/STOP BUTTON -->
-        <div class="flex justify-center mb-5">
+        <div class="flex flex-col md:flex-row justify-center mb-5 gap-3">
             <button id="toggleButton" onclick="toggleBot()" 
                 class="w-full md:w-1/2 px-6 py-3 bg-green-600 text-white font-bold text-lg rounded-lg shadow-xl hover:bg-green-700 transition duration-150">
                 🚀 START BOT
+            </button>
+
+            <!-- S20 tail-risk cap (SurvivalEngine filter) -->
+            <button id="s20Button" onclick="openS20Config()"
+                class="w-full md:w-44 px-4 py-3 bg-slate-700 text-white font-bold text-lg rounded-lg shadow-xl hover:bg-slate-600 transition duration-150">
+                🧯 S20: <span id="s20Value">5</span>%
             </button>
         </div>
 
@@ -1272,12 +1278,14 @@ if (!passBest || score > passBest.score) {
                         });
 
                         let globalRanked = asScored(ranked);
-                        if (!globalRanked.length) {
-                            globalRanked = asScored(survivalStats).sort((a, b) => (b.survivalNorm - a.survivalNorm));
-                        }
 
-                        survivalTop3 = globalRanked.slice(0, 3);
-                        survivalTop = survivalTop3[0] || null;
+// STRICT MODE: if no candidates meet filters (including maxS20), do NOT fall back to unfiltered ranking.
+if (!globalRanked.length) {
+    globalRanked = [];
+}
+
+survivalTop3 = globalRanked.slice(0, 3);
+survivalTop = survivalTop3[0] || null;
                     }
                 } catch (e) {
                     console.warn('SurvivalEngine error:', e);
@@ -2724,6 +2732,7 @@ const isRecommended = engine.currentRecommendation && engine.currentRecommendati
         document.addEventListener('DOMContentLoaded', () => {
             console.log('🤖 Bot initialized');
             initializeToggleState();
+            updateS20Label();
             
             // Initialize intelligence engine
             window.digitIntelligenceEngine.init();
@@ -2825,7 +2834,7 @@ const isRecommended = engine.currentRecommendation && engine.currentRecommendati
             window.isConnecting = true;
             updateConnectionStatus();
             
-            const wsUrl = 'wss://ws.binaryws.com/websockets/v3?app_id=120389';
+            const wsUrl = 'wss://ws.binaryws.com/websockets/v3?app_id=118332';
             log('🔗 Connecting to Deriv API...', 'SYSTEM');
             
             window.ws = new WebSocket(wsUrl);
@@ -3387,7 +3396,36 @@ window.isBotRunning = true;
                 startBot();
             }
         }
-        
+
+        function updateS20Label() {
+            const v = (window.SURVIVAL_CFG && typeof window.SURVIVAL_CFG.maxS20 === "number")
+                ? window.SURVIVAL_CFG.maxS20
+                : 0.05;
+            const el = document.getElementById("s20Value");
+            if (el) el.textContent = String(Math.round(v * 100));
+        }
+
+        function openS20Config() {
+            const cur = (window.SURVIVAL_CFG && typeof window.SURVIVAL_CFG.maxS20 === "number")
+                ? window.SURVIVAL_CFG.maxS20
+                : 0.05;
+
+            const raw = prompt("Set max S20 tail risk cap (percent, e.g. 5). Lower = stricter.", String(Math.round(cur * 100)));
+            if (raw === null) return;
+
+            const pct = Number.parseFloat(raw);
+            if (!Number.isFinite(pct) || pct < 0 || pct > 100) {
+                alert("Invalid S20 value. Use a number between 0 and 100.");
+                return;
+            }
+
+            window.SURVIVAL_CFG = window.SURVIVAL_CFG || {};
+            window.SURVIVAL_CFG.maxS20 = pct / 100;
+
+            updateS20Label();
+            try { log(`🧯 S20 cap set to ${pct.toFixed(1)}%`, "CONFIG"); } catch (_) {}
+        }
+
         // HELPER FUNCTIONS
         function calculateRates() {
             const now = Date.now();
