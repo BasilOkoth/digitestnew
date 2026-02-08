@@ -572,6 +572,18 @@
         title="Hard gate: bot will not trade if extendRatio (currentGap/avgGap) exceeds this value">
 </div>
 
+
+<!-- Max S20 Tail (Survival 20) -->
+<div>
+    <label for="maxTailS20" class="block text-xs font-semibold text-gray-300 mb-1">
+        Max S20 Tail <span id="maxTailS20Display" class="text-gray-400 font-bold">(0.03)</span>
+    </label>
+    <input type="number" id="maxTailS20" value="0.03" min="0" max="1" step="0.01"
+        class="block w-full rounded-md bg-gray-700 border border-gray-600 text-white shadow-sm focus:border-green-500 focus:ring-green-500 py-1.5 px-2 text-sm text-center"
+        title="Hard gate: bot will not recommend/trade digits with SurvivalEngine S20 above this (e.g. 0.03 = 3%)">
+</div>
+
+
                     <!-- Contract Type -->
                     <div>
                         <label for="contractType" class="block text-xs font-semibold text-gray-300 mb-1">Contract Type</label>
@@ -2773,7 +2785,40 @@ const isRecommended = engine.currentRecommendation && engine.currentRecommendati
         const v = Number(el.value);
         if (display && Number.isFinite(v)) display.textContent = `(${v})`;
     });
+})()
+
+
+// Bind Max S20 Tail control (#maxTailS20) to window.MAX_TAIL_S20 (persisted in localStorage as 'maxTailS20').
+(() => {
+    const el = document.getElementById('maxTailS20');
+    const display = document.getElementById('maxTailS20Display');
+    if (!el) return;
+
+    const saved = localStorage.getItem('maxTailS20');
+    const initial = Number(saved ?? el.value);
+    const sane = (Number.isFinite(initial) && initial >= 0 && initial <= 1) ? initial : 0.03;
+
+    el.value = String(sane);
+    window.MAX_TAIL_S20 = sane;
+    if (display) display.textContent = `(${sane})`;
+
+    const apply = () => {
+        const v = Number(el.value);
+        const next = (Number.isFinite(v) && v >= 0 && v <= 1) ? v : 0.03;
+        window.MAX_TAIL_S20 = next;
+        localStorage.setItem('maxTailS20', String(next));
+        if (display) display.textContent = `(${next})`;
+        log(`🧱 Max S20 Tail set to ${next} (${(next * 100).toFixed(1)}%)`, 'ENGINE');
+    };
+
+    el.addEventListener('change', apply);
+    el.addEventListener('input', () => {
+        const v = Number(el.value);
+        if (display && Number.isFinite(v)) display.textContent = `(${v})`;
+    });
 })();
+
+;
 
             
             // Initialize intelligence engine
