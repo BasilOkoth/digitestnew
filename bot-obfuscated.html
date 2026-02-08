@@ -3070,6 +3070,17 @@ const isRecommended = engine.currentRecommendation && engine.currentRecommendati
             // Update engine with digit
             if (window.digitIntelligenceEngine.enabled) {
                 window.digitIntelligenceEngine.processLiveTick(digit);
+
+                // Live-refresh digit analysis panel
+                try {
+                    const panel = document.getElementById('digit-analysis-panel');
+                    if (panel && !panel.classList.contains('hidden')) {
+                        updateDigitAnalysisDisplay();
+                    }
+                } catch (e) {
+                    console.warn('Digit analysis refresh error:', e);
+                }
+
             }
             
             playAudioFeedback('TICK');
@@ -3143,11 +3154,6 @@ const isRecommended = engine.currentRecommendation && engine.currentRecommendati
                 const d = window.digitIntelligenceEngine.currentRecommendation.digit;
                 lockSessionDigit(d, true, 'AUTO start lock');
             }
-
-            if (checkForImmediateWin(tick)) {
-                return;
-            }
-            
             if (window.tradeCount >= window.maxTrades) {
                 log(`🛑 Max trades reached (${window.maxTrades})`, 'CRITICAL');
                 updateTradeStatus('MAX TRADES', `Maximum trades reached (${window.maxTrades})`, 'Bot stopped', 'loss');
