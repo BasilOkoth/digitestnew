@@ -2589,15 +2589,62 @@ const isRecommended = engine.currentRecommendation && engine.currentRecommendati
             return best;
         }
 
-        function rotateHybridDigit(reason = '') {
+        
+        /**
+         * Ensures the currently selected digit is trade-ready. If not, picks a new digit that
+         * satisfies ALL execution gates (extendRatio + S20 tail).
+         * Returns true if a trade-ready digit is selected; false if none qualify.
+         */
+        function ensureTradeReadyDigit(reason = '') {
+            const maxS20 = window.MAX_TAIL_S20 ?? 0.03;
+            const maxER = window.MAX_EXTEND_RATIO ?? 1.2;
+
+            const current =
+                (sessionState.sessionDigit !== null)
+                    ? sessionState.sessionDigit
+                    : parseInt(document.getElementById('predictedDigit').value);
+
+            const s = window.survivalEngine?.latestSurvivalByDigit?.[current];
+            const s20 = s ? Number(s.s20) : Infinity;
+            const er = getExtendRatioForDigit(current);
+
+            const ok =
+                Number.isFinite(current) &&
+                current >= 0 && current <= 9 &&
+                Number.isFinite(s20) && s20 <= maxS20 &&
+                Number.isFinite(er) && er <= maxER;
+
+            if (ok) return true;
+
+            const pick = pickBestLowTailRiskDigit(maxS20);
+            if (!pick || !Number.isFinite(pick.digit)) {
+                updateTradeStatus(
+                    'NO TRADE',
+                    'No trade-ready digit available',
+                    `All digits failed gates (maxER ${maxER.toFixed(2)}, maxS20 ${(maxS20 * 100).toFixed(1)}%)`,
+                    'loss'
+                );
+                return false;
+            }
+
+            lockSessionDigit(pick.digit, true, reason || 'Auto-pick trade-ready digit');
+            updateTradeStatus(
+                'READY',
+                `Auto-picked digit ${pick.digit}`,
+                `Trade-ready (extendRatio ≤ ${maxER.toFixed(2)}, S20 ≤ ${(maxS20 * 100).toFixed(1)}%)`,
+                'normal'
+            );
+            return true;
+        }
+
+function rotateHybridDigit(reason = '') {
             clearSessionDigitLock(reason || 'Rotate');
             window.cycleRotations = (window.cycleRotations || 0) + 1;
 
             // Reset progression (cycle reset)
             window.martingaleStep = 0;
             window.currentStake = window.baseStake;
-
-            if (sessionState.mode !== 'ai') return;
+            // Allow rotation in BOTH instant and AI modes
 
             // Prefer a low tail-risk digit (s20 <= 5%), otherwise use current AI rec.
             const pick = pickBestLowTailRiskDigit(window.MAX_TAIL_S20 ?? 0.03);
@@ -2705,7 +2752,7 @@ const isRecommended = engine.currentRecommendation && engine.currentRecommendati
         }
         
         function updateExecutionLogic() {
-            if (sessionState.mode === 'ai') {
+            if (sessionState.mode === 'ai' || sessionState.mode === 'instant') {
                 const hasRec = !!window.digitIntelligenceEngine.currentRecommendation;
                 const warmed = !!window.digitIntelligenceEngine.warmupDone;
 
@@ -3154,6 +3201,12 @@ const isRecommended = engine.currentRecommendation && engine.currentRecommendati
                 const d = window.digitIntelligenceEngine.currentRecommendation.digit;
                 lockSessionDigit(d, true, 'AUTO start lock');
             }
+
+            // ✅ Ensure selected digit is trade-ready; auto-pick another if it fails gates
+            if (!ensureTradeReadyDigit('Gate fail: auto-pick')) {
+                return;
+            }
+
             if (window.tradeCount >= window.maxTrades) {
                 log(`🛑 Max trades reached (${window.maxTrades})`, 'CRITICAL');
                 updateTradeStatus('MAX TRADES', `Maximum trades reached (${window.maxTrades})`, 'Bot stopped', 'loss');
@@ -3205,7 +3258,7 @@ if (window.isBotRunning) {
             'loss'
         );
 
-        if (sessionState.mode === 'ai') {
+        if (sessionState.mode === 'ai' || sessionState.mode === 'instant') {
             try { rotateHybridDigit('Extend-ratio gate'); } catch (_) {}
         }
         return;
