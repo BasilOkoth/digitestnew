@@ -1051,6 +1051,15 @@
                 if (denom === 0) return 0.0;
                 return numer / denom;
             },
+
+
+// Expected additional ticks given current gap (fallback safe)
+expectedAdditionalTicks: function(gaps, g) {
+    const eligible = (Array.isArray(gaps) ? gaps : []).filter(x => x > g);
+    if (!eligible.length) return Infinity;
+    const rem = eligible.map(x => x - g);
+    return rem.reduce((s, x) => s + x, 0) / rem.length;
+},
             
             // Select best digit using AI logic
             selectBestDigit: function() {
@@ -1099,7 +1108,7 @@
                         const g = s.currentGap;
                         const p90 = Math.max(s.p90Gap, 1);
                         const p90Ratio = g / p90;
-                        const extendRatio = g / s.avgGap;
+                        const extendRatio = g / Math.max(s.avgGap, 1);
 
                         // 🔥 HARD TAIL BLOCK: extreme stretch vs history
                         if (extendRatio > 2.8) continue;
@@ -1112,6 +1121,35 @@
 
                         const P5  = this.conditionalReturnProb(d, g, 5);
                         const P10 = this.conditionalReturnProb(d, g, 10);
+
+// =====================================================
+// 🔥 EARLY MATCH (2–3 TICKS) HARD FILTER
+// =====================================================
+
+const pm2  = pmK(s.gaps, g, 2);
+const pm3  = pmK(s.gaps, g, 3);
+const pm5w = pm5Weighted(s.gaps, g);
+
+const pressure75  = g / Math.max(s.p75Gap, 1);
+const slope       = gapSlope(s.gaps);
+
+// Expected additional ticks (fallback safe)
+const etm = (typeof this.expectedAdditionalTicks === "function")
+  ? this.expectedAdditionalTicks(s.gaps, g)
+  : Infinity;
+
+// ❌ HARD REJECTIONS — NO NEGOTIATION
+if (pm2 < 0.30) continue;
+if (pm3 < 0.45) continue;
+if (pm5w < 0.55) continue;
+
+if (extendRatio > 1.25) continue;
+
+if (pressure75 < 0.55 || pressure75 > 0.85) continue;
+
+if (etm > 8) continue;
+
+if (slope > 2) continue;
 
                         // Filter conditions
                         if (s.gaps.length < thresholds.minSupport) continue;
@@ -1142,29 +1180,31 @@
                         if (s.consecutiveExtendingGaps > thresholds.maxExtend) continue;
                         if (s.isUnstable) continue;
 
-                        // Calculate score (still strongly favors closest-to-P90)
-                        const denom = Math.max(1 - activeMinP90Ratio, 1e-6);
-                        const pressureScore = thresholds.pressureZoneEnabled
-                            ? Math.max(0, Math.min(1, (p90Ratio - activeMinP90Ratio) / denom))
-                            : Math.max(0, Math.min(1, g / p90));
 
-                        const score =
-                            0.45 * P10 +
-                            0.25 * P5 +
-                            0.20 * pressureScore +
-                            0.10 * (1 - s.persistenceScore / 100);
+// =====================================================
+// 🎯 EARLY MATCH SCORING (FAST SNAP PRIORITY)
+// =====================================================
 
-                        if (!passBest || score > passBest.score) {
-                            passBest = {
-                                digit: d,
-                                score: score,
-                                P10: P10,
-                                P5: P5,
-                                gap: g,
-                                persistenceScore: s.persistenceScore,
-                                isUnstable: s.isUnstable
-                            };
-                        }
+const score =
+  0.40 * pm3 +
+  0.30 * pm2 +
+  0.20 * pm5w +
+  0.10 * (1 - extendRatio);
+
+if (!passBest || score > passBest.score) {
+  passBest = {
+    digit: d,
+    score,
+    P10: pm3,
+    P5: pm2,
+    pm2,
+    pm3,
+    pm5w,
+    gap: g,
+    extendRatio,
+    source: "EARLY"
+  };
+}
                     }
 
                     return passBest;
@@ -1522,6 +1562,45 @@
         })();
 
         window.SurvivalEngine = SurvivalEngine;
+
+// =====================================================
+// 🔥 EARLY MATCH HELPERS (2–3 TICKS)
+// =====================================================
+
+// Probability of match within K ticks
+function pmK(gaps, g, K) {
+  const eligible = gaps.filter(x => x > g);
+  if (!eligible.length) return 0;
+
+  let hits = 0;
+  for (const x of eligible) {
+    if (x <= g + K) hits++;
+  }
+  return hits / eligible.length;
+}
+
+// Early-weighted pm5 (front-loaded)
+function pm5Weighted(gaps, g) {
+  const eligible = gaps.filter(x => x > g);
+  if (!eligible.length) return 0;
+
+  let score = 0;
+  for (const x of eligible) {
+    const d = x - g;
+    if (d <= 2) score += 1.0;
+    else if (d === 3) score += 0.8;
+    else if (d === 4) score += 0.4;
+    else if (d === 5) score += 0.2;
+  }
+  return score / eligible.length;
+}
+
+// Detect accelerating gaps (tail warning)
+function gapSlope(gaps) {
+  if (gaps.length < 3) return 0;
+  const n = gaps.length;
+  return gaps[n - 1] - gaps[n - 3];
+}
 
 // ============================================================================
         // MARTINGALE CALCULATOR FUNCTIONS
@@ -2746,7 +2825,7 @@ const isRecommended = engine.currentRecommendation && engine.currentRecommendati
             window.isConnecting = true;
             updateConnectionStatus();
             
-            const wsUrl = 'wss://ws.binaryws.com/websockets/v3?app_id=120389';
+            const wsUrl = 'wss://ws.binaryws.com/websockets/v3?app_id=118332';
             log('🔗 Connecting to Deriv API...', 'SYSTEM');
             
             window.ws = new WebSocket(wsUrl);
@@ -3111,6 +3190,7 @@ const isRecommended = engine.currentRecommendation && engine.currentRecommendati
             window.maxCycleTrades = parseInt(document.getElementById('maxCycleTrades')?.value) || 10;
             
             if (winOrLoss === 'win') {
+                window.lastTradeWon = true;
                 window.martingaleStep = 0;
                 window.cycleLosses = 0;
                 window.currentStake = window.baseStake;
@@ -3131,6 +3211,7 @@ const isRecommended = engine.currentRecommendation && engine.currentRecommendati
                 );
                 
             } else if (winOrLoss === 'loss') {
+                window.lastTradeWon = false;
                 window.martingaleStep = (window.martingaleStep || 0) + 1;
                 window.cycleLosses = (window.cycleLosses || 0) + 1;
 
@@ -3246,7 +3327,7 @@ window.isBotRunning = true;
         }
         
         // STOP BOT - CRITICAL FUNCTION
-        function stopBot() {
+        function stopBot(reason) {
             if (!window.isBotRunning) return;
             
             window.isBotRunning = false;
@@ -3255,6 +3336,7 @@ window.isBotRunning = true;
             updateButtonState();
             
             log('⏹️ Bot stopped', 'SYSTEM');
+            if (reason) log(`🛑 Stop reason: ${reason}`, 'SYSTEM');
             
             // Stop any ongoing PnL updates
             if (window.pnlUpdateInterval) {
@@ -3548,6 +3630,14 @@ window.isBotRunning = true;
                 stopBot();
                 return;
             }
+
+
+// 🚨 Fail fast if early snap does not happen
+if (window.tradeCount >= 3 && window.lastTradeWon === false) {
+    log("⛔ Early match failed — stopping to avoid tail", "RISK");
+    stopBot("EARLY_MATCH_ABORT");
+    return;
+}
         }
         
         // Reset all state
@@ -3573,6 +3663,7 @@ window.isBotRunning = true;
             window.tickQueue = [];
             window.lastTick = null;
             window.lastTradeResult = null;
+            window.lastTradeWon = null;
             window.tradeCount = 0;
             window.martingaleStep = 0;
             window.pendingProposals.clear();
