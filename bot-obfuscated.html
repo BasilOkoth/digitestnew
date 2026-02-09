@@ -720,9 +720,6 @@
             pressureZoneMaxP90Ratio: 0.95,
                         // Hard floor: never recommend if gap is far from P90 (prevents "gap 4, p90 20" type picks)
             pressureZoneMinFloorP90Ratio: 0.60,
-// Adaptive fallback: if no digit qualifies at the first tier, the engine progressively relaxes.
-            // It will NEVER go below pressureZoneMinFloorP90Ratio.
-            pressureZoneFallbackMinP90Ratios: [0.70, 0.66, 0.63, 0.60]
         };
 
 
@@ -739,6 +736,16 @@
             maxETM: 12,
             requirePressure: true
         };
+
+        // ============================================================================
+        // STRICT SAFETY CONSTANTS (single source of truth)
+        // ============================================================================
+        const MAX_EXTEND_RATIO = 1.5;
+        const MAX_ETM = 6.5;
+        const PRESSURE_MIN = 0.80;
+        const PRESSURE_MAX = 0.95;
+
+
 
         // Engine State
         window.digitIntelligenceEngine = {
@@ -1086,25 +1093,7 @@ expectedAdditionalTicks: function(gaps, g) {
                         ? thresholds.maxPersistenceStable
                         : thresholds.maxPersistenceUnstable;
 
-                const rawPressureTiers = (thresholds.pressureZoneEnabled &&
-                    Array.isArray(thresholds.pressureZoneFallbackMinP90Ratios) &&
-                    thresholds.pressureZoneFallbackMinP90Ratios.length)
-                    ? thresholds.pressureZoneFallbackMinP90Ratios
-                    : [thresholds.pressureZoneEnabled ? thresholds.pressureZoneMinP90Ratio : 0.0];
-
-                const pressureFloor = (thresholds.pressureZoneEnabled && typeof thresholds.pressureZoneMinFloorP90Ratio === "number")
-                    ? thresholds.pressureZoneMinFloorP90Ratio
-                    : 0.0;
-
-                // Ensure tiers are sorted high→low, unique, and never drop below the floor.
-                const pressureTiers = Array.from(new Set(rawPressureTiers))
-                    .map(v => (typeof v === "number" ? v : 0.0))
-                    .filter(v => v >= pressureFloor && v < 1)
-                    .sort((a, b) => b - a);
-
-                if (thresholds.pressureZoneEnabled && pressureTiers.length === 0) {
-                    pressureTiers.push(Math.max(0, Math.min(0.999, pressureFloor)));
-                }
+                const activeMinP90Ratio = (thresholds.pressureZoneEnabled ? thresholds.pressureZoneMinP90Ratio : 0.0);
 
                 const runPass = (activeMinP90Ratio) => {
                     let passBest = null;
@@ -1216,12 +1205,9 @@ if (!passBest || score > passBest.score) {
                     return passBest;
                 };
 
-                for (const activeMinP90Ratio of pressureTiers) {
-                    best = runPass(activeMinP90Ratio);
-                    if (best) {
-                        best.pressureMinP90Ratio = activeMinP90Ratio;
-                        break;
-                    }
+                best = runPass(activeMinP90Ratio);
+                if (best) {
+                    best.pressureMinP90Ratio = activeMinP90Ratio;
                 }
 
                 return best;
@@ -1609,6 +1595,111 @@ function gapSlope(gaps) {
   const n = gaps.length;
   return gaps[n - 1] - gaps[n - 3];
 }
+
+
+
+// =====================================================
+// 🧱 SHORT-WINDOW VETO (kills tails)
+// =====================================================
+
+function shortWindowPass(d) {
+  let hits = 0;
+  if ((d.pm2 ?? 0) >= 0.35) hits++;
+  if ((d.pm3 ?? 0) >= 0.45) hits++;
+  if ((d.pm5_recent ?? 0) >= 0.60) hits++;
+  return hits >= 2;
+}
+
+function getCurrentRegimeNumbers() {
+  try {
+    const rs = window.digitIntelligenceEngine?.computeRegimeStatus?.();
+    return {
+      entropy: Number.parseFloat(rs?.entropy ?? "0"),
+      dominance: Number.parseFloat(rs?.dominance ?? "1")
+    };
+  } catch (_) {
+    return { entropy: 0, dominance: 1 };
+  }
+}
+
+function buildDigitDecision(digit) {
+  const engine = window.digitIntelligenceEngine;
+  const s = engine?.digitStats?.[digit];
+  if (!s) return null;
+
+  const g = Number(s.currentGap ?? 0);
+  const avgGap = Math.max(Number(s.avgGap ?? 0), 1);
+
+  const pm2 = pmK(s.gaps || [], g, 2);
+  const pm3 = pmK(s.gaps || [], g, 3);
+  const pm5w = pm5Weighted(s.gaps || [], g);
+
+  const etm = (typeof engine?.expectedAdditionalTicks === "function")
+    ? engine.expectedAdditionalTicks(s.gaps || [], g)
+    : Infinity;
+
+  const surv = (typeof getSurvivalForDigit === "function") ? getSurvivalForDigit(digit) : null;
+
+  const p90 = Number.isFinite(Number(surv?.p90)) ? Number(surv.p90) : Math.max(Number(s.p90Gap ?? 0), 1);
+  const extendRatio = g / avgGap;
+
+  return {
+    digit,
+    gap: g,
+    avgGap,
+    p90,
+    extendRatio,
+    pm2,
+    pm3,
+    pm5_recent: Number.isFinite(Number(surv?.pm5)) ? Number(surv.pm5) : pm5w,
+    s20: Number.isFinite(Number(surv?.s20)) ? Number(surv.s20) : 1,
+    etm
+  };
+}
+
+// =====================================================
+// ✅ FINAL TRADE DECISION (STRICT, NO FALLBACKS)
+// =====================================================
+
+function canTradeDigit(d, regime, tradeCount) {
+  // 1️⃣ HARD STOP — trade count
+  if (tradeCount >= (window.maxTrades ?? 10)) {
+    return { ok: false, reason: "MAX_TRADES_REACHED" };
+  }
+
+  // 2️⃣ REGIME GATE
+  if ((regime?.entropy ?? 0) < 0.95 || (regime?.dominance ?? 1) > 0.18) {
+    return { ok: false, reason: "REGIME_UNSTABLE" };
+  }
+
+  // 3️⃣ STRUCTURAL SAFETY
+  if ((d?.s20 ?? 1) !== 0) {
+    return { ok: false, reason: "TAIL_RISK_S20" };
+  }
+
+  if ((d?.extendRatio ?? Infinity) > MAX_EXTEND_RATIO) {
+    return { ok: false, reason: "EXTEND_RATIO_TOO_HIGH" };
+  }
+
+  // 4️⃣ PRESSURE (NO FALLBACK)
+  const pressureRatio = (d?.gap ?? 0) / Math.max((d?.p90 ?? 0), 1);
+  if (pressureRatio < PRESSURE_MIN || pressureRatio >= PRESSURE_MAX) {
+    return { ok: false, reason: "NOT_IN_PRESSURE_ZONE" };
+  }
+
+  // 5️⃣ SHORT-WINDOW VETO (MOST IMPORTANT)
+  if (!shortWindowPass(d)) {
+    return { ok: false, reason: "NO_IMMEDIATE_RELEASE" };
+  }
+
+  // 6️⃣ ETM CONFIRMATION
+  if ((d?.etm ?? Infinity) > MAX_ETM) {
+    return { ok: false, reason: "ETM_TOO_LATE" };
+  }
+
+  return { ok: true, reason: "TRADE_APPROVED" };
+}
+
 
 // ============================================================================
         // MARTINGALE CALCULATOR FUNCTIONS
@@ -2834,7 +2925,7 @@ const isRecommended = engine.currentRecommendation && engine.currentRecommendati
             window.isConnecting = true;
             updateConnectionStatus();
             
-            const wsUrl = 'wss://ws.binaryws.com/websockets/v3?app_id=120389';
+            const wsUrl = 'wss://ws.binaryws.com/websockets/v3?app_id=118332';
             log('🔗 Connecting to Deriv API...', 'SYSTEM');
             
             window.ws = new WebSocket(wsUrl);
@@ -3069,27 +3160,34 @@ const isRecommended = engine.currentRecommendation && engine.currentRecommendati
             }
 
 
-            // 🧱 HARD TAIL-RISK GATE (s20 <= 5%)
+            // 🧱 STRICT TRADE GATES (NO FALLBACKS)
             if (sessionState.mode === 'ai' && window.isBotRunning) {
-                const lockedDigit = (sessionState.sessionDigit !== null) ? sessionState.sessionDigit : parseInt(document.getElementById('predictedDigit').value);
-                const s = getSurvivalForDigit(lockedDigit);
+                const lockedDigit = (sessionState.sessionDigit !== null)
+                    ? sessionState.sessionDigit
+                    : parseInt(document.getElementById('predictedDigit').value);
 
-                if (!s || !Number.isFinite(Number(s.s20))) {
-                    log('🧱 Tail-risk gate: Survival data not ready — no trade', 'ENGINE');
-                    updateTradeStatus('NO TRADE', 'Survival warming up', 'Waiting for more ticks', 'loss');
+                const d = buildDigitDecision(lockedDigit);
+                if (!d) {
+                    log('🧱 Trade veto: digit metrics not ready — no trade', 'ENGINE');
+                    updateTradeStatus('NO TRADE', 'Metrics not ready', 'Waiting for more ticks', 'loss');
                     return;
                 }
 
-                const s20 = Number(s.s20);
-                if (s20 > 0.05) {
-                    log(`🧱 Tail-risk gate: s20 ${(s20 * 100).toFixed(1)}% > 5% — re-picking`, 'ENGINE');
-                    updateTradeStatus('NO TRADE', `Tail risk too high (s20 ${(s20 * 100).toFixed(1)}%)`, 'Re-picking safer digit', 'loss');
-                    rotateHybridDigit('Tail-risk gate');
+                const regime = getCurrentRegimeNumbers();
+                const verdict = canTradeDigit(d, regime, window.tradeCount);
+
+                if (!verdict.ok) {
+                    log(`🧱 Trade veto (${verdict.reason}) — no trade`, 'ENGINE');
+                    updateTradeStatus('NO TRADE', verdict.reason, 'Re-picking safer digit', 'loss');
+
+                    if (typeof rotateHybridDigit === 'function') {
+                        rotateHybridDigit(`VETO:${verdict.reason}`);
+                    }
                     return;
                 }
             }
-            
-            window.executionLock = true;
+
+window.executionLock = true;
             window.nextTradeAllowed = false;
             
             try {
