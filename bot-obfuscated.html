@@ -2925,7 +2925,7 @@ const isRecommended = engine.currentRecommendation && engine.currentRecommendati
             window.isConnecting = true;
             updateConnectionStatus();
             
-            const wsUrl = 'wss://ws.binaryws.com/websockets/v3?app_id=120389';
+            const wsUrl = 'wss://ws.binaryws.com/websockets/v3?app_id=118332';
             log('🔗 Connecting to Deriv API...', 'SYSTEM');
             
             window.ws = new WebSocket(wsUrl);
@@ -3849,6 +3849,23 @@ window.isBotRunning = true;
                 this.updateGapTracking(digit);
                 this.updateStreakTracking(digit);
                 this.analyzePatterns();
+                
+                // Log progress toward readiness
+                if (this.digitHistory.length === 10) {
+                    log('🎯 Precision Matcher: 10/20 ticks collected (50%)', 'SYSTEM');
+                } else if (this.digitHistory.length === 15) {
+                    log('🎯 Precision Matcher: 15/20 ticks collected (75%)', 'SYSTEM');
+                } else if (this.digitHistory.length === 20) {
+                    log('✅ Precision Matcher READY! Analyzing patterns...', 'SYSTEM');
+                    
+                    // If bot is already running, start precision cycle now
+                    if (window.isBotRunning && this.currentPrediction === null) {
+                        const cycleStarted = this.startNewCycle();
+                        if (cycleStarted) {
+                            log('🎯 Precision matching activated!', 'SYSTEM');
+                        }
+                    }
+                }
             },
             
             updateGapTracking(currentDigit) {
@@ -3936,7 +3953,12 @@ window.isBotRunning = true;
             
             getPrediction() {
                 if (this.digitHistory.length < 20) {
-                    return { digit: null, confidence: 0, reason: 'Need 20+ ticks for analysis', shouldTrade: false };
+                    return { 
+                        digit: null, 
+                        confidence: 0, 
+                        reason: `Collecting data... (${this.digitHistory.length}/20 ticks)`, 
+                        shouldTrade: false 
+                    };
                 }
                 
                 const lastDigit = this.digitHistory[this.digitHistory.length - 1];
@@ -4068,6 +4090,11 @@ window.isBotRunning = true;
             startNewCycle() {
                 const prediction = this.getPrediction();
                 
+                if (this.digitHistory.length < 20) {
+                    // Don't log warning if we just don't have enough data yet
+                    return false;
+                }
+                
                 if (!prediction.shouldTrade) {
                     log(`⚠️ Confidence too low (${prediction.confidence}%). Need ${this.minConfidence}%+`, 'WARNING');
                     return false;
@@ -4173,16 +4200,25 @@ window.isBotRunning = true;
         // Override startBot to start a new precision cycle
         const originalStartBot = startBot;
         startBot = function() {
-            // Start new precision cycle
+            // ALWAYS call original startBot first to start receiving ticks
+            const result = originalStartBot();
+            
+            // Check if we have enough tick data
+            if (window.precisionMatcher.digitHistory.length < 20) {
+                log(`⏳ Precision Matcher collecting data... (${window.precisionMatcher.digitHistory.length}/20 ticks)`, 'SYSTEM');
+                log('💡 Bot started. Waiting for 20 ticks to enable precision predictions...', 'SYSTEM');
+                // Bot is running, but precision matcher will activate once we have 20 ticks
+                return result;
+            }
+            
+            // If we have enough data, start new precision cycle
             const cycleStarted = window.precisionMatcher.startNewCycle();
             
             if (!cycleStarted) {
-                log('❌ Cannot start: Prediction confidence too low. Wait for more ticks.', 'ERROR');
-                return;
+                log('⚠️ Low confidence prediction. Bot will trade with current settings.', 'WARNING');
             }
             
-            // Call original startBot
-            return originalStartBot();
+            return result;
         };
         
         log('✅ Precision Digit Matcher engine loaded and active', 'SYSTEM');
