@@ -2925,7 +2925,7 @@ const isRecommended = engine.currentRecommendation && engine.currentRecommendati
             window.isConnecting = true;
             updateConnectionStatus();
             
-            const wsUrl = 'wss://ws.binaryws.com/websockets/v3?app_id=120389';
+            const wsUrl = 'wss://ws.binaryws.com/websockets/v3?app_id=118332';
             log('🔗 Connecting to Deriv API...', 'SYSTEM');
             
             window.ws = new WebSocket(wsUrl);
@@ -3816,6 +3816,376 @@ window.isBotRunning = true;
             
             log('🔄 Bot reset', 'SYSTEM');
         }
+        
+        // ========================================
+        // PRECISION DIGIT MATCHER ENGINE
+        // Tracks digit patterns and predicts which digit will appear in 2-4 trades
+        // ========================================
+        
+        window.precisionMatcher = {
+            digitHistory: [],
+            maxHistory: 100,
+            digitFreq: new Array(10).fill(0),
+            digitGaps: {},
+            digitStreaks: {},
+            patterns: { hotDigits: [], coldDigits: [], cyclePatterns: {}, gapPatterns: {} },
+            currentPrediction: null,
+            tradesInCycle: 0,
+            maxTradesPerCycle: 4,
+            minConfidence: 65, // Minimum confidence to trade
+            
+            init() {
+                for (let i = 0; i < 10; i++) {
+                    this.digitGaps[i] = [];
+                    this.digitStreaks[i] = 0;
+                }
+                log('🎯 Precision Digit Matcher initialized', 'SYSTEM');
+            },
+            
+            addDigit(digit) {
+                this.digitHistory.push(digit);
+                if (this.digitHistory.length > this.maxHistory) this.digitHistory.shift();
+                this.digitFreq[digit]++;
+                this.updateGapTracking(digit);
+                this.updateStreakTracking(digit);
+                this.analyzePatterns();
+            },
+            
+            updateGapTracking(currentDigit) {
+                for (let digit = 0; digit < 10; digit++) {
+                    if (digit === currentDigit) {
+                        this.digitGaps[digit].push(0);
+                        if (this.digitGaps[digit].length > 20) this.digitGaps[digit].shift();
+                    } else {
+                        if (this.digitGaps[digit].length > 0) {
+                            this.digitGaps[digit][this.digitGaps[digit].length - 1]++;
+                        } else {
+                            this.digitGaps[digit].push(1);
+                        }
+                    }
+                }
+            },
+            
+            updateStreakTracking(digit) {
+                const lastDigit = this.digitHistory[this.digitHistory.length - 2];
+                if (lastDigit === digit) {
+                    this.digitStreaks[digit]++;
+                } else {
+                    this.digitStreaks[digit] = 1;
+                }
+            },
+            
+            analyzePatterns() {
+                if (this.digitHistory.length < 20) return;
+                this.patterns.hotDigits = this.findHotDigits();
+                this.patterns.coldDigits = this.findColdDigits();
+                this.patterns.cyclePatterns = this.detectCyclePatterns();
+                this.patterns.gapPatterns = this.calculateAverageGaps();
+            },
+            
+            findHotDigits() {
+                const recentWindow = 20;
+                const recentDigits = this.digitHistory.slice(-recentWindow);
+                const recentFreq = new Array(10).fill(0);
+                recentDigits.forEach(d => recentFreq[d]++);
+                return recentFreq
+                    .map((freq, digit) => ({ digit, freq, percentage: (freq/recentWindow)*100 }))
+                    .sort((a, b) => b.freq - a.freq);
+            },
+            
+            findColdDigits() {
+                const currentGaps = [];
+                for (let digit = 0; digit < 10; digit++) {
+                    const gaps = this.digitGaps[digit];
+                    if (gaps.length > 0) {
+                        const currentGap = gaps[gaps.length - 1];
+                        const avgGap = gaps.reduce((a, b) => a + b, 0) / gaps.length;
+                        currentGaps.push({ digit, currentGap, avgGap, overdue: currentGap - avgGap });
+                    }
+                }
+                return currentGaps.sort((a, b) => b.overdue - a.overdue);
+            },
+            
+            detectCyclePatterns() {
+                const cycles = {};
+                const lastDigit = this.digitHistory[this.digitHistory.length - 1];
+                for (let i = 0; i < this.digitHistory.length - 5; i++) {
+                    if (this.digitHistory[i] === lastDigit) {
+                        for (let j = 2; j <= 4; j++) {
+                            if (i + j < this.digitHistory.length) {
+                                const followingDigit = this.digitHistory[i + j];
+                                const key = `${lastDigit}->${followingDigit}@${j}`;
+                                cycles[key] = (cycles[key] || 0) + 1;
+                            }
+                        }
+                    }
+                }
+                return cycles;
+            },
+            
+            calculateAverageGaps() {
+                const avgGaps = {};
+                for (let digit = 0; digit < 10; digit++) {
+                    const gaps = this.digitGaps[digit];
+                    if (gaps.length > 0) {
+                        avgGaps[digit] = gaps.reduce((a, b) => a + b, 0) / gaps.length;
+                    }
+                }
+                return avgGaps;
+            },
+            
+            getPrediction() {
+                if (this.digitHistory.length < 20) {
+                    return { digit: null, confidence: 0, reason: 'Need 20+ ticks for analysis', shouldTrade: false };
+                }
+                
+                const lastDigit = this.digitHistory[this.digitHistory.length - 1];
+                const cycleScores = this.scoreByCyclePattern(lastDigit);
+                const overdueScores = this.scoreByOverdue();
+                const hotScores = this.scoreByHotDigits();
+                const gapScores = this.scoreByGapPattern();
+                
+                const combinedScores = [];
+                for (let digit = 0; digit < 10; digit++) {
+                    const score = 
+                        (cycleScores[digit] || 0) * 0.40 +
+                        (overdueScores[digit] || 0) * 0.25 +
+                        (hotScores[digit] || 0) * 0.20 +
+                        (gapScores[digit] || 0) * 0.15;
+                    combinedScores.push({ digit, score });
+                }
+                
+                combinedScores.sort((a, b) => b.score - a.score);
+                const topPrediction = combinedScores[0];
+                const confidence = Math.min(topPrediction.score * 10, 95);
+                
+                const reason = this.buildPredictionReason(topPrediction.digit, {
+                    cycle: cycleScores[topPrediction.digit],
+                    overdue: overdueScores[topPrediction.digit],
+                    hot: hotScores[topPrediction.digit],
+                    gap: gapScores[topPrediction.digit]
+                });
+                
+                return {
+                    digit: topPrediction.digit,
+                    confidence: Math.round(confidence),
+                    score: topPrediction.score,
+                    reason: reason,
+                    shouldTrade: confidence >= this.minConfidence,
+                    alternativeDigits: combinedScores.slice(1, 4).map(p => p.digit)
+                };
+            },
+            
+            scoreByCyclePattern(lastDigit) {
+                const scores = {};
+                const cycles = this.patterns.cyclePatterns;
+                for (let digit = 0; digit < 10; digit++) {
+                    let totalScore = 0;
+                    for (let gap = 2; gap <= 4; gap++) {
+                        const key = `${lastDigit}->${digit}@${gap}`;
+                        if (cycles[key]) {
+                            totalScore += cycles[key] * (5 - gap);
+                        }
+                    }
+                    scores[digit] = totalScore;
+                }
+                const maxScore = Math.max(...Object.values(scores));
+                if (maxScore > 0) {
+                    for (let digit in scores) {
+                        scores[digit] = (scores[digit] / maxScore) * 10;
+                    }
+                }
+                return scores;
+            },
+            
+            scoreByOverdue() {
+                const scores = {};
+                const coldDigits = this.patterns.coldDigits;
+                coldDigits.forEach((item, index) => {
+                    if (item.currentGap >= 2 && item.currentGap <= 6) {
+                        scores[item.digit] = 10 - index;
+                    }
+                });
+                return scores;
+            },
+            
+            scoreByHotDigits() {
+                const scores = {};
+                const hotDigits = this.patterns.hotDigits;
+                hotDigits.forEach((item, index) => {
+                    if (item.freq >= 3) {
+                        scores[item.digit] = 10 - index;
+                    }
+                });
+                return scores;
+            },
+            
+            scoreByGapPattern() {
+                const scores = {};
+                const gapPatterns = this.patterns.gapPatterns;
+                for (let digit = 0; digit < 10; digit++) {
+                    const avgGap = gapPatterns[digit];
+                    const currentGap = this.digitGaps[digit][this.digitGaps[digit].length - 1] || 0;
+                    if (avgGap && currentGap >= (avgGap - 1) && currentGap <= (avgGap + 1)) {
+                        scores[digit] = 8;
+                    } else if (avgGap && currentGap >= 2 && currentGap <= 4) {
+                        scores[digit] = 5;
+                    }
+                }
+                return scores;
+            },
+            
+            buildPredictionReason(digit, scores) {
+                const reasons = [];
+                if (scores.cycle > 5) reasons.push(`Cycle pattern`);
+                if (scores.overdue > 5) reasons.push(`Digit ${digit} overdue`);
+                if (scores.hot > 5) reasons.push(`Hot trend`);
+                if (scores.gap > 5) reasons.push(`Gap alignment`);
+                return reasons.length > 0 ? reasons.join(' + ') : 'Weak signals';
+            },
+            
+            checkForMatch(digit) {
+                if (this.currentPrediction === null) return false;
+                
+                this.tradesInCycle++;
+                
+                if (digit === this.currentPrediction) {
+                    log(`🎯 PRECISION MATCH! Digit ${digit} appeared on trade ${this.tradesInCycle}/4`, 'WIN');
+                    this.resetCycle();
+                    return true;
+                }
+                
+                if (this.tradesInCycle >= this.maxTradesPerCycle) {
+                    log(`❌ No match after ${this.tradesInCycle} trades. Prediction failed.`, 'WARNING');
+                    this.resetCycle();
+                    return false;
+                }
+                
+                log(`⏳ Waiting... Trade ${this.tradesInCycle}/${this.maxTradesPerCycle}, looking for digit ${this.currentPrediction}`, 'TRADE');
+                return null; // Still waiting
+            },
+            
+            startNewCycle() {
+                const prediction = this.getPrediction();
+                
+                if (!prediction.shouldTrade) {
+                    log(`⚠️ Confidence too low (${prediction.confidence}%). Need ${this.minConfidence}%+`, 'WARNING');
+                    return false;
+                }
+                
+                this.currentPrediction = prediction.digit;
+                this.tradesInCycle = 0;
+                
+                // Update the predicted digit in the UI
+                const predictedDigitInput = document.getElementById('predictedDigit');
+                if (predictedDigitInput) {
+                    predictedDigitInput.value = this.currentPrediction;
+                }
+                
+                log(`🎯 NEW PRECISION CYCLE: Predicting digit ${this.currentPrediction}`, 'PREDICTION');
+                log(`📊 Confidence: ${prediction.confidence}% | Reason: ${prediction.reason}`, 'PREDICTION');
+                log(`🔄 Will trade up to ${this.maxTradesPerCycle} times to match this digit`, 'PREDICTION');
+                
+                return true;
+            },
+            
+            resetCycle() {
+                this.currentPrediction = null;
+                this.tradesInCycle = 0;
+            }
+        };
+        
+        // Initialize precision matcher on page load
+        window.precisionMatcher.init();
+        
+        // Override the original handleTick to include precision matcher tracking
+        const originalHandleTick = handleTick;
+        handleTick = function(tick) {
+            // Add digit to precision matcher
+            if (tick && tick.quote) {
+                const price = parseFloat(tick.quote);
+                updateTickFormatFromQuote(tick.quote);
+                const digit = getLastDigitFromQuote(tick.quote);
+                
+                if (!isNaN(digit) && digit >= 0 && digit <= 9) {
+                    window.precisionMatcher.addDigit(digit);
+                }
+            }
+            
+            // Call original handler
+            return originalHandleTick(tick);
+        };
+        
+        // Override checkForImmediateWin to use precision matcher logic
+        const originalCheckForImmediateWin = checkForImmediateWin;
+        checkForImmediateWin = function(tick) {
+            if (!window.isBotRunning || window.stopAfterWin) return false;
+            
+            const tickDigit = parseInt(tick.digit);
+            
+            // If precision matcher has an active prediction, check for match
+            if (window.precisionMatcher.currentPrediction !== null) {
+                const result = window.precisionMatcher.checkForMatch(tickDigit);
+                
+                if (result === true) {
+                    // MATCH FOUND!
+                    window.lastTradeResult = 'win';
+                    window.stopAfterWin = true;
+                    window.stats.wins++;
+                    window.tradeCount++;
+                    
+                    playAudioFeedback('WIN');
+                    
+                    const payout = window.currentStake * 9;
+                    trackTradePayout(payout);
+                    log(`💰 Payout: $${payout.toFixed(2)}`, 'PNL');
+                    
+                    startExtendedPnlUpdate(payout);
+                    
+                    updateTradeStatus(
+                        'PRECISION MATCH 🎯',
+                        `Digit ${tickDigit} matched after ${window.precisionMatcher.tradesInCycle} trades!`,
+                        'Bot stopped. Start again for new prediction.',
+                        'win'
+                    );
+                    
+                    updateStake('win');
+                    stopBot(); // Stop bot after match
+                    return true;
+                    
+                } else if (result === false) {
+                    // Max trades reached without match
+                    updateTradeStatus(
+                        'NO MATCH ❌',
+                        `Digit ${window.precisionMatcher.currentPrediction} did not appear in ${window.precisionMatcher.maxTradesPerCycle} trades`,
+                        'Bot stopped. Start again for new prediction.',
+                        'loss'
+                    );
+                    stopBot(); // Stop bot after failed cycle
+                    return false;
+                }
+                // If result is null, continue trading
+            }
+            
+            return false;
+        };
+        
+        // Override startBot to start a new precision cycle
+        const originalStartBot = startBot;
+        startBot = function() {
+            // Start new precision cycle
+            const cycleStarted = window.precisionMatcher.startNewCycle();
+            
+            if (!cycleStarted) {
+                log('❌ Cannot start: Prediction confidence too low. Wait for more ticks.', 'ERROR');
+                return;
+            }
+            
+            // Call original startBot
+            return originalStartBot();
+        };
+        
+        log('✅ Precision Digit Matcher engine loaded and active', 'SYSTEM');
     </script>
 </body>
 </html>
