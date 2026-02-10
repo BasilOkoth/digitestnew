@@ -691,6 +691,7 @@
         // ============================================================================
         
         // Global AI thresholds (single source of truth)
+        const WARMUP_TICKS = 1000;
         window.AI_THRESHOLDS = {
             minSupport: 22,
 
@@ -735,8 +736,9 @@
         window.digitIntelligenceEngine = {
             enabled: true,
             warmupDone: false,
+            engineReady: false,
             warmupTicks: 0,
-            targetWarmupTicks: 1000,
+            targetWarmupTicks: WARMUP_TICKS,
             tickIndex: 0,
             
             // Data structures
@@ -745,7 +747,7 @@
                 lastSeen: null,
                 currentGap: 0,
                 prevPrevGap: null,
-                prevGap: 0,
+                prevGap: null,
                 avgGap: 0,
                 p75Gap: 0,
                 p90Gap: 0,
@@ -782,6 +784,7 @@
             // Reset engine
             reset: function() {
                 this.warmupDone = false;
+                this.engineReady = false;
                 this.warmupTicks = 0;
                 this.tickIndex = 0;
                 this.currentRecommendation = null;
@@ -791,7 +794,7 @@
                     lastSeen: null,
                     currentGap: 0,
                 prevPrevGap: null,
-                prevGap: 0,
+                prevGap: null,
                     avgGap: 0,
                     p75Gap: 0,
                     p90Gap: 0,
@@ -866,17 +869,23 @@
                     }
                 }
                 
-                if (this.warmupTicks >= this.targetWarmupTicks && !this.warmupDone) {
+                if (!this.engineReady && this.tickIndex >= this.targetWarmupTicks) {
+                    this.engineReady = true;
                     this.warmupDone = true;
+
+                    if (this.tickIndex === this.targetWarmupTicks) {
+                        console.log("✅ ENGINE READY — WARM-UP COMPLETE");
+                    }
+
                     log(`🧠 Warm-up complete! Analyzed ${this.warmupTicks} ticks`, 'ENGINE');
                     updateEngineStatus('Analyzing market...', 'ANALYZING', 100);
-                    
+
                     // Initial analysis
                     setTimeout(() => {
                         this.analyzeAndRecommend();
                     }, 100);
                 }
-            },
+},
             
             // Process live tick
             processLiveTick: function(digit) {
@@ -902,12 +911,18 @@
                         updateEngineStatus(`Warming up... ${this.warmupTicks}/${this.targetWarmupTicks}`, 'WARMUP', progress);
                     }
                     
-                    if (this.warmupTicks >= this.targetWarmupTicks && !this.warmupDone) {
+                    if (!this.engineReady && this.tickIndex >= this.targetWarmupTicks) {
+                        this.engineReady = true;
                         this.warmupDone = true;
+
+                        if (this.tickIndex === this.targetWarmupTicks) {
+                            console.log("✅ ENGINE READY — WARM-UP COMPLETE");
+                        }
+
                         log(`🧠 Warm-up complete! Analyzed ${this.warmupTicks} ticks`, 'ENGINE');
                         updateEngineStatus('Analyzing market...', 'ANALYZING', 100);
                     }
-                }
+}
                 
                 this.updateRegime(digit);
                 this.onNewDigit(digit);
@@ -983,17 +998,29 @@
 
                 s.lastSeen = this.tickIndex;
 
-                // update current gaps
+                // update current gaps (staged history so velocity gate won't block early ticks)
                 for (let d = 0; d < 10; d++) {
                     const st = this.digitStats[d];
-                    // Store previous gaps before updating current gap (release transition gate)
-                    st.prevPrevGap = st.prevGap;
-                    st.prevGap = st.currentGap;
-                    st.currentGap = (st.lastSeen === null)
+
+                    const newGap = (st.lastSeen === null)
                         ? this.tickIndex
                         : (this.tickIndex - st.lastSeen);
+
+                    // Fill history gradually: currentGap -> prevGap -> prevPrevGap
+                    if (st.prevGap === null) {
+                        st.prevGap = st.currentGap;
+                        st.prevPrevGap = null;
+                    } else if (st.prevPrevGap === null) {
+                        st.prevPrevGap = st.prevGap;
+                        st.prevGap = st.currentGap;
+                    } else {
+                        st.prevPrevGap = st.prevGap;
+                        st.prevGap = st.currentGap;
+                    }
+
+                    st.currentGap = newGap;
                 }
-            },
+},
             
             // Update gap statistics
             updateGapStats: function(digit, gap) {
@@ -1071,7 +1098,8 @@
             
             // Select best digit using AI logic
             selectBestDigit: function() {
-                if (!this.warmupDone || !this.enabled) return null;
+                // Allow stats to stabilize during warm-up
+                if (!this.engineReady || !this.enabled) return null;
 
                 // Patch 7: freeze digit after entry (no re-selection mid-trade)
                 if (window.releaseWindow && window.releaseWindow.inTrade) return null;
@@ -1105,7 +1133,8 @@
                 for (let d = 0; d < 10; d++) {
                     const s = this.digitStats[d];
                     const g = s.currentGap;
-                    const p90 = Math.max(s.p90Gap, 1);
+                    const p90 = s.p90Gap;
+                    if (!p90 || p90 < 5) continue;
                     const p90Ratio = g / p90;
                     const extendRatio = (s.avgGap && s.avgGap > 0) ? (g / s.avgGap) : Infinity;
 
@@ -1124,11 +1153,15 @@
 
                     // ---- RELEASE VELOCITY (VERY IMPORTANT) ----
                     const delta1 = s.currentGap - s.prevGap;
-                    const delta2 = s.prevGap - (s.prevPrevGap ?? s.prevGap);
 
-                    // Reject accelerating or flat gaps
-                    if (delta1 >= delta2) continue;
+                    if (s.prevPrevGap === null) {
+                        // Not enough history yet
+                    } else {
+                        const delta2 = s.prevGap - s.prevPrevGap;
 
+                        // Reject accelerating or flat gaps
+                        if (delta1 >= delta2) continue;
+                    }
 const P5  = this.conditionalReturnProb(d, g, 5);
                     const P10 = this.conditionalReturnProb(d, g, 10);
 
@@ -1758,7 +1791,8 @@ const P5  = this.conditionalReturnProb(d, g, 5);
                     extendRatio <= 1.3
                 ) ? thresholds.maxPersistenceStableRelax : baseMaxPersistence;
 
-                const p90 = Math.max(s.p90Gap, 1);
+                const p90 = s.p90Gap;
+                    if (!p90 || p90 < 5) continue;
                 const p90Ratio = g / p90;
 
                 const passSupport = support >= thresholds.minSupport;
