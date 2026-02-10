@@ -1125,10 +1125,10 @@
                     const stx = this.digitStats[x];
                     const p90x = Math.max(stx.p90Gap, 1);
                     const ratio = stx.currentGap / p90x;
-                    if (ratio >= 0.80 && ratio <= 0.86) pressureCount++;
+                    if (ratio >= 0.78 && ratio <= 0.90) pressureCount++;
                 }
                 // Too many "okay" digits = weak release
-                if (pressureCount > 3) return null;
+                if (pressureCount > 4) return null;
 
                 for (let d = 0; d < 10; d++) {
                     const s = this.digitStats[d];
@@ -1142,8 +1142,8 @@
                     if (extendRatio > MAX_EXTEND_RATIO) continue;
 
                     // ---- EARLY RELEASE TRANSITION ----
-                    const lower = 0.80 * p90;
-                    const upper = 0.86 * p90;
+                    const lower = 0.78 * p90;
+                    const upper = 0.90 * p90;
 
                     // Must ENTER pressure THIS tick
                     if (!(s.prevGap < lower && g >= lower)) continue;
@@ -1160,7 +1160,7 @@
                         const delta2 = s.prevGap - s.prevPrevGap;
 
                         // Reject accelerating or flat gaps
-                        if (delta1 >= delta2) continue;
+                        if (delta1 > delta2 + 1) continue;
                     }
 const P5  = this.conditionalReturnProb(d, g, 5);
                     const P10 = this.conditionalReturnProb(d, g, 10);
