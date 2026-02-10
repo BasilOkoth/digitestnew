@@ -745,6 +745,7 @@
                 lastSeen: null,
                 currentGap: 0,
 
+                prevGap: 0,
                 avgGap: 0,
                 p75Gap: 0,
                 p90Gap: 0,
@@ -789,6 +790,7 @@
                     gaps: [],
                     lastSeen: null,
                     currentGap: 0,
+                prevGap: 0,
                     avgGap: 0,
                     p75Gap: 0,
                     p90Gap: 0,
@@ -985,6 +987,8 @@
                 // update current gaps
                 for (let d = 0; d < 10; d++) {
                     const st = this.digitStats[d];
+                    // Store previous gap before updating current gap (release transition gate)
+                    st.prevGap = st.currentGap;
                     st.currentGap = (st.lastSeen === null)
                         ? this.tickIndex
                         : (this.tickIndex - st.lastSeen);
@@ -1094,6 +1098,10 @@
 
                     // PATCH 2: ExtendRatio is a SINGLE hard rule
                     if (extendRatio > MAX_EXTEND_RATIO) continue;
+
+                    // RELEASE TRANSITION GATE (critical for 2–3 tick wins)
+                    // Only allow digits that just entered the release band this tick.
+                    if (!(s.prevGap < 0.78 * p90 && g >= 0.78 * p90)) continue;
 
                     // PATCH 1: Pressure fallback removed completely — single hard band gate only
                     if (p90Ratio < 0.78 || p90Ratio > 0.92) continue;
