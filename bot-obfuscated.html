@@ -987,8 +987,7 @@
                 // update current gaps
                 for (let d = 0; d < 10; d++) {
                     const st = this.digitStats[d];
-                    // Store previous gaps before updating current gap (release transition gate)
-                    st.prevPrevGap = st.prevGap;
+                    // Store previous gap before updating current gap (release transition gate)
                     st.prevGap = st.currentGap;
                     st.currentGap = (st.lastSeen === null)
                         ? this.tickIndex
@@ -1103,14 +1102,6 @@
                     // RELEASE TRANSITION GATE (critical for 2–3 tick wins)
                     // Only allow digits that just entered the release band this tick.
                     if (!(s.prevGap < 0.78 * p90 && g >= 0.78 * p90)) continue;
-
-                    // RELEASE VELOCITY GATE — prevents late stalls
-                    // We only want digits whose gap expansion is slowing down
-                    const delta1 = s.currentGap - s.prevGap;
-                    const delta2 = s.prevGap - (s.prevPrevGap ?? s.prevGap);
-
-                    // Reject accelerating gaps (stalling tails)
-                    if (delta1 > delta2) continue;
 
                     // PATCH 1: Pressure fallback removed completely — single hard band gate only
                     if (p90Ratio < 0.78 || p90Ratio > 0.92) continue;
