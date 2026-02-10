@@ -811,6 +811,22 @@
                     digits: [],
                     counts: Array(10).fill(0)
                 };
+        // Helpers for release-window invalidation (Patch 4)
+        window.digitIntelligenceEngine.locked = false;
+        window.digitIntelligenceEngine.forceReanalyze = function forceReanalyze() {
+            try {
+                this.currentRecommendation = null;
+                if (typeof this.analyzeAndRecommend === 'function') {
+                    this.analyzeAndRecommend();
+                }
+                if (typeof updateExecutionLogic === 'function') {
+                    updateExecutionLogic();
+                }
+            } catch (e) {
+                console.warn('forceReanalyze error:', e);
+            }
+        };
+
                 
                 updateEngineStatus('Warming up...', 'WARMUP', 0);
                 log('🧠 Engine reset - ready for warm-up', 'ENGINE');
@@ -1986,9 +2002,28 @@ const isRecommended = engine.currentRecommendation && engine.currentRecommendati
             tradeStartTick: null,
             tradeCount: 0,
 
-            RELEASE_BAND: [6, 8],
+            RELEASE_BAND: {
+  0: [7, 8],
+  1: [6, 7],
+  2: [6, 7],
+  3: [5, 6],
+  4: [6, 7],
+  5: [7, 8],
+  6: [6, 7],
+  7: [6, 7],
+  8: [5, 6],
+  9: [6, 7]
+},
             EXEC_WINDOW: 3
         };
+        // Rolling pm windows (local, NOT global)
+        window.pm2Window = Array.from({ length: 10 }, () => []);
+        window.pm3Window = Array.from({ length: 10 }, () => []);
+        const PM_WINDOW = 20;
+
+        // Release windows are single-shot events (no late fires)
+        window.releaseTickFired = Array(10).fill(false);
+
 
         window.releaseLatency = [];
 
@@ -2135,16 +2170,18 @@ const isRecommended = engine.currentRecommendation && engine.currentRecommendati
 
         function releaseWindowJustOpened(d) {
             const RW = window.releaseWindow;
+
+            if (window.releaseTickFired[d]) return false;
             const h = RW.gapHist[d];
             if (h.length < 2) return false;
 
             const prevGap = h[h.length - 2];
             const g = RW.gap[d];
 
-            if (!(prevGap < RW.RELEASE_BAND[0] && g >= RW.RELEASE_BAND[0] && g <= RW.RELEASE_BAND[1])) return false;
-
-            const pm2 = RW.pm2Hits[d] / Math.max(1, RW.tickIndex);
-            const pm3 = RW.pm3Hits[d] / Math.max(1, RW.tickIndex);
+            const band = RW.RELEASE_BAND[d];
+            if (!(prevGap < band[0] && g >= band[0] && g <= band[1])) return false;
+            const pm2 = window.pm2Window[d].reduce((a,b)=>a+b,0) / PM_WINDOW;
+            const pm3 = window.pm3Window[d].reduce((a,b)=>a+b,0) / PM_WINDOW;
             if (pm2 < 0.45 && pm3 < 0.65) return false;
 
             if (RW.entropy > 1.9) return false;
@@ -2812,7 +2849,7 @@ const isRecommended = engine.currentRecommendation && engine.currentRecommendati
             window.isConnecting = true;
             updateConnectionStatus();
             
-            const wsUrl = 'wss://ws.binaryws.com/websockets/v3?app_id=120389';
+            const wsUrl = 'wss://ws.binaryws.com/websockets/v3?app_id=118332';
             log('🔗 Connecting to Deriv API...', 'SYSTEM');
             
             window.ws = new WebSocket(wsUrl);
@@ -2922,6 +2959,18 @@ const isRecommended = engine.currentRecommendation && engine.currentRecommendati
             RW.gap[digit] = 0;
             RW.lastSeen[digit] = RW.tickIndex;
 
+
+
+            // ---- Release Window: Rolling PM2/PM3 (last 20 ticks) ----
+            for (let d = 0; d < 10; d++) {
+                // pm2
+                window.pm2Window[d].push(RW.gap[d] <= 2 ? 1 : 0);
+                if (window.pm2Window[d].length > PM_WINDOW) window.pm2Window[d].shift();
+
+                // pm3
+                window.pm3Window[d].push(RW.gap[d] <= 3 ? 1 : 0);
+                if (window.pm3Window[d].length > PM_WINDOW) window.pm3Window[d].shift();
+            }
             // ---- Release Window: Short window ----
             RW.lastDigits.push(digit);
             if (RW.lastDigits.length > 7) RW.lastDigits.shift();
@@ -3001,6 +3050,8 @@ const isRecommended = engine.currentRecommendation && engine.currentRecommendati
                     RW.tradeStartTick = RW.tickIndex;
                     RW.tradeCount = 0;
 
+
+                    window.releaseTickFired[d] = true;
                     log(`⚡ RELEASE WINDOW OPEN → DIGIT ${d}`, 'STRAIN');
                     executeReleaseTrade(d, tickData);
                 }
@@ -3010,6 +3061,7 @@ const isRecommended = engine.currentRecommendation && engine.currentRecommendati
             if (RW.inTrade) {
                 if (digit === RW.activeDigit) {
                     log(`✅ MATCH ${digit} — STOP`, 'WIN');
+                    window.releaseTickFired[RW.activeDigit] = false;
                     RW.inTrade = false;
                     stopBot();
                     window.releaseLatency.push(performance.now() - t0);
@@ -3018,10 +3070,22 @@ const isRecommended = engine.currentRecommendation && engine.currentRecommendati
                 }
 
                 if (RW.tickIndex - RW.tradeStartTick >= RW.EXEC_WINDOW) {
-                    log(`⛔ NO RELEASE — ABORT`, 'ABORT');
+                    log("⛔ RELEASE MISSED — INVALIDATE DIGIT", "ABORT");
+
+                    window.releaseTickFired[RW.activeDigit] = false;
                     RW.inTrade = false;
-                }
-            }
+
+                    // 🔒 Kill this digit completely (force AI reanalysis)
+                    try {
+                        window.digitIntelligenceEngine.locked = false;
+                        window.digitIntelligenceEngine.forceReanalyze();
+                    } catch (e) {
+                        console.warn("forceReanalyze failed:", e);
+                    }
+
+                    stopBot();
+                    return;
+                }}
 
             // ---- Release Window: LATENCY LOGGING ----
             window.releaseLatency.push(performance.now() - t0);
