@@ -1986,7 +1986,14 @@ const isRecommended = engine.currentRecommendation && engine.currentRecommendati
         window.currentStake = 1.0;
         window.multiplier = 1.15;
 
-        // ================= RELEASE WINDOW STRAIN MODE =================
+        
+        // Release Window: Digit freeze (Patch 1)
+        window.frozenDigit = null;
+        window.freezeTick = null;
+
+        // Early-pressure multiplier window (Patch 2)
+        const EARLY_WINDOW = 3; // ticks
+// ================= RELEASE WINDOW STRAIN MODE =================
         window.releaseWindow = {
             tickIndex: 0,
             gap: Array(10).fill(0),
@@ -2055,6 +2062,8 @@ const isRecommended = engine.currentRecommendation && engine.currentRecommendati
         window.lastTick = null;
         window.nextTradeAllowed = true;
         window.stopAfterWin = false;
+            window.frozenDigit = null;
+            window.freezeTick = null;
         window.pendingProposals = new Map();
         window.executionLock = false;
         
@@ -2178,24 +2187,47 @@ const isRecommended = engine.currentRecommendation && engine.currentRecommendati
             const prevGap = h[h.length - 2];
             const g = RW.gap[d];
 
+            // Patch 3: entry only on exact gap transition into band[0]
             const band = RW.RELEASE_BAND[d];
-            if (!(prevGap < band[0] && g >= band[0] && g <= band[1])) return false;
+            if (!(prevGap < band[0] && g === band[0])) return false;
+
             const pm2 = window.pm2Window[d].reduce((a,b)=>a+b,0) / PM_WINDOW;
             const pm3 = window.pm3Window[d].reduce((a,b)=>a+b,0) / PM_WINDOW;
             if (pm2 < 0.45 && pm3 < 0.65) return false;
 
             if (RW.entropy > 1.9) return false;
 
+            // Patch 4: local dominance only (rolling pm3 window)
+            const dScore = window.pm3Window[d].reduce((a,b)=>a+b,0);
             for (let x = 0; x < 10; x++) {
-                if (x !== d && RW.pm3Hits[x] > RW.pm3Hits[d]) return false;
+                if (x !== d) {
+                    const xScore = window.pm3Window[x].reduce((a,b)=>a+b,0);
+                    if (xScore > dScore) return false;
+                }
             }
 
             return true;
         }
 
         function executeReleaseTrade(d, tick) {
+            const RW = window.releaseWindow;
+
+            // Patch 1: always trade the frozen digit once in-trade
+            const digitToTrade = (window.frozenDigit !== null) ? window.frozenDigit : d;
+
             const digitInput = document.getElementById('predictedDigit');
-            if (digitInput) digitInput.value = d;
+            if (digitInput) digitInput.value = digitToTrade;
+
+            // Patch 2: early-pressure multiplier (no aborting late trades)
+            if (window.freezeTick !== null) {
+                const age = RW.tickIndex - window.freezeTick;
+                if (age <= EARLY_WINDOW) {
+                    window.currentStake = parseFloat((window.currentStake * 1.15).toFixed(2));
+                } else {
+                    window.currentStake = parseFloat((window.currentStake * 1.02).toFixed(2));
+                }
+            }
+
             executeTrade(tick);
         }
 
@@ -3041,52 +3073,60 @@ const isRecommended = engine.currentRecommendation && engine.currentRecommendati
             // Update connection status UI
             updateConnectionStatus();
 
-            // ---- Release Window: ENTRY LOGIC (AI-SAFE) ----
+            // ---- Release Window: ENTRY LOGIC (FROZEN DIGIT) ----
             if (!RW.inTrade && window.isBotRunning && window.nextTradeAllowed && !window.executionLock && window.digitIntelligenceEngine.currentRecommendation) {
                 const d = window.digitIntelligenceEngine.currentRecommendation.digit;
                 if (releaseWindowJustOpened(d)) {
                     RW.inTrade = true;
+
+                    // Patch 1: freeze digit + start tick (no re-evaluation)
+                    window.frozenDigit = d;
+                    window.freezeTick = RW.tickIndex;
+
                     RW.activeDigit = d;
                     RW.tradeStartTick = RW.tickIndex;
                     RW.tradeCount = 0;
 
+                    window.currentStake = window.baseStake;
 
                     window.releaseTickFired[d] = true;
-                    log(`⚡ RELEASE WINDOW OPEN → DIGIT ${d}`, 'STRAIN');
+                    log(`⚡ RELEASE WINDOW OPEN → DIGIT ${d} (FROZEN)`, 'STRAIN');
                     executeReleaseTrade(d, tickData);
                 }
             }
 
-            // ---- Release Window: HARD STOP (MATCH / EXEC WINDOW) ----
+            // ---- Release Window: HARD STOP (MATCH / MAX TRADES) ----
             if (RW.inTrade) {
                 if (digit === RW.activeDigit) {
                     log(`✅ MATCH ${digit} — STOP`, 'WIN');
+
                     window.releaseTickFired[RW.activeDigit] = false;
                     RW.inTrade = false;
+                    window.frozenDigit = null;
+                    window.freezeTick = null;
+
+                    resetAllState();
                     stopBot();
+
                     window.releaseLatency.push(performance.now() - t0);
                     if (window.releaseLatency.length > 200) window.releaseLatency.shift();
                     return;
                 }
 
-                if (RW.tickIndex - RW.tradeStartTick >= RW.EXEC_WINDOW) {
-                    log("⛔ RELEASE MISSED — INVALIDATE DIGIT", "ABORT");
+                if (RW.tradeCount >= window.maxTrades) {
+                    log(`⛔ MAX TRADES — STOP`, 'STOP');
 
                     window.releaseTickFired[RW.activeDigit] = false;
                     RW.inTrade = false;
+                    window.frozenDigit = null;
+                    window.freezeTick = null;
 
-                    // 🔒 Kill this digit completely (force AI reanalysis)
-                    try {
-                        window.digitIntelligenceEngine.locked = false;
-                        window.digitIntelligenceEngine.forceReanalyze();
-                    } catch (e) {
-                        console.warn("forceReanalyze failed:", e);
-                    }
-
+                    resetAllState();
                     stopBot();
-                    return;
-                }}
 
+                    return;
+                }
+            }
             // ---- Release Window: LATENCY LOGGING ----
             window.releaseLatency.push(performance.now() - t0);
             if (window.releaseLatency.length > 200) window.releaseLatency.shift();
@@ -3186,11 +3226,30 @@ const isRecommended = engine.currentRecommendation && engine.currentRecommendati
                 if (s20 > 0.05) {
                     log(`🧱 Tail-risk gate: s20 ${(s20 * 100).toFixed(1)}% > 5% — re-picking`, 'ENGINE');
                     updateTradeStatus('NO TRADE', `Tail risk too high (s20 ${(s20 * 100).toFixed(1)}%)`, 'Re-picking safer digit', 'loss');
-                    rotateHybridDigit('Tail-risk gate');
+                    if (!(window.releaseWindow && window.releaseWindow.inTrade)) {
+                        rotateHybridDigit('Tail-risk gate');
+                    }
                     return;
                 }
             }
             
+
+            // Patch 1: ignore AI updates while a release-window trade is active
+            if (window.releaseWindow && window.releaseWindow.inTrade && window.frozenDigit !== null) {
+                const digitInput = document.getElementById('predictedDigit');
+                if (digitInput) digitInput.value = window.frozenDigit;
+            }
+
+            // Patch 2: early-pressure multiplier (applied per trade attempt)
+            if (window.releaseWindow && window.releaseWindow.inTrade && window.freezeTick !== null) {
+                const age = window.releaseWindow.tickIndex - window.freezeTick;
+                if (age <= EARLY_WINDOW) {
+                    window.currentStake = parseFloat((window.currentStake * 1.15).toFixed(2));
+                } else {
+                    window.currentStake = parseFloat((window.currentStake * 1.02).toFixed(2));
+                }
+            }
+
             window.executionLock = true;
             window.nextTradeAllowed = false;
             
@@ -3442,6 +3501,8 @@ window.isBotRunning = true;
             window.isBotRunning = false;
             window.nextTradeAllowed = false;
             window.stopAfterWin = false;
+            window.frozenDigit = null;
+            window.freezeTick = null;
             updateButtonState();
             
             log('⏹️ Bot stopped', 'SYSTEM');
@@ -3787,6 +3848,8 @@ window.isBotRunning = true;
             window.waitingForTradeResult = false;
             window.nextTradeAllowed = true;
             window.stopAfterWin = false;
+            window.frozenDigit = null;
+            window.freezeTick = null;
             
             // Reset digit zero tracker
             window.digitZeroTracker = {
