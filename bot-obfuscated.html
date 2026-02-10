@@ -745,7 +745,6 @@
                 lastSeen: null,
                 currentGap: 0,
 
-                prevGap: 0,
                 avgGap: 0,
                 p75Gap: 0,
                 p90Gap: 0,
@@ -790,7 +789,6 @@
                     gaps: [],
                     lastSeen: null,
                     currentGap: 0,
-                prevGap: 0,
                     avgGap: 0,
                     p75Gap: 0,
                     p90Gap: 0,
@@ -987,8 +985,6 @@
                 // update current gaps
                 for (let d = 0; d < 10; d++) {
                     const st = this.digitStats[d];
-                    // Store previous gap before updating current gap (release transition gate)
-                    st.prevGap = st.currentGap;
                     st.currentGap = (st.lastSeen === null)
                         ? this.tickIndex
                         : (this.tickIndex - st.lastSeen);
@@ -1099,10 +1095,6 @@
                     // PATCH 2: ExtendRatio is a SINGLE hard rule
                     if (extendRatio > MAX_EXTEND_RATIO) continue;
 
-                    // RELEASE TRANSITION GATE (critical for 2–3 tick wins)
-                    // Only allow digits that just entered the release band this tick.
-                    if (!(s.prevGap < 0.78 * p90 && g >= 0.78 * p90)) continue;
-
                     // PATCH 1: Pressure fallback removed completely — single hard band gate only
                     if (p90Ratio < 0.78 || p90Ratio > 0.92) continue;
 
@@ -1194,8 +1186,12 @@
                             return { ...x, survivalScore: raw, survivalNorm: norm };
                         });
 
-                        const rankedScored = asScored(ranked);
-                        survivalTop3 = rankedScored.slice(0, 3);
+                        let globalRanked = asScored(ranked);
+                        if (!globalRanked.length) {
+                            globalRanked = asScored(survivalStats).sort((a, b) => (b.survivalNorm - a.survivalNorm));
+                        }
+
+                        survivalTop3 = globalRanked.slice(0, 3);
                         survivalTop = survivalTop3[0] || null;
                     }
                 } catch (e) {
@@ -1245,10 +1241,45 @@
                     return candidate;
                 };
 
-                // Attach survival metrics to base pick (no survival-only fallback)
-                best = attachHybrid(best);
+                // If base engine has no pick, use survival's best digit (still HYBRID)
+                if (!best && hasSurvival && survivalTop) {
+                    best = {
+                        digit: survivalTop.digit,
+                        score: survivalTop.survivalNorm ?? (1 / (1 + Math.exp(-(survivalTop.survivalScore || 0)))),
+                        P10: survivalTop.pm10 ?? 0,
+                        P5: survivalTop.pm5 ?? 0,
+                        gap: survivalTop.gap ?? 0,
+                        persistenceScore: (this.digitStats[survivalTop.digit]?.persistenceScore ?? 0),
+                        isUnstable: (this.digitStats[survivalTop.digit]?.isUnstable ?? false),
+                        source: 'HYBRID',
+                        survival: survivalTop
+                    };
+                } else {
+                    best = attachHybrid(best);
+                }
 
-
+                // Optional override: if survival strongly prefers another digit, allow it to replace weak base picks.
+                if (best && hasSurvival && survivalTop && survivalTop.digit !== best.digit) {
+                    const baseScore = Number.isFinite(best.score) ? best.score : 0;
+                    const survTopNorm = survivalTop.survivalNorm ?? (1 / (1 + Math.exp(-(survivalTop.survivalScore || 0))));
+                    if (survTopNorm >= Math.max(0.62, baseScore + 0.08)) {
+                        best = {
+                            digit: survivalTop.digit,
+                            score: survTopNorm,
+                            P10: survivalTop.pm10 ?? 0,
+                            P5: survivalTop.pm5 ?? 0,
+                            gap: survivalTop.gap ?? 0,
+                            persistenceScore: (this.digitStats[survivalTop.digit]?.persistenceScore ?? 0),
+                            isUnstable: (this.digitStats[survivalTop.digit]?.isUnstable ?? false),
+                            source: 'HYBRID',
+                            survival: survivalTop
+                        };
+                    } else {
+                        // Ensure survival metrics are attached even if not overriding.
+                        best.survival = best.survival || survivalByDigit.get(best.digit) || null;
+                        best.source = 'HYBRID';
+                    }
+                }
 
                 if (best) {
                     this.currentRecommendation = best;
@@ -2089,47 +2120,24 @@ const isRecommended = engine.currentRecommendation && engine.currentRecommendati
             const prevGap = h[h.length - 2];
             const g = RW.gap[d];
 
-            // Entry only on exact gap transition into band[0]
+            // Patch 3: entry only on exact gap transition into band[0]
             const band = RW.RELEASE_BAND[d];
             if (!(prevGap < band[0] && g === band[0])) return false;
 
-            // PATCH 1 — RELEASE VELOCITY FILTER (CRITICAL)
-            // The gap must jump by ≥2 ticks in one step.
-            const gapVelocity = g - prevGap;
-            if (gapVelocity < 2) return false;
-
-            // PATCH 2 — COMPETITOR COLLAPSE CHECK
-            // At least 2 competitors just reset.
-            let collapsing = 0;
-            for (let x = 0; x < 10; x++) {
-                if (x !== d && RW.gap[x] <= 2) collapsing++;
-            }
-            if (collapsing < 2) return false;
-
-            // PATCH 3 — EARLY pm3 DOMINANCE (LOCAL)
-            // Require at least 3 hits in last 20 ticks.
-            const dScore = window.pm3Window[d].reduce((a,b)=>a+b,0);
-            if (dScore < 3) return false;
+            const pm2 = window.pm2Window[d].reduce((a,b)=>a+b,0) / PM_WINDOW;
+            const pm3 = window.pm3Window[d].reduce((a,b)=>a+b,0) / PM_WINDOW;
+            if (pm2 < 0.45 && pm3 < 0.65) return false;
 
             if (RW.entropy > 1.9) return false;
 
-            // Local dominance only (rolling pm3 window)
+            // Patch 4: local dominance only (rolling pm3 window)
+            const dScore = window.pm3Window[d].reduce((a,b)=>a+b,0);
             for (let x = 0; x < 10; x++) {
                 if (x !== d) {
                     const xScore = window.pm3Window[x].reduce((a,b)=>a+b,0);
                     if (xScore > dScore) return false;
                 }
             }
-
-            // PATCH 4 — FORBID MULTI-SURVIVOR PRESSURE
-            // If too many digits are in pressure, it's weak.
-            let pressureCount = 0;
-            for (let x = 0; x < 10; x++) {
-                const xb = RW.RELEASE_BAND[x];
-                const gx = RW.gap[x];
-                if (gx >= xb[0] && gx <= xb[1]) pressureCount++;
-            }
-            if (pressureCount > 2) return false;
 
             return true;
         }
@@ -2548,10 +2556,13 @@ const isRecommended = engine.currentRecommendation && engine.currentRecommendati
 
             if (sessionState.mode !== 'ai') return;
 
-            // Pick a low tail-risk digit (s20 <= 5%). No fallback.
+            // Prefer a low tail-risk digit (s20 <= 5%), otherwise use current AI rec.
             const pick = pickBestLowTailRiskDigit(0.05);
-            if (!pick || !Number.isFinite(pick.digit)) return;
-            const nextDigit = pick.digit;
+            const nextDigit =
+                (pick && Number.isFinite(pick.digit)) ? pick.digit :
+                (window.digitIntelligenceEngine?.currentRecommendation?.digit ?? null);
+
+            if (nextDigit === null) return;
 
             lockSessionDigit(nextDigit, true, reason || 'Rotate');
             log(`🔁 Re-picked HYBRID digit ${nextDigit}${reason ? ' (' + reason + ')' : ''}`, 'SESSION');
