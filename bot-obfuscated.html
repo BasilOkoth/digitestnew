@@ -1096,7 +1096,8 @@
                     if (extendRatio > MAX_EXTEND_RATIO) continue;
 
                     // PATCH 1: Pressure fallback removed completely — single hard band gate only
-                    if (p90Ratio < 0.78 || p90Ratio > 0.92) continue;
+                    if (p90Ratio < 0.82 || p90Ratio > 0.88) continue;
+
 
                     const P5  = this.conditionalReturnProb(d, g, 5);
                     const P10 = this.conditionalReturnProb(d, g, 10);
@@ -1113,8 +1114,8 @@
                     const pressureScore = Math.max(0, Math.min(1, (p90Ratio - 0.78) / (0.92 - 0.78)));
 
                     const score =
-                        0.45 * P10 +
-                        0.25 * P5 +
+                        0.55 * P5 +
+                        0.25 * P10 +
                         0.20 * pressureScore +
                         0.10 * (1 - s.persistenceScore / 100);
 
