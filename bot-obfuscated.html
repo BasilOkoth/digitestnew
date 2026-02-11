@@ -3089,11 +3089,19 @@ const isRecommended = engine.currentRecommendation && engine.currentRecommendati
         
         
         function getCurrentExecutionDigit() {
+            // AI mode: use engine recommendation when available
             if (sessionState.mode === 'ai') {
-                return window.digitIntelligenceEngine.currentRecommendation?.digit;
+                const d = window.digitIntelligenceEngine?.currentRecommendation?.digit;
+                return Number.isFinite(d) ? d : 5;
             }
-            const v = getCurrentExecutionDigit();
-            return Number.isFinite(v) ? v : 5;
+
+            // Instant/manual: read from UI input
+            const el = document.getElementById('predictedDigit');
+            const raw = el ? Number(el.value) : NaN;
+            if (!Number.isFinite(raw)) return 5;
+
+            const d = Math.floor(raw);
+            return d >= 0 && d <= 9 ? d : 5;
         }
 
 // PROCESS TICK IMMEDIATELY - CRITICAL TRADE EXECUTION FUNCTION
