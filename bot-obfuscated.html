@@ -1139,6 +1139,7 @@
             
             // Analyze and recommend digit
             analyzeAndRecommend: function() {
+                if (window.isSessionActive) return;
                 const regimeStatus = this.computeRegimeStatus();
 
                 if (!regimeStatus.ok) {
@@ -1234,7 +1235,6 @@
 
                         candidate.survival = { ...s, survivalScore: raw, survivalNorm: survNorm };
                         candidate.source = 'HYBRID';
-                        candidate.score = Math.max(0, Math.min(1, ((1 - w) * base) + (w * survNorm)));
                     } else {
                         candidate.source = 'HYBRID';
                         candidate.survival = null;
@@ -1863,6 +1863,7 @@ const isRecommended = engine.currentRecommendation && engine.currentRecommendati
         window.ws = null;
         window.req_id = 0;
         window.isBotRunning = false;
+            window.isSessionActive = false;
         window.isConnecting = false;
         window.soundEnabled = true;
         window.ToneInitialized = false;
@@ -2585,7 +2586,7 @@ const isRecommended = engine.currentRecommendation && engine.currentRecommendati
                 window.nextTradeAllowed = true;
                 
                 if (window.isBotRunning && !sessionState.manualOverride) {
-                    const manualDigit = parseInt(document.getElementById('predictedDigit').value);
+                    const manualDigit = getCurrentExecutionDigit();
                     if (!isNaN(manualDigit) && manualDigit >= 0 && manualDigit <= 9) {
                         sessionState.sessionDigit = manualDigit;
                         sessionState.sessionStarted = true;
@@ -2722,6 +2723,12 @@ const isRecommended = engine.currentRecommendation && engine.currentRecommendati
             resetTradeStatus();
             
             document.getElementById('predictedDigit').addEventListener('change', function() {
+                if (sessionState.mode === 'ai') {
+                    const d = window.digitIntelligenceEngine.currentRecommendation?.digit;
+                    this.value = Number.isFinite(d) ? d : (sessionState.sessionDigit ?? 5);
+                    log('🤖 AI mode: manual digit override is disabled.', 'ENGINE');
+                    return;
+                }
                 const newDigit = parseInt(this.value);
                 if (!isNaN(newDigit) && newDigit >= 0 && newDigit <= 9) {
                     
@@ -3080,7 +3087,16 @@ const isRecommended = engine.currentRecommendation && engine.currentRecommendati
             return true;
         }
         
-        // PROCESS TICK IMMEDIATELY - CRITICAL TRADE EXECUTION FUNCTION
+        
+        function getCurrentExecutionDigit() {
+            if (sessionState.mode === 'ai') {
+                return window.digitIntelligenceEngine.currentRecommendation?.digit;
+            }
+            const v = getCurrentExecutionDigit();
+            return Number.isFinite(v) ? v : 5;
+        }
+
+// PROCESS TICK IMMEDIATELY - CRITICAL TRADE EXECUTION FUNCTION
         function processTickImmediately(tick) {
             if (window.stopAfterWin) return;
             
@@ -3110,7 +3126,7 @@ const isRecommended = engine.currentRecommendation && engine.currentRecommendati
 
             // 🧱 HARD TAIL-RISK GATE (s20 <= 5%)
             if (sessionState.mode === 'ai' && window.isBotRunning) {
-                const lockedDigit = (sessionState.sessionDigit !== null) ? sessionState.sessionDigit : parseInt(document.getElementById('predictedDigit').value);
+                const lockedDigit = (sessionState.sessionDigit !== null) ? sessionState.sessionDigit : getCurrentExecutionDigit();
                 const s = getSurvivalForDigit(lockedDigit);
 
                 if (!s || !Number.isFinite(Number(s.s20))) {
@@ -3160,7 +3176,7 @@ const isRecommended = engine.currentRecommendation && engine.currentRecommendati
                 
                 updateTradeStatus(
                     'TRADING',
-                    `Trade #${window.tradeCount}: $${window.currentStake.toFixed(2)} on digit ${parseInt(document.getElementById('predictedDigit').value)}`,
+                    `Trade #${window.tradeCount}: $${window.currentStake.toFixed(2)} on digit ${getCurrentExecutionDigit()}`,
                     'Executing trade...',
                     'trade'
                 );
@@ -3180,7 +3196,9 @@ const isRecommended = engine.currentRecommendation && engine.currentRecommendati
         function executeTrade(tick) {
             const contractType = document.getElementById('contractType').value;
             const symbol = document.getElementById('symbol').value;
-            const predictedDigit = parseInt(document.getElementById('predictedDigit').value);
+            const predictedDigit = (sessionState.mode === 'ai')
+                ? window.digitIntelligenceEngine.currentRecommendation.digit
+                : getCurrentExecutionDigit();
             
             let stake = window.currentStake;
             trackTradeInvestment(stake);
@@ -3215,7 +3233,7 @@ const isRecommended = engine.currentRecommendation && engine.currentRecommendati
         function checkForImmediateWin(tick) {
             if (!window.isBotRunning || window.stopAfterWin) return false;
             
-            const predictedDigit = parseInt(document.getElementById('predictedDigit').value);
+            const predictedDigit = getCurrentExecutionDigit();
             const tickDigit = parseInt(tick.digit);
             
             if (tickDigit === predictedDigit) {
@@ -3349,7 +3367,7 @@ const isRecommended = engine.currentRecommendation && engine.currentRecommendati
             clearSessionDigitLock('Start');
 
             if (sessionState.mode === 'instant') {
-                const manualDigit = parseInt(document.getElementById('predictedDigit').value);
+                const manualDigit = getCurrentExecutionDigit();
                 sessionState.sessionDigit = (Number.isFinite(manualDigit) && manualDigit >= 0 && manualDigit <= 9) ? manualDigit : 5;
                 sessionState.sessionStarted = true;
                 sessionState.manualOverride = true;
@@ -3362,6 +3380,7 @@ const isRecommended = engine.currentRecommendation && engine.currentRecommendati
                 updateSessionDisplay();
             }
 window.isBotRunning = true;
+            window.isSessionActive = true;
             updateButtonState();
             
             log('🚀 Starting bot...', 'SYSTEM');
@@ -3396,6 +3415,7 @@ window.isBotRunning = true;
             if (!window.isBotRunning) return;
             
             window.isBotRunning = false;
+            window.isSessionActive = false;
             window.nextTradeAllowed = false;
             window.stopAfterWin = false;
             window.frozenDigit = null;
@@ -3715,6 +3735,7 @@ window.isBotRunning = true;
         
         // Reset all state
         function resetAllState() {
+            window.isSessionActive = false;
             window.maxTrades = parseInt(document.getElementById('maxTrades').value) || 10;
             window.maxCycleTrades = parseInt(document.getElementById('maxCycleTrades')?.value) || 10;
             window.cycleRotations = 0;
