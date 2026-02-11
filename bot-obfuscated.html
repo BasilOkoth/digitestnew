@@ -1081,7 +1081,7 @@
                         ? thresholds.maxPersistenceStable
                         : thresholds.maxPersistenceUnstable;
 
-                const MAX_EXTEND_RATIO = 1.8;
+                const MAX_EXTEND_RATIO = 1.5;
 
                 let best = null;
 
@@ -1096,7 +1096,7 @@
                     if (extendRatio > MAX_EXTEND_RATIO) continue;
 
                     // PATCH 1: Pressure fallback removed completely — single hard band gate only
-                    if (p90Ratio < 0.70 || p90Ratio > 0.90) continue;
+                    if (p90Ratio < 0.65 || p90Ratio > 0.92) continue;
 
 
                     const P5  = this.conditionalReturnProb(d, g, 5);
@@ -1105,19 +1105,12 @@
                     if (s.gaps.length < thresholds.minSupport) continue;
                     if (P5 < thresholds.minH5) continue;
                     if (P10 < thresholds.minP10) continue;
-                    if (thresholds.require_g_lt_p90 && g >= p90) continue;
-
-                    if (s.persistenceScore > maxPersistence) continue;
-                    if (s.consecutiveExtendingGaps > thresholds.maxExtend) continue;
-                    if (s.isUnstable) continue;
-
-                    const pressureScore = Math.max(0, Math.min(1, (p90Ratio - 0.78) / (0.92 - 0.78)));
+const pressureScore = Math.max(0, Math.min(1, (p90Ratio - 0.78) / (0.92 - 0.78)));
 
                     const score =
-                        0.55 * P5 +
-                        0.25 * P10 +
-                        0.20 * pressureScore +
-                        0.10 * (1 - s.persistenceScore / 100);
+                        0.70 * P5 +
+                        0.20 * P10 +
+                        0.10 * pressureScore;
 
                     if (!best || score > best.score) {
                         best = {
