@@ -1234,7 +1234,7 @@
 
                         candidate.survival = { ...s, survivalScore: raw, survivalNorm: survNorm };
                         candidate.source = 'HYBRID';
-                        
+                        candidate.score = Math.max(0, Math.min(1, ((1 - w) * base) + (w * survNorm)));
                     } else {
                         candidate.source = 'HYBRID';
                         candidate.survival = null;
@@ -1812,7 +1812,7 @@ const isRecommended = engine.currentRecommendation && engine.currentRecommendati
             }
             
             const recommendedDigit = window.digitIntelligenceEngine.currentRecommendation.digit;
-            digitIntelligenceEngine.currentRecommendation.digit= recommendedDigit;
+            document.getElementById('predictedDigit').value = recommendedDigit;
             
             if (sessionState.sessionStarted) {
                 const confirmChange = confirm(`AI recommends digit ${recommendedDigit}. Change current digit?`);
@@ -2456,7 +2456,7 @@ const isRecommended = engine.currentRecommendation && engine.currentRecommendati
             sessionState.sessionDigit = digit;
             sessionState.sessionStarted = true;
             sessionState.manualOverride = false;
-            digitIntelligenceEngine.currentRecommendation.digit= digit;
+            document.getElementById('predictedDigit').value = digit;
             updateSessionDisplay();
             log(`🔒 Digit ${digit} locked for current session${reason ? ' (' + reason + ')' : ''}`, 'SESSION');
             return digit;
@@ -2585,8 +2585,7 @@ const isRecommended = engine.currentRecommendation && engine.currentRecommendati
                 window.nextTradeAllowed = true;
                 
                 if (window.isBotRunning && !sessionState.manualOverride) {
-                    const manualDigit = parseInt(digitIntelligenceEngine.currentRecommendation.digit
-
+                    const manualDigit = parseInt(document.getElementById('predictedDigit').value);
                     if (!isNaN(manualDigit) && manualDigit >= 0 && manualDigit <= 9) {
                         sessionState.sessionDigit = manualDigit;
                         sessionState.sessionStarted = true;
@@ -2604,8 +2603,7 @@ const isRecommended = engine.currentRecommendation && engine.currentRecommendati
                 // In AI mode we PREVIEW digits while stopped, and LOCK only when the bot is running.
                 if (window.digitIntelligenceEngine.warmupDone && window.digitIntelligenceEngine.currentRecommendation) {
                     const recommendedDigit = window.digitIntelligenceEngine.currentRecommendation.digit;
-                    digitIntelligenceEngine.currentRecommendation.digit=recommendedDigit;
-
+                    document.getElementById('predictedDigit').value = recommendedDigit;
 
                     if (window.isBotRunning) {
                         lockSessionDigit(recommendedDigit, true, 'AI AUTO (running)');
@@ -2649,8 +2647,7 @@ const isRecommended = engine.currentRecommendation && engine.currentRecommendati
 
                 if (!window.isBotRunning) {
                     // Preview only while stopped
-                    digitIntelligenceEngine.currentRecommendation.digit=recommendedDigit;
-
+                    document.getElementById('predictedDigit').value = recommendedDigit;
                     clearSessionDigitLock('AI preview (stopped)');
                     window.nextTradeAllowed = false;
                     updateTradeStatus('READY', `AI digit ${recommendedDigit} ready`, 'Will lock on Start', 'normal');
@@ -3113,7 +3110,7 @@ const isRecommended = engine.currentRecommendation && engine.currentRecommendati
 
             // 🧱 HARD TAIL-RISK GATE (s20 <= 5%)
             if (sessionState.mode === 'ai' && window.isBotRunning) {
-                const lockedDigit = (sessionState.sessionDigit !== null) ? sessionState.sessionDigit : parseInt(digitIntelligenceEngine.currentRecommendation.digit;
+                const lockedDigit = (sessionState.sessionDigit !== null) ? sessionState.sessionDigit : parseInt(document.getElementById('predictedDigit').value);
                 const s = getSurvivalForDigit(lockedDigit);
 
                 if (!s || !Number.isFinite(Number(s.s20))) {
@@ -3163,7 +3160,7 @@ const isRecommended = engine.currentRecommendation && engine.currentRecommendati
                 
                 updateTradeStatus(
                     'TRADING',
-                    `Trade #${window.tradeCount}: $${window.currentStake.toFixed(2)} on digit ${parseInt(digitIntelligenceEngine.currentRecommendation.digit)}`,
+                    `Trade #${window.tradeCount}: $${window.currentStake.toFixed(2)} on digit ${parseInt(document.getElementById('predictedDigit').value)}`,
                     'Executing trade...',
                     'trade'
                 );
@@ -3181,7 +3178,7 @@ const isRecommended = engine.currentRecommendation && engine.currentRecommendati
         
         // EXECUTE TRADE - CRITICAL FUNCTION
         function executeTrade(tick) {
-            const contractType = digitIntelligenceEngine.currentRecommendation.digit;
+            const contractType = document.getElementById('contractType').value;
             const symbol = document.getElementById('symbol').value;
             const predictedDigit = parseInt(document.getElementById('predictedDigit').value);
             
@@ -3218,7 +3215,7 @@ const isRecommended = engine.currentRecommendation && engine.currentRecommendati
         function checkForImmediateWin(tick) {
             if (!window.isBotRunning || window.stopAfterWin) return false;
             
-            const predictedDigit = parseInt(digitIntelligenceEngine.currentRecommendation.digit);
+            const predictedDigit = parseInt(document.getElementById('predictedDigit').value);
             const tickDigit = parseInt(tick.digit);
             
             if (tickDigit === predictedDigit) {
@@ -3352,7 +3349,7 @@ const isRecommended = engine.currentRecommendation && engine.currentRecommendati
             clearSessionDigitLock('Start');
 
             if (sessionState.mode === 'instant') {
-                const manualDigit = parseInt(digitIntelligenceEngine.currentRecommendation.digit);
+                const manualDigit = parseInt(document.getElementById('predictedDigit').value);
                 sessionState.sessionDigit = (Number.isFinite(manualDigit) && manualDigit >= 0 && manualDigit <= 9) ? manualDigit : 5;
                 sessionState.sessionStarted = true;
                 sessionState.manualOverride = true;
