@@ -1234,7 +1234,7 @@
 
                         candidate.survival = { ...s, survivalScore: raw, survivalNorm: survNorm };
                         candidate.source = 'HYBRID';
-                        candidate.score = Math.max(0, Math.min(1, ((1 - w) * base) + (w * survNorm)));
+                        
                     } else {
                         candidate.source = 'HYBRID';
                         candidate.survival = null;
