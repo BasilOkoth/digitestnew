@@ -696,7 +696,7 @@
 
             // EARLY PRESSURE (REALISTIC MODE)
             minH5: 0.42,        // 🔥 KEY CHANGE (from 0.50 → 0.45)
-            minP10: 0.60,       // slightly relaxed
+            minP10: 0.66,       // slightly relaxed
 
             maxPersistenceStable: 97,      // allow more clean cold
             maxPersistenceStableRelax: 97,
@@ -710,8 +710,8 @@
             pressureZoneEnabled: true,
             // Looser default so you still get trades, but quality stays high.
             // 0.75 means "within last 25% of P90"
-            pressureZoneMinP90Ratio: 0.68,
-            pressureZoneMaxP90Ratio: 0.93,
+            pressureZoneMinP90Ratio: 0.70,
+            pressureZoneMaxP90Ratio: 0.95,
                         // Hard floor: never recommend if gap is far from P90 (prevents "gap 4, p90 20" type picks)
             pressureZoneMinFloorP90Ratio: 0.60,
         };
@@ -1096,7 +1096,7 @@
                     if (extendRatio > MAX_EXTEND_RATIO) continue;
 
                     // PATCH 1: Pressure fallback removed completely — single hard band gate only
-                    if (p90Ratio < 0.65 || p90Ratio > 0.92) continue;
+                    if (p90Ratio < 0.70 || p90Ratio > 0.90) continue;
 
 
                     const P5  = this.conditionalReturnProb(d, g, 5);
@@ -1105,12 +1105,19 @@
                     if (s.gaps.length < thresholds.minSupport) continue;
                     if (P5 < thresholds.minH5) continue;
                     if (P10 < thresholds.minP10) continue;
-const pressureScore = Math.max(0, Math.min(1, (p90Ratio - 0.78) / (0.92 - 0.78)));
+                    if (thresholds.require_g_lt_p90 && g >= p90) continue;
+
+                    if (s.persistenceScore > maxPersistence) continue;
+                    if (s.consecutiveExtendingGaps > thresholds.maxExtend) continue;
+                    if (s.isUnstable) continue;
+
+                    const pressureScore = Math.max(0, Math.min(1, (p90Ratio - 0.78) / (0.92 - 0.78)));
 
                     const score =
-                        0.70 * P5 +
-                        0.20 * P10 +
-                        0.10 * pressureScore;
+                        0.55 * P5 +
+                        0.25 * P10 +
+                        0.20 * pressureScore +
+                        0.10 * (1 - s.persistenceScore / 100);
 
                     if (!best || score > best.score) {
                         best = {
@@ -1132,7 +1139,6 @@ const pressureScore = Math.max(0, Math.min(1, (p90Ratio - 0.78) / (0.92 - 0.78))
             
             // Analyze and recommend digit
             analyzeAndRecommend: function() {
-                if (window.isSessionActive) return;
                 const regimeStatus = this.computeRegimeStatus();
 
                 if (!regimeStatus.ok) {
@@ -1228,6 +1234,7 @@ const pressureScore = Math.max(0, Math.min(1, (p90Ratio - 0.78) / (0.92 - 0.78))
 
                         candidate.survival = { ...s, survivalScore: raw, survivalNorm: survNorm };
                         candidate.source = 'HYBRID';
+                        candidate.score = Math.max(0, Math.min(1, ((1 - w) * base) + (w * survNorm)));
                     } else {
                         candidate.source = 'HYBRID';
                         candidate.survival = null;
@@ -1856,7 +1863,6 @@ const isRecommended = engine.currentRecommendation && engine.currentRecommendati
         window.ws = null;
         window.req_id = 0;
         window.isBotRunning = false;
-            window.isSessionActive = false;
         window.isConnecting = false;
         window.soundEnabled = true;
         window.ToneInitialized = false;
@@ -2579,7 +2585,7 @@ const isRecommended = engine.currentRecommendation && engine.currentRecommendati
                 window.nextTradeAllowed = true;
                 
                 if (window.isBotRunning && !sessionState.manualOverride) {
-                    const manualDigit = getCurrentExecutionDigit();
+                    const manualDigit = parseInt(document.getElementById('predictedDigit').value);
                     if (!isNaN(manualDigit) && manualDigit >= 0 && manualDigit <= 9) {
                         sessionState.sessionDigit = manualDigit;
                         sessionState.sessionStarted = true;
@@ -2716,12 +2722,6 @@ const isRecommended = engine.currentRecommendation && engine.currentRecommendati
             resetTradeStatus();
             
             document.getElementById('predictedDigit').addEventListener('change', function() {
-                if (sessionState.mode === 'ai') {
-                    const d = window.digitIntelligenceEngine.currentRecommendation?.digit;
-                    this.value = Number.isFinite(d) ? d : (sessionState.sessionDigit ?? 5);
-                    log('🤖 AI mode: manual digit override is disabled.', 'ENGINE');
-                    return;
-                }
                 const newDigit = parseInt(this.value);
                 if (!isNaN(newDigit) && newDigit >= 0 && newDigit <= 9) {
                     
@@ -3080,24 +3080,7 @@ const isRecommended = engine.currentRecommendation && engine.currentRecommendati
             return true;
         }
         
-        
-        function getCurrentExecutionDigit() {
-            // AI mode: use engine recommendation when available
-            if (sessionState.mode === 'ai') {
-                const d = window.digitIntelligenceEngine?.currentRecommendation?.digit;
-                return Number.isFinite(d) ? d : 5;
-            }
-
-            // Instant/manual: read from UI input
-            const el = document.getElementById('predictedDigit');
-            const raw = el ? Number(el.value) : NaN;
-            if (!Number.isFinite(raw)) return 5;
-
-            const d = Math.floor(raw);
-            return d >= 0 && d <= 9 ? d : 5;
-        }
-
-// PROCESS TICK IMMEDIATELY - CRITICAL TRADE EXECUTION FUNCTION
+        // PROCESS TICK IMMEDIATELY - CRITICAL TRADE EXECUTION FUNCTION
         function processTickImmediately(tick) {
             if (window.stopAfterWin) return;
             
@@ -3127,7 +3110,7 @@ const isRecommended = engine.currentRecommendation && engine.currentRecommendati
 
             // 🧱 HARD TAIL-RISK GATE (s20 <= 5%)
             if (sessionState.mode === 'ai' && window.isBotRunning) {
-                const lockedDigit = (sessionState.sessionDigit !== null) ? sessionState.sessionDigit : getCurrentExecutionDigit();
+                const lockedDigit = (sessionState.sessionDigit !== null) ? sessionState.sessionDigit : parseInt(document.getElementById('predictedDigit').value);
                 const s = getSurvivalForDigit(lockedDigit);
 
                 if (!s || !Number.isFinite(Number(s.s20))) {
@@ -3177,7 +3160,7 @@ const isRecommended = engine.currentRecommendation && engine.currentRecommendati
                 
                 updateTradeStatus(
                     'TRADING',
-                    `Trade #${window.tradeCount}: $${window.currentStake.toFixed(2)} on digit ${getCurrentExecutionDigit()}`,
+                    `Trade #${window.tradeCount}: $${window.currentStake.toFixed(2)} on digit ${parseInt(document.getElementById('predictedDigit').value)}`,
                     'Executing trade...',
                     'trade'
                 );
@@ -3197,9 +3180,7 @@ const isRecommended = engine.currentRecommendation && engine.currentRecommendati
         function executeTrade(tick) {
             const contractType = document.getElementById('contractType').value;
             const symbol = document.getElementById('symbol').value;
-            const predictedDigit = (sessionState.mode === 'ai')
-                ? window.digitIntelligenceEngine.currentRecommendation.digit
-                : getCurrentExecutionDigit();
+            const predictedDigit = parseInt(document.getElementById('predictedDigit').value);
             
             let stake = window.currentStake;
             trackTradeInvestment(stake);
@@ -3234,7 +3215,7 @@ const isRecommended = engine.currentRecommendation && engine.currentRecommendati
         function checkForImmediateWin(tick) {
             if (!window.isBotRunning || window.stopAfterWin) return false;
             
-            const predictedDigit = getCurrentExecutionDigit();
+            const predictedDigit = parseInt(document.getElementById('predictedDigit').value);
             const tickDigit = parseInt(tick.digit);
             
             if (tickDigit === predictedDigit) {
@@ -3368,7 +3349,7 @@ const isRecommended = engine.currentRecommendation && engine.currentRecommendati
             clearSessionDigitLock('Start');
 
             if (sessionState.mode === 'instant') {
-                const manualDigit = getCurrentExecutionDigit();
+                const manualDigit = parseInt(document.getElementById('predictedDigit').value);
                 sessionState.sessionDigit = (Number.isFinite(manualDigit) && manualDigit >= 0 && manualDigit <= 9) ? manualDigit : 5;
                 sessionState.sessionStarted = true;
                 sessionState.manualOverride = true;
@@ -3381,7 +3362,6 @@ const isRecommended = engine.currentRecommendation && engine.currentRecommendati
                 updateSessionDisplay();
             }
 window.isBotRunning = true;
-            window.isSessionActive = true;
             updateButtonState();
             
             log('🚀 Starting bot...', 'SYSTEM');
@@ -3416,7 +3396,6 @@ window.isBotRunning = true;
             if (!window.isBotRunning) return;
             
             window.isBotRunning = false;
-            window.isSessionActive = false;
             window.nextTradeAllowed = false;
             window.stopAfterWin = false;
             window.frozenDigit = null;
@@ -3736,7 +3715,6 @@ window.isBotRunning = true;
         
         // Reset all state
         function resetAllState() {
-            window.isSessionActive = false;
             window.maxTrades = parseInt(document.getElementById('maxTrades').value) || 10;
             window.maxCycleTrades = parseInt(document.getElementById('maxCycleTrades')?.value) || 10;
             window.cycleRotations = 0;
