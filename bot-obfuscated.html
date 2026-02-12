@@ -909,11 +909,9 @@
                 this.updateRegime(digit);
                 this.onNewDigit(digit);
                 
-                // Update analysis every 50 ticks
-                if (this.tickIndex % 50 === 0) {
-                    this.analyzeAndRecommend();
-                }
-            },
+                // PATCH 3: Force immediate re-analysis (every tick)
+                this.analyzeAndRecommend();
+},
             
             // Update regime statistics
             updateRegime: function(digit) {
@@ -1081,7 +1079,7 @@
                         ? thresholds.maxPersistenceStable
                         : thresholds.maxPersistenceUnstable;
 
-                const MAX_EXTEND_RATIO = 1.3;
+                const MAX_EXTEND_RATIO = 1.9;
 
                 let best = null;
 
@@ -1095,8 +1093,11 @@
                     // PATCH 2: ExtendRatio is a SINGLE hard rule
                     if (extendRatio > MAX_EXTEND_RATIO) continue;
 
-                    // PATCH 1: Pressure fallback removed completely — single hard band gate only
-                    if (p90Ratio < 0.80 || p90Ratio > 0.90) continue;
+                    // PATCH 1: Synchronize pressure band with UI (single hard gate)
+                    const PRESSURE_MIN = 0.70;
+                    const PRESSURE_MAX = 0.95;
+
+                    if (p90Ratio < PRESSURE_MIN || p90Ratio > PRESSURE_MAX) continue;
 
 
                     const P5  = this.conditionalReturnProb(d, g, 5);
@@ -1238,6 +1239,7 @@
                 best = attachHybrid(best);
 
                 if (!best) {
+                    log('🚫 No digit passed final engine gates', 'ENGINE');
                     this.currentRecommendation = null;
                     document.getElementById('ai-recommended-digit').textContent = '-';
                     document.getElementById('ai-digit-score').textContent = 'Score: 0.0% | P10: 0.0% | NO-TRADE';
@@ -1861,6 +1863,29 @@ const isRecommended = engine.currentRecommendation && engine.currentRecommendati
         // CORE BOT FUNCTIONS - UPDATED FOR 10 SECOND PNL DISPLAY & NETWORK RECOVERY
         // ============================================================================
         
+
+        // ============================================================================
+        // EXECUTION DIGIT RESOLVER (Patch 5)
+        // Single source of truth for what digit is actually being traded / checked.
+        // ============================================================================
+        function getExecutionDigit() {
+            try {
+                // AI mode: prefer locked session digit; fall back to current AI recommendation
+                if (typeof sessionState !== 'undefined' && sessionState && sessionState.mode === 'ai') {
+                    const locked = sessionState.sessionDigit;
+                    if (Number.isInteger(locked) && locked >= 0 && locked <= 9) return locked;
+
+                    const rec = window.digitIntelligenceEngine?.currentRecommendation?.digit;
+                    if (Number.isInteger(rec) && rec >= 0 && rec <= 9) return rec;
+                }
+
+                const v = parseInt(document.getElementById('predictedDigit')?.value, 10);
+                if (Number.isInteger(v) && v >= 0 && v <= 9) return v;
+            } catch (_) {}
+
+            return 5;
+        }
+
         // Global State
         window.ws = null;
         window.req_id = 0;
@@ -3162,7 +3187,7 @@ const isRecommended = engine.currentRecommendation && engine.currentRecommendati
                 
                 updateTradeStatus(
                     'TRADING',
-                    `Trade #${window.tradeCount}: $${window.currentStake.toFixed(2)} on digit ${parseInt(document.getElementById('predictedDigit').value)}`,
+                    `Trade #${window.tradeCount}: $${window.currentStake.toFixed(2)} on digit ${getExecutionDigit()}`,
                     'Executing trade...',
                     'trade'
                 );
@@ -3182,7 +3207,7 @@ const isRecommended = engine.currentRecommendation && engine.currentRecommendati
         function executeTrade(tick) {
             const contractType = document.getElementById('contractType').value;
             const symbol = document.getElementById('symbol').value;
-            const predictedDigit = parseInt(document.getElementById('predictedDigit').value);
+            const predictedDigit = getExecutionDigit();
             
             let stake = window.currentStake;
             trackTradeInvestment(stake);
@@ -3217,7 +3242,7 @@ const isRecommended = engine.currentRecommendation && engine.currentRecommendati
         function checkForImmediateWin(tick) {
             if (!window.isBotRunning || window.stopAfterWin) return false;
             
-            const predictedDigit = parseInt(document.getElementById('predictedDigit').value);
+            const predictedDigit = getExecutionDigit();
             const tickDigit = parseInt(tick.digit);
             
             if (tickDigit === predictedDigit) {
