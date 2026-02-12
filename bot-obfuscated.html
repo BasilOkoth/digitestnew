@@ -2971,10 +2971,8 @@ function releaseWindowJustOpened(d) {
             window.tickTimestamps.push(Date.now());
             const tenSecondsAgo = Date.now() - 10000;
             window.tickTimestamps = window.tickTimestamps.filter(ts => ts > tenSecondsAgo);
-            
-            // Add tick to queue for processing
-            addTickToQueue(tickData);
-            
+
+            // Queueing happens later (after release-entry detection) to avoid double-execution.
             // Update engine with digit
             if (window.digitIntelligenceEngine.enabled) {
                 window.digitIntelligenceEngine.processLiveTick(digit);
@@ -3016,8 +3014,10 @@ if (sessionState.mode === 'ai' && window.digitIntelligenceEngine.currentRecommen
     }
 }
 
+            // Add tick to queue for normal processing (prevents double trade on release-entry tick)
+            addTickToQueue(tickData);
 
-            // ---- Release Window: HARD STOP (MATCH / MAX TRADES) ----
+// ---- Release Window: HARD STOP (MATCH / MAX TRADES) ----
             if (RW.inTrade) {
                 if (digit === RW.activeDigit) {
                     log(`✅ MATCH ${digit} — UNLOCK`, 'WIN');
