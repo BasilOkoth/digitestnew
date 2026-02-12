@@ -726,7 +726,7 @@
         // Ranking defaults (tweakable)
         window.SURVIVAL_CFG = {
             minPm5: 0.60,
-            maxS20: 0.05,
+            maxS20: 0.08,
             maxETM: 12,
             requirePressure: true
         };
@@ -1081,6 +1081,24 @@
 
                 const MAX_EXTEND_RATIO = 1.9;
 
+
+                // --- survival metrics (tail-risk cap) ---
+                const MAX_S20 = 0.08;  // 8% tail cap
+                let _survivalByDigit = null;
+
+                try {
+                    const minDigits = (typeof window.SURVIVAL_MIN_DIGITS === 'number') ? window.SURVIVAL_MIN_DIGITS : 80;
+                    const windowSize = window.SURVIVAL_WINDOW || 2000;
+
+                    if (window.SurvivalEngine && Array.isArray(window.lastDigits) && window.lastDigits.length >= minDigits) {
+                        const sStats = window.SurvivalEngine.analyze(window.lastDigits, { window: windowSize });
+                        _survivalByDigit = new Map(sStats.map(x => [x.digit, x]));
+                    }
+                } catch (e) {
+                    _survivalByDigit = null;
+                }
+
+
                 let best = null;
 
                 for (let d = 0; d < 10; d++) {
@@ -1102,6 +1120,11 @@
 
                     const P5  = this.conditionalReturnProb(d, g, 5);
                     const P10 = this.conditionalReturnProb(d, g, 10);
+
+
+
+                    const s20 = _survivalByDigit ? Number((_survivalByDigit.get(d) || {}).s20) : 0;
+                    if (!Number.isFinite(s20) || s20 > MAX_S20) continue;
 
                     if (s.gaps.length < thresholds.minSupport) continue;
                     if (P5 < thresholds.minH5) continue;
@@ -2497,68 +2520,6 @@ const isRecommended = engine.currentRecommendation && engine.currentRecommendati
             if (reason) log(`🔓 Session digit lock cleared (${reason})`, 'SESSION');
         }
 
-        // HYBRID UTILITIES (tail-risk gate + cycle rotation)
-        function getSurvivalForDigit(digit) {
-            const d = Number(digit);
-            if (!Number.isFinite(d) || d < 0 || d > 9) return null;
-
-            if (window.latestSurvivalByDigit && window.latestSurvivalByDigit[d]) {
-                return window.latestSurvivalByDigit[d];
-            }
-
-            const rec = window.digitIntelligenceEngine?.currentRecommendation;
-            if (rec && rec.digit === d && rec.survival) return rec.survival;
-
-            return null;
-        }
-
-        function pickBestLowTailRiskDigit(maxS20 = 0.05) {
-            if (!window.latestSurvivalByDigit) return null;
-
-            let best = null;
-            for (let d = 0; d <= 9; d++) {
-                const s = window.latestSurvivalByDigit[d];
-                if (!s) continue;
-
-                const s20 = Number(s.s20);
-                if (!Number.isFinite(s20) || s20 > maxS20) continue;
-
-                const raw =
-                    (2.0 * (s.pm5 || 0)) +
-                    (1.0 * (s.pm10 || 0)) -
-                    (2.5 * (s.s20 || 0)) -
-                    (0.05 * Math.min(Number.isFinite(s.etm) ? s.etm : 100, 100));
-
-                const norm = 1 / (1 + Math.exp(-raw));
-                if (!best || norm > best.norm) best = { digit: d, norm, s };
-            }
-            return best;
-        }
-
-        function rotateHybridDigit(reason = '') {
-            clearSessionDigitLock(reason || 'Rotate');
-            window.cycleRotations = (window.cycleRotations || 0) + 1;
-
-            // Reset progression (cycle reset)
-            window.martingaleStep = 0;
-            window.currentStake = window.baseStake;
-
-            if (sessionState.mode !== 'ai') return;
-
-            // Prefer a low tail-risk digit (s20 <= 5%), otherwise use current AI rec.
-            const pick = pickBestLowTailRiskDigit(0.05);
-            const nextDigit =
-                (pick && Number.isFinite(pick.digit)) ? pick.digit :
-                (window.digitIntelligenceEngine?.currentRecommendation?.digit ?? null);
-
-            if (nextDigit === null) return;
-
-            lockSessionDigit(nextDigit, true, reason || 'Rotate');
-            log(`🔁 Re-picked HYBRID digit ${nextDigit}${reason ? ' (' + reason + ')' : ''}`, 'SESSION');
-        }
-
-
-
 // CONNECTION STATUS
         function updateConnectionStatus() {
             const isConnected = window.ws && window.ws.readyState === WebSocket.OPEN;
@@ -3134,30 +3095,6 @@ const isRecommended = engine.currentRecommendation && engine.currentRecommendati
                 return;
             }
 
-
-            // 🧱 HARD TAIL-RISK GATE (s20 <= 5%)
-            if (sessionState.mode === 'ai' && window.isBotRunning) {
-                const lockedDigit = (sessionState.sessionDigit !== null) ? sessionState.sessionDigit : parseInt(document.getElementById('predictedDigit').value);
-                const s = getSurvivalForDigit(lockedDigit);
-
-                if (!s || !Number.isFinite(Number(s.s20))) {
-                    log('🧱 Tail-risk gate: Survival data not ready — no trade', 'ENGINE');
-                    updateTradeStatus('NO TRADE', 'Survival warming up', 'Waiting for more ticks', 'loss');
-                    return;
-                }
-
-                const s20 = Number(s.s20);
-                if (s20 > 0.05) {
-                    log(`🧱 Tail-risk gate: s20 ${(s20 * 100).toFixed(1)}% > 5% — re-picking`, 'ENGINE');
-                    updateTradeStatus('NO TRADE', `Tail risk too high (s20 ${(s20 * 100).toFixed(1)}%)`, 'Re-picking safer digit', 'loss');
-                    if (!(window.releaseWindow && window.releaseWindow.inTrade)) {
-                        rotateHybridDigit('Tail-risk gate');
-                    }
-                    return;
-                }
-            }
-            
-
             // Patch 1: ignore AI updates while a release-window trade is active
             if (window.releaseWindow && window.releaseWindow.inTrade && window.frozenDigit !== null) {
                 const digitInput = document.getElementById('predictedDigit');
@@ -3311,19 +3248,17 @@ const isRecommended = engine.currentRecommendation && engine.currentRecommendati
                 window.currentStake = parseFloat(newStake.toFixed(2));
 
                 if (window.cycleLosses >= window.maxCycleTrades) {
-                    log(`🧯 LOSS CAP REACHED (${window.maxCycleTrades}) — switching HYBRID digit (keeping martingale)`, 'CRITICAL');
+                    log(`🧯 LOSS CAP REACHED (${window.maxCycleTrades}) — resetting cycle (no digit switch)`, 'CRITICAL');
                     updateTradeStatus(
-                        'SWITCH DIGIT 🔁',
+                        'LOSS CAP 🧯',
                         `Loss cap reached (${window.maxCycleTrades})`,
-                        'Switching HYBRID digit; keeping martingale progression...',
+                        'Resetting cycle counters; keeping digit lock...',
                         'loss'
                     );
 
                     window.cycleLosses = 0;
-
-                    if (window.isBotRunning && sessionState.mode === 'ai') {
-                        rotateHybridDigit(`Loss cap ${window.maxCycleTrades} (keep martingale)`);
-                    }
+                    window.martingaleStep = 0;
+                    window.currentStake = window.baseStake;
                 }
                 log(`❌ LOSS. Next stake: $${window.currentStake.toFixed(2)} (Step: ${window.martingaleStep})`, 'LOSS');
                 
