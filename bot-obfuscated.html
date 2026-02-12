@@ -1956,18 +1956,7 @@ const isRecommended = engine.currentRecommendation && engine.currentRecommendati
             tradeStartTick: null,
             tradeCount: 0,
 
-            RELEASE_BAND: {
-  0: [7, 8],
-  1: [6, 7],
-  2: [6, 7],
-  3: [5, 6],
-  4: [6, 7],
-  5: [7, 8],
-  6: [6, 7],
-  7: [6, 7],
-  8: [5, 6],
-  9: [6, 7]
-},
+            RELEASE_BAND: null,
             EXEC_WINDOW: 3
         };
         // Rolling pm windows (local, NOT global)
@@ -2124,7 +2113,24 @@ const isRecommended = engine.currentRecommendation && engine.currentRecommendati
             return H / Math.log(10);
         }
 
-        function releaseWindowJustOpened(d) {
+        
+        function getDynamicReleaseBand(d) {
+            // Dynamic P90-based band (replaces static per-digit bands)
+            try {
+                const s = window.digitIntelligenceEngine?.digitStats?.[d];
+                const p90 = Number(s?.p90Gap);
+                if (Number.isFinite(p90) && p90 > 0) {
+                    const lower = Math.max(1, Math.floor(0.78 * p90));
+                    const upper = Math.max(lower + 1, Math.floor(0.88 * p90));
+                    return [lower, upper];
+                }
+            } catch (_) {}
+
+            // Fallback if engine is not warmed up yet
+            return [6, 7];
+        }
+
+function releaseWindowJustOpened(d) {
             const RW = window.releaseWindow;
 
             if (window.releaseTickFired[d]) return false;
@@ -2135,7 +2141,7 @@ const isRecommended = engine.currentRecommendation && engine.currentRecommendati
             const g = RW.gap[d];
 
             // Patch 3: entry only on exact gap transition into band[0]
-            const band = RW.RELEASE_BAND[d];
+            const band = getDynamicReleaseBand(d);
             if (!(prevGap < band[0] && g === band[0])) return false;
 
             const pm2 = window.pm2Window[d].reduce((a,b)=>a+b,0) / PM_WINDOW;
@@ -2159,23 +2165,59 @@ const isRecommended = engine.currentRecommendation && engine.currentRecommendati
         function executeReleaseTrade(d, tick) {
             const RW = window.releaseWindow;
 
-            // Patch 1: always trade the frozen digit once in-trade
+            // Always trade the frozen digit once in-trade
             const digitToTrade = (window.frozenDigit !== null) ? window.frozenDigit : d;
 
-            const digitInput = document.getElementById('predictedDigit');
-            if (digitInput) digitInput.value = digitToTrade;
+            // Keep UI digit in sync (release mode bypasses AI preview/lock UI)
+            try {
+                const digitInput = document.getElementById('predictedDigit');
+                if (digitInput) digitInput.value = digitToTrade;
+                // Update session panel to show the frozen digit
+                if (typeof lockSessionDigit === 'function') lockSessionDigit(digitToTrade, true, 'Release Window');
+                else if (typeof updateSessionDisplay === 'function') updateSessionDisplay();
+            } catch (_) {}
 
-            // Patch 2: early-pressure multiplier (no aborting late trades)
-            if (window.freezeTick !== null) {
-                const age = RW.tickIndex - window.freezeTick;
-                if (age <= EARLY_WINDOW) {
-                    window.currentStake = parseFloat((window.currentStake * 1.15).toFixed(2));
-                } else {
-                    window.currentStake = parseFloat((window.currentStake * 1.02).toFixed(2));
+            // Use the SAME execution accounting as normal trades
+            window.nextTradeAllowed = false;
+            window.executionLock = true;
+
+            try {
+                window.stats.tradesExecuted++;
+                window.tradeCount++;
+                const tc = document.getElementById('metricTradeCount');
+                if (tc) tc.textContent = window.tradeCount;
+
+                updateSessionDisplay();
+
+                log(`🚀 Release Trade #${window.tradeCount}: ${tick.price.toFixed(3)} (Digit ${tick.digit})`, 'TRADE');
+
+                updateTradeStatus(
+                    'TRADING',
+                    `Trade #${window.tradeCount}: $${window.currentStake.toFixed(2)} on digit ${digitToTrade}`,
+                    'Executing release trade.',
+                    'trade'
+                );
+
+                playAudioFeedback('EXECUTION');
+
+                // Early-pressure multiplier (no aborting late trades)
+                if (window.freezeTick !== null) {
+                    const age = RW.tickIndex - window.freezeTick;
+                    if (age <= EARLY_WINDOW) {
+                        window.currentStake = parseFloat((window.currentStake * 1.15).toFixed(2));
+                    } else {
+                        window.currentStake = parseFloat((window.currentStake * 1.02).toFixed(2));
+                    }
                 }
-            }
 
-            executeTrade(tick);
+                // Execute using the SAME trade function as AI/instant
+                executeTrade(tick);
+            } catch (error) {
+                log(`❌ Release trade error: ${error}`, 'ERROR');
+                window.executionLock = false;
+                window.nextTradeAllowed = true;
+                updateTradeStatus('ERROR', `Trade failed: ${error}`, 'Retrying.', 'loss');
+            }
         }
 
         
