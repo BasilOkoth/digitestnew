@@ -904,8 +904,10 @@
                 this.updateRegime(digit);
                 this.onNewDigit(digit);
                 
-                // PATCH 3: Force immediate re-analysis (every tick)
-                this.analyzeAndRecommend();
+                // PATCH 3: Re-analyze only when NOT in a cycle and martingale is idle
+                if (!window.cycleActive && (window.martingaleStep || 0) === 0) {
+                    this.analyzeAndRecommend();
+                }
 },
             
             // Update regime statistics
@@ -1159,6 +1161,8 @@
             // Analyze and recommend digit
             analyzeAndRecommend: function() {
                 if (window.releaseWindow && window.releaseWindow.inTrade) return;
+                if ((window.martingaleStep || 0) > 0) return;
+                if (window.cycleActive) return;
 
                 const regimeStatus = this.computeRegimeStatus();
 
@@ -1969,6 +1973,10 @@ const isRecommended = engine.currentRecommendation && engine.currentRecommendati
         window.maxTrades = 20;
         window.tradeCount = 0;
         window.martingaleStep = 0;
+        window.cycleActive = false;
+        window.cycleTradeCount = 0;
+        window.MAX_CYCLE_TRADES = 5;
+
         window.cycleLosses = 0;
         window.accountBalance = 0.0;
         window.startingBalance = 0.0;
@@ -2142,6 +2150,10 @@ function releaseWindowJustOpened(d) {
             // Always trade the frozen digit once in-trade
             const digitToTrade = (window.frozenDigit !== null) ? window.frozenDigit : d;
 
+            if (!window.cycleActive || window.cycleTradeCount >= window.MAX_CYCLE_TRADES) {
+                return;
+            }
+
             // Keep UI digit in sync (release mode bypasses AI preview/lock UI)
             try {
                 const digitInput = document.getElementById('predictedDigit');
@@ -2158,6 +2170,10 @@ function releaseWindowJustOpened(d) {
             try {
                 window.stats.tradesExecuted++;
                 window.tradeCount++;
+                if (window.cycleActive) {
+                    window.cycleTradeCount++;
+                    if (window.releaseWindow) window.releaseWindow.tradeCount = window.cycleTradeCount;
+                }
                 const tc = document.getElementById('metricTradeCount');
                 if (tc) tc.textContent = window.tradeCount;
 
@@ -2990,7 +3006,9 @@ if (sessionState.mode === 'ai' && window.digitIntelligenceEngine.currentRecommen
             window.releaseWindow.tradeStartTick = window.releaseWindow.tickIndex;
             window.releaseWindow.tradeCount = 0;
 
-            window.currentStake = window.baseStake;
+            window.cycleActive = true;
+            window.cycleTradeCount = 0;
+            log("🚀 Starting 5-trade cycle on digit " + d + " (martingale step " + (window.martingaleStep || 0) + ")", "ENGINE");
 
             // Update UI immediately
             const digitInput = document.getElementById('predictedDigit');
@@ -3024,17 +3042,13 @@ if (sessionState.mode === 'ai' && window.digitIntelligenceEngine.currentRecommen
                     return;
                 }
 
-                if (RW.tradeCount >= window.maxTrades) {
-                    log(`⛔ MAX TRADES — STOP`, 'STOP');
-
+                if (window.cycleActive && window.cycleTradeCount >= window.MAX_CYCLE_TRADES) {
                     window.releaseTickFired[RW.activeDigit] = false;
                     RW.inTrade = false;
                     window.frozenDigit = null;
                     window.freezeTick = null;
-
-                    resetAllState();
-                    stopBot();
-
+                    window.cycleActive = false;
+                    log('⏸ 5 trades completed — waiting for next band entry (keeping martingale)', 'SYSTEM');
                     return;
                 }
             }
@@ -3103,6 +3117,15 @@ if (sessionState.mode === 'ai' && window.digitIntelligenceEngine.currentRecommen
                 log('🤖 Waiting for AI recommendation...', 'ENGINE');
                 return;
             }
+
+            // Band-cycle gate (AI mode): do not trade unless a 5-trade cycle is active
+            if (sessionState.mode === 'ai') {
+                if (!window.cycleActive) return;
+                if (window.cycleTradeCount >= window.MAX_CYCLE_TRADES) {
+                    window.cycleActive = false;
+                    return;
+                }
+            }
             
             // AI AUTO: lock the CURRENT prediction for trading when the bot is running (once per START)
             if (sessionState.mode === 'ai' && window.isBotRunning && (!sessionState.sessionStarted || sessionState.sessionDigit === null)) {
@@ -3143,6 +3166,10 @@ if (sessionState.mode === 'ai' && window.digitIntelligenceEngine.currentRecommen
             try {
                 window.stats.tradesExecuted++;
                 window.tradeCount++;
+                if (window.cycleActive) {
+                    window.cycleTradeCount++;
+                    if (window.releaseWindow) window.releaseWindow.tradeCount = window.cycleTradeCount;
+                }
                 document.getElementById('metricTradeCount').textContent = window.tradeCount;
                 
                 updateSessionDisplay();
@@ -3250,8 +3277,10 @@ if (sessionState.mode === 'ai' && window.digitIntelligenceEngine.currentRecommen
                 window.cycleLosses = 0;
                 window.currentStake = window.baseStake;
                 
-                // Release Window: reset after WIN
+                // Release Window / cycle: reset after WIN
                 if (window.releaseWindow) window.releaseWindow.inTrade = false;
+                window.cycleActive = false;
+                window.cycleTradeCount = 0;
                 window.frozenDigit = null;
                 window.freezeTick = null;
 log(`✅ WIN! Reset stake: $${window.currentStake.toFixed(2)}`, 'WIN');
@@ -3659,16 +3688,16 @@ window.isBotRunning = true;
             window.nextTradeAllowed = true;
             updateSessionDisplay();
 
-            // Release Window trade accounting / max-trades safety
+            // Release Window: 5-trade cycle accounting (do NOT stop bot; keep martingale)
             try {
                 const RW = window.releaseWindow;
-                if (RW && RW.inTrade) {
-                    RW.tradeCount++;
-                    if (RW.tradeCount >= window.maxTrades) {
-                        log(`⛔ MAX TRADES — STOP`, 'STOP');
+                if (RW && RW.inTrade && window.cycleActive) {
+                    // cycleTradeCount is incremented at trade-send time (executeReleaseTrade / processTickImmediately).
+                    if (window.cycleTradeCount >= window.MAX_CYCLE_TRADES) {
+                        window.cycleActive = false;
                         RW.inTrade = false;
-                        stopBot();
-                        return;
+                        window.freezeTick = null;
+                        log('⏸ 5 trades completed — waiting for next band entry (keeping martingale)', 'SYSTEM');
                     }
                 }
             } catch (_) {}
