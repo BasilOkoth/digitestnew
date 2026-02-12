@@ -2128,6 +2128,41 @@ const isRecommended = engine.currentRecommendation && engine.currentRecommendati
                     const upper = Math.max(lower + 1, Math.floor(0.88 * p90));
                     return [lower, upper];
                 }
+
+        // ============================================================================
+        // RELEASE WINDOW HELPERS
+        // ============================================================================
+        function getCurrentGap(digit) {
+            const d = Number(digit);
+            if (!Number.isFinite(d) || d < 0 || d > 9) return 0;
+
+            // Prefer engine stats if available (AI + release share this)
+            const engGap = window.digitIntelligenceEngine?.digitStats?.[d]?.currentGap;
+            if (Number.isFinite(engGap)) return engGap;
+
+            // Fallback to releaseWindow gap tracker
+            const rwGap = window.releaseWindow?.gap?.[d];
+            return Number.isFinite(rwGap) ? rwGap : 0;
+        }
+
+        function getBand(digit) {
+            const d = Number(digit);
+            if (!Number.isFinite(d) || d < 0 || d > 9) return [0, Infinity];
+
+            // If a band is explicitly set on the release window, respect it.
+            const rwBand = window.releaseWindow?.RELEASE_BAND;
+            if (Array.isArray(rwBand) && rwBand.length >= 2) {
+                const lo = Number(rwBand[0]);
+                const hi = Number(rwBand[1]);
+                if (Number.isFinite(lo) && Number.isFinite(hi)) return [lo, hi];
+            }
+
+            // Otherwise use dynamic P90-based band.
+            if (typeof getDynamicReleaseBand === 'function') return getDynamicReleaseBand(d);
+
+            return [0, Infinity];
+        }
+
             } catch (_) {}
 
             // Fallback if engine is not warmed up yet
@@ -2160,6 +2195,20 @@ function releaseWindowJustOpened(d) {
                 if (typeof lockSessionDigit === 'function') lockSessionDigit(digitToTrade, true, 'Release Window');
                 else if (typeof updateSessionDisplay === 'function') updateSessionDisplay();
             } catch (_) {}
+
+
+            // 🔍 Revalidate release band before each martingale step
+            const activeDigit = digitToTrade;
+            const g = getCurrentGap(activeDigit);
+            const [bandLow, bandHigh] = getBand(activeDigit);
+
+            if (g < bandLow || g > bandHigh) {
+                log('🛑 Release band invalidated — aborting window');
+                window.releaseWindow.inTrade = false;
+                window.releaseWindow.activeDigit = null;
+                resetStake();
+                return;
+            }
 
             // Use the SAME execution accounting as normal trades
             window.nextTradeAllowed = false;
@@ -3149,7 +3198,23 @@ if (sessionState.mode === 'ai' && window.digitIntelligenceEngine.currentRecommen
                 }
             }
 
-            window.executionLock = true;
+            
+            // 🔍 Revalidate release band before each martingale step
+            if (window.releaseWindow && window.releaseWindow.inTrade) {
+                const activeDigit = window.releaseWindow.activeDigit ?? window.frozenDigit;
+                const g = getCurrentGap(activeDigit);
+                const [bandLow, bandHigh] = getBand(activeDigit);
+
+                if (g < bandLow || g > bandHigh) {
+                    log('🛑 Release band invalidated — aborting window');
+                    window.releaseWindow.inTrade = false;
+                    window.releaseWindow.activeDigit = null;
+                    resetStake();
+                    return;
+                }
+            }
+
+window.executionLock = true;
             window.nextTradeAllowed = false;
             
             try {
