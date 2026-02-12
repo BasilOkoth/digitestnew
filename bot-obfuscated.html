@@ -1958,6 +1958,7 @@ const isRecommended = engine.currentRecommendation && engine.currentRecommendati
             activeDigit: null,
             tradeStartTick: null,
             tradeCount: 0,
+            MAX_BURST_TRADES: 5,
 
             RELEASE_BAND: null,
             EXEC_WINDOW: 3
@@ -3033,17 +3034,19 @@ if (sessionState.mode === 'ai' && window.digitIntelligenceEngine.currentRecommen
                     return;
                 }
 
-                if (RW.tradeCount >= window.maxTrades) {
-                    log(`⛔ MAX TRADES — STOP`, 'STOP');
+                if (RW.tradeCount >= (RW.MAX_BURST_TRADES || 5)) {
+                    log('🛑 Release window expired — unlocking digit', 'STOP');
 
                     window.releaseTickFired[RW.activeDigit] = false;
+
                     RW.inTrade = false;
+                    RW.activeDigit = null;
+                    RW.tradeCount = 0;
+
                     window.frozenDigit = null;
                     window.freezeTick = null;
 
-                    resetAllState();
-                    stopBot();
-
+                    resetStake(); // critical
                     return;
                 }
             }
@@ -3123,7 +3126,7 @@ if (sessionState.mode === 'ai' && window.digitIntelligenceEngine.currentRecommen
                 return;
             }
             
-            if (window.tradeCount >= window.maxTrades) {
+            if (window.tradeCount >= window.maxTrades && sessionState.mode !== 'ai') {
                 log(`🛑 Max trades reached (${window.maxTrades})`, 'CRITICAL');
                 updateTradeStatus('MAX TRADES', `Maximum trades reached (${window.maxTrades})`, 'Bot stopped', 'loss');
                 stopBot();
@@ -3261,7 +3264,11 @@ if (sessionState.mode === 'ai' && window.digitIntelligenceEngine.currentRecommen
                 window.currentStake = window.baseStake;
                 
                 // Release Window: reset after WIN
-                if (window.releaseWindow) window.releaseWindow.inTrade = false;
+                if (window.releaseWindow) {
+                    window.releaseWindow.inTrade = false;
+                    window.releaseWindow.activeDigit = null;
+                    window.releaseWindow.tradeCount = 0;
+                }
                 window.frozenDigit = null;
                 window.freezeTick = null;
 log(`✅ WIN! Reset stake: $${window.currentStake.toFixed(2)}`, 'WIN');
@@ -3325,7 +3332,21 @@ log(`✅ WIN! Reset stake: $${window.currentStake.toFixed(2)}`, 'WIN');
             stakeElem.className = winOrLoss === 'win' ? 'text-lg font-bold text-green-400' : 'text-lg font-bold text-white';
         }
         
-        // START BOT - CRITICAL FUNCTION
+        
+        function resetStake() {
+            window.baseStake = parseFloat(document.getElementById('baseStake').value) || window.baseStake || 1.0;
+            window.currentStake = window.baseStake;
+            window.martingaleStep = 0;
+            window.cycleLosses = 0;
+
+            const stakeElem = document.getElementById('metricCurrentStake');
+            if (stakeElem) {
+                stakeElem.textContent = `$${window.currentStake.toFixed(2)}`;
+                stakeElem.className = 'text-lg font-bold text-white';
+            }
+        }
+
+// START BOT - CRITICAL FUNCTION
         function startBot() {
             if (window.isBotRunning) {
                 stopBot();
@@ -3684,21 +3705,26 @@ window.isBotRunning = true;
             window.nextTradeAllowed = true;
             updateSessionDisplay();
 
-            // Release Window trade accounting / max-trades safety
+            // Release Window burst accounting (losses only)
             try {
                 const RW = window.releaseWindow;
-                if (RW && RW.inTrade) {
+                if (!isSuccess && RW && RW.inTrade) {
                     RW.tradeCount++;
-                    if (RW.tradeCount >= window.maxTrades) {
-                        log(`⛔ MAX TRADES — STOP`, 'STOP');
+
+                    if (RW.tradeCount >= (RW.MAX_BURST_TRADES || 5)) {
+                        log('🛑 Release window expired — unlocking digit', 'STOP');
+
                         RW.inTrade = false;
-                        stopBot();
-                        return;
+                        RW.activeDigit = null;
+                        RW.tradeCount = 0;
+
+                        resetStake(); // critical
+                        return; // stop further martingale
                     }
                 }
             } catch (_) {}
 
-            
+
             if (!isSuccess) {
                 updateStake('loss');
             }
