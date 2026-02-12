@@ -745,6 +745,7 @@
                 lastSeen: null,
                 currentGap: 0,
 
+                prevGap: null,
                 avgGap: 0,
                 p75Gap: 0,
                 p90Gap: 0,
@@ -789,6 +790,7 @@
                     gaps: [],
                     lastSeen: null,
                     currentGap: 0,
+                prevGap: null,
                     avgGap: 0,
                     p75Gap: 0,
                     p90Gap: 0,
@@ -983,6 +985,7 @@
                 // update current gaps
                 for (let d = 0; d < 10; d++) {
                     const st = this.digitStats[d];
+                    st.prevGap = st.currentGap;
                     st.currentGap = (st.lastSeen === null)
                         ? this.tickIndex
                         : (this.tickIndex - st.lastSeen);
@@ -2131,36 +2134,16 @@ const isRecommended = engine.currentRecommendation && engine.currentRecommendati
         }
 
 function releaseWindowJustOpened(d) {
-            const RW = window.releaseWindow;
+    const s = window.digitIntelligenceEngine?.digitStats?.[d];
+    if (!s) return false;
 
-            if (window.releaseTickFired[d]) return false;
-            const h = RW.gapHist[d];
-            if (h.length < 2) return false;
+    const p90 = Math.max(s.p90Gap, 1);
+    const currRatio = s.currentGap / p90;
+    const prevRatio = s.prevGap !== null ? (s.prevGap / p90) : 0;
 
-            const prevGap = h[h.length - 2];
-            const g = RW.gap[d];
-
-            // Patch 3: entry only on exact gap transition into band[0]
-            const band = getDynamicReleaseBand(d);
-            if (!(prevGap < band[0] && g === band[0])) return false;
-
-            const pm2 = window.pm2Window[d].reduce((a,b)=>a+b,0) / PM_WINDOW;
-            const pm3 = window.pm3Window[d].reduce((a,b)=>a+b,0) / PM_WINDOW;
-            if (pm2 < 0.45 && pm3 < 0.65) return false;
-
-            if (RW.entropy > 1.9) return false;
-
-            // Patch 4: local dominance only (rolling pm3 window)
-            const dScore = window.pm3Window[d].reduce((a,b)=>a+b,0);
-            for (let x = 0; x < 10; x++) {
-                if (x !== d) {
-                    const xScore = window.pm3Window[x].reduce((a,b)=>a+b,0);
-                    if (xScore > dScore) return false;
-                }
-            }
-
-            return true;
-        }
+    const PRESSURE_MIN = 0.70; // same as your selection band lower
+    return (prevRatio < PRESSURE_MIN && currRatio >= PRESSURE_MIN);
+}
 
         function executeReleaseTrade(d, tick) {
             const RW = window.releaseWindow;
@@ -3001,48 +2984,49 @@ function releaseWindowJustOpened(d) {
             
             // Update connection status UI
             updateConnectionStatus();
-// ================= HARD RELEASE EXECUTION =================
-if (!window.releaseWindow.inTrade && window.isBotRunning && window.nextTradeAllowed && !window.executionLock) {
-    for (let d = 0; d < 10; d++) {
+// ================= RELEASE ENTRY EXECUTION =================
+if (sessionState.mode === 'ai' && window.digitIntelligenceEngine.currentRecommendation) {
+    const d = window.digitIntelligenceEngine.currentRecommendation.digit;
+
+    if (!window.releaseWindow.inTrade && window.isBotRunning && window.nextTradeAllowed && !window.executionLock) {
         if (releaseWindowJustOpened(d)) {
             console.log(`🚀 RELEASE ENTRY detected for digit ${d}`);
 
-            window.frozenDigit = d;
-            window.freezeTick = window.releaseWindow.tickIndex;
-
             window.releaseWindow.inTrade = true;
             window.releaseWindow.activeDigit = d;
+            window.frozenDigit = d;
+
+            window.freezeTick = window.releaseWindow.tickIndex;
             window.releaseWindow.freezeTick = window.releaseWindow.tickIndex;
             window.releaseWindow.tradeStartTick = window.releaseWindow.tickIndex;
             window.releaseWindow.tradeCount = 0;
 
             window.currentStake = window.baseStake;
 
-            window.releaseTickFired[d] = true;
-
-            console.log(`🎯 Locked digit ${d} at band entry`);
+            // Update UI immediately
+            const digitInput = document.getElementById('predictedDigit');
+            if (digitInput) digitInput.value = d;
 
             // 🚨 FORCE execution (do NOT allow gate to block)
             window.nextTradeAllowed = true;
             executeReleaseTrade(d, tickData);
 
-            return; // 🔥 STOP ALL OTHER LOGIC ON THIS TICK
+            return; // 🔥 STOP FURTHER LOGIC THIS TICK
         }
     }
 }
 
+
             // ---- Release Window: HARD STOP (MATCH / MAX TRADES) ----
             if (RW.inTrade) {
                 if (digit === RW.activeDigit) {
-                    log(`✅ MATCH ${digit} — STOP`, 'WIN');
+                    log(`✅ MATCH ${digit} — UNLOCK`, 'WIN');
 
                     window.releaseTickFired[RW.activeDigit] = false;
                     RW.inTrade = false;
+                    RW.activeDigit = null;
                     window.frozenDigit = null;
                     window.freezeTick = null;
-
-                    resetAllState();
-                    stopBot();
 
                     window.releaseLatency.push(performance.now() - t0);
                     if (window.releaseLatency.length > 200) window.releaseLatency.shift();
@@ -3275,7 +3259,12 @@ if (!window.releaseWindow.inTrade && window.isBotRunning && window.nextTradeAllo
                 window.martingaleStep = 0;
                 window.cycleLosses = 0;
                 window.currentStake = window.baseStake;
-                log(`✅ WIN! Reset stake: $${window.currentStake.toFixed(2)}`, 'WIN');
+                
+                // Release Window: reset after WIN
+                if (window.releaseWindow) window.releaseWindow.inTrade = false;
+                window.frozenDigit = null;
+                window.freezeTick = null;
+log(`✅ WIN! Reset stake: $${window.currentStake.toFixed(2)}`, 'WIN');
                 
                 const payout = window.currentStake * 9;
                 trackTradePayout(payout);
