@@ -1995,6 +1995,42 @@ const isRecommended = engine.currentRecommendation && engine.currentRecommendati
             window.frozenDigit = null;
             window.freezeTick = null;
         window.pendingProposals = new Map();
+
+// ============================================================================
+// STRICT BAND TRIGGER STATE (no burst / no forced loops)
+// ============================================================================
+window.lockedDigit = null;
+window.gap = Array(10).fill(0);
+window.p90Map = Array(10).fill(1);
+window.extendRatio = Array(10).fill(1);
+
+function refreshBandMetrics() {
+    const RW = window.releaseWindow;
+    for (let d = 0; d < 10; d++) {
+        const s = window.digitIntelligenceEngine?.digitStats?.[d];
+        const g = Number.isFinite(s?.currentGap) ? s.currentGap : (RW?.gap?.[d] ?? 0);
+        const p90 = Number.isFinite(s?.p90Gap) && s.p90Gap > 0 ? s.p90Gap : 1;
+        const avg = Number.isFinite(s?.avgGap) && s.avgGap > 0 ? s.avgGap : p90;
+
+        window.gap[d] = g;
+        window.p90Map[d] = p90;
+        window.extendRatio[d] = g / avg;
+    }
+}
+
+function digitInBand(d) {
+    const g = window.gap[d];
+    const p90 = window.p90Map[d];
+
+    const ratio = g / p90;
+
+    return (
+        ratio >= 0.78 &&
+        ratio <= 0.90 &&
+        window.extendRatio[d] <= 1.5
+    );
+}
+
         window.executionLock = false;
         
         // Statistics
@@ -2185,7 +2221,7 @@ function releaseWindowJustOpened(d) {
                 }
 
                 // Execute using the SAME trade function as AI/instant
-                executeTrade(tick);
+                sendTradeProposal(tick, window.currentStake, digitToTrade);
             } catch (error) {
                 log(`❌ Release trade error: ${error}`, 'ERROR');
                 window.executionLock = false;
@@ -2522,7 +2558,8 @@ function releaseWindowJustOpened(d) {
             }
 
             sessionState.sessionDigit = digit;
-            sessionState.sessionStarted = true;
+                        window.lockedDigit = digit;
+sessionState.sessionStarted = true;
             sessionState.manualOverride = false;
             document.getElementById('predictedDigit').value = digit;
             updateSessionDisplay();
@@ -2532,7 +2569,8 @@ function releaseWindowJustOpened(d) {
 
         function clearSessionDigitLock(reason = '') {
             sessionState.sessionDigit = null;
-            sessionState.sessionStarted = false;
+                        window.lockedDigit = null;
+sessionState.sessionStarted = false;
             sessionState.manualOverride = false;
             updateSessionDisplay();
             if (reason) log(`🔓 Session digit lock cleared (${reason})`, 'SESSION');
@@ -2594,7 +2632,8 @@ function releaseWindowJustOpened(d) {
                     const manualDigit = parseInt(document.getElementById('predictedDigit').value);
                     if (!isNaN(manualDigit) && manualDigit >= 0 && manualDigit <= 9) {
                         sessionState.sessionDigit = manualDigit;
-                        sessionState.sessionStarted = true;
+                                                window.lockedDigit = manualDigit;
+sessionState.sessionStarted = true;
                         sessionState.manualOverride = true;
                         updateSessionDisplay();
                         log(`🔒 Digit ${manualDigit} set manually for instant mode`, 'SESSION');
@@ -2740,7 +2779,8 @@ function releaseWindowJustOpened(d) {
                     }
                     
                     sessionState.sessionDigit = newDigit;
-                    sessionState.sessionStarted = true;
+                                         window.lockedDigit = newDigit;
+sessionState.sessionStarted = true;
                     sessionState.manualOverride = true;
                     updateSessionDisplay();
                     log(`🔢 Digit manually set to ${newDigit}`, 'SESSION');
@@ -3042,6 +3082,25 @@ if (sessionState.mode === 'ai' && window.digitIntelligenceEngine.currentRecommen
             window.releaseLatency.push(performance.now() - t0);
             if (window.releaseLatency.length > 200) window.releaseLatency.shift();
 
+
+// ============================================================================
+// STRICT BAND TRIGGER (no continuous firing)
+// ============================================================================
+refreshBandMetrics();
+const lockedDigit = (window.lockedDigit !== null && window.lockedDigit !== undefined)
+    ? window.lockedDigit
+    : (sessionState.sessionDigit !== null ? sessionState.sessionDigit : null);
+
+const tradeInProgress = !!window.executionLock;
+
+if (
+    lockedDigit !== null &&
+    digitInBand(lockedDigit) &&
+    !tradeInProgress
+) {
+    executeTrade(window.currentStake, lockedDigit);
+}
+
         }
         
         // API RESPONSE HANDLER - MODIFIED FOR ENGINE INTEGRATION
@@ -3146,7 +3205,9 @@ if (sessionState.mode === 'ai' && window.digitIntelligenceEngine.currentRecommen
                 document.getElementById('metricTradeCount').textContent = window.tradeCount;
                 
                 updateSessionDisplay();
-                log(`⚡ Trade #${window.tradeCount}: ${tick.price.toFixed(3)} (Digit ${tick.digit})`, 'TRADE');
+                const tickPrice = Number.isFinite(tick.price) ? tick.price : parseFloat(tick.quote);
+
+                log(`⚡ Trade #${window.tradeCount}: ${tickPrice.toFixed(3)} (Digit ${tick.digit})`, 'TRADE');
                 
                 updateTradeStatus(
                     'TRADING',
@@ -3156,7 +3217,7 @@ if (sessionState.mode === 'ai' && window.digitIntelligenceEngine.currentRecommen
                 );
                 
                 playAudioFeedback('EXECUTION');
-                executeTrade(tick);
+                sendTradeProposal(tick, window.currentStake, getExecutionDigit());
                 
             } catch (error) {
                 log(`❌ Error: ${error}`, 'ERROR');
@@ -3166,42 +3227,100 @@ if (sessionState.mode === 'ai' && window.digitIntelligenceEngine.currentRecommen
             }
         }
         
-        // EXECUTE TRADE - CRITICAL FUNCTION
-        function executeTrade(tick) {
-            const contractType = document.getElementById('contractType').value;
-            const symbol = document.getElementById('symbol').value;
-            const predictedDigit = getExecutionDigit();
-            
-            let stake = window.currentStake;
-            trackTradeInvestment(stake);
-            
-            const proposalRequest = {
-                proposal: 1,
-                amount: stake.toFixed(2),
-                basis: "stake",
-                contract_type: contractType,
-                currency: "USD",
-                duration: 1,
-                duration_unit: "t",
-                symbol: symbol,
-                barrier: predictedDigit.toString(),
-                req_id: getNextReqId()
-            };
-            
-            window.pendingProposals.set(proposalRequest.req_id, {
-                tick: tick,
-                stake: stake,
-                contractType: contractType,
-                predictedDigit: predictedDigit,
-                startTime: Date.now(),
-                tradeNumber: window.tradeCount,
-                martingaleStep: window.martingaleStep
-            });
-            
-            sendRequest(proposalRequest);
-        }
         
-        // CHECK FOR IMMEDIATE WIN - CRITICAL FUNCTION
+// EXECUTE TRADE (launcher) - STRICT MODE ENTRY POINT
+// Signature required by strategy logic:
+//   executeTrade(currentStake, lockedDigit)
+function executeTrade(currentStake, lockedDigit) {
+    const tick = window.lastTick;
+    if (!window.isBotRunning || window.stopAfterWin) return;
+    if (!tick) return;
+
+    // In AI mode, wait for engine recommendation (still required to have a locked digit)
+    if (sessionState.mode === 'ai' && (!window.digitIntelligenceEngine.warmupDone || !window.digitIntelligenceEngine.currentRecommendation)) {
+        log('🤖 Waiting for AI recommendation.', 'ENGINE');
+        return;
+    }
+
+    if (window.tradeCount >= window.maxTrades) {
+        log(`🛑 Max trades reached (${window.maxTrades})`, 'CRITICAL');
+        updateTradeStatus('MAX TRADES', `Maximum trades reached (${window.maxTrades})`, 'Bot stopped', 'loss');
+        stopBot();
+        return;
+    }
+
+    // Optional quick win check (does NOT place a trade)
+    if (checkForImmediateWin(tick)) return;
+
+    window.executionLock = true;
+    window.nextTradeAllowed = false;
+
+    try {
+        window.stats.tradesExecuted++;
+        window.tradeCount++;
+        document.getElementById('metricTradeCount').textContent = window.tradeCount;
+
+        // Keep UI digit in sync with the locked digit used for the trade
+        try {
+            const digitInput = document.getElementById('predictedDigit');
+            if (digitInput) digitInput.value = lockedDigit;
+        } catch (_) {}
+
+        updateSessionDisplay();
+        log(`⚡ Trade #${window.tradeCount}: ${tick.price.toFixed(3)} (Digit ${tick.digit})`, 'TRADE');
+
+        updateTradeStatus(
+            'TRADING',
+            `Trade #${window.tradeCount}: $${Number(currentStake).toFixed(2)} on digit ${lockedDigit}`,
+            'Executing trade.',
+            'trade'
+        );
+
+        playAudioFeedback('EXECUTION');
+        sendTradeProposal(tick, currentStake, lockedDigit);
+
+    } catch (error) {
+        log(`❌ Error: ${error}`, 'ERROR');
+        window.executionLock = false;
+        window.nextTradeAllowed = true;
+        updateTradeStatus('ERROR', `Trade failed: ${error}`, 'Retrying.', 'loss');
+    }
+}
+
+// SEND TRADE PROPOSAL - CRITICAL FUNCTION
+function sendTradeProposal(tick, stake, predictedDigit) {
+    const contractType = document.getElementById('contractType').value;
+    const symbol = document.getElementById('symbol').value;
+
+    const stakeNum = parseFloat(stake);
+    trackTradeInvestment(stakeNum);
+
+    const proposalRequest = {
+        proposal: 1,
+        amount: stakeNum.toFixed(2),
+        basis: "stake",
+        contract_type: contractType,
+        currency: "USD",
+        duration: 1,
+        duration_unit: "t",
+        symbol: symbol,
+        barrier: predictedDigit.toString(),
+        req_id: getNextReqId()
+    };
+
+    window.pendingProposals.set(proposalRequest.req_id, {
+        tick: tick,
+        stake: stakeNum,
+        contractType: contractType,
+        predictedDigit: predictedDigit,
+        startTime: Date.now(),
+        tradeNumber: window.tradeCount,
+        martingaleStep: window.martingaleStep
+    });
+
+    sendRequest(proposalRequest);
+}
+// CHECK FOR IMMEDIATE WIN - CRITICAL FUNCTION
         function checkForImmediateWin(tick) {
             if (!window.isBotRunning || window.stopAfterWin) return false;
             
@@ -3239,70 +3358,74 @@ if (sessionState.mode === 'ai' && window.digitIntelligenceEngine.currentRecommen
             return false;
         }
         
-        // UPDATE STAKE - CRITICAL FUNCTION
-        function updateStake(winOrLoss) {
-            window.baseStake = parseFloat(document.getElementById('baseStake').value) || 1.0;
-            window.multiplier = parseFloat(document.getElementById('multiplier').value) || 1.15;
-            window.maxTrades = parseInt(document.getElementById('maxTrades').value) || 10;
-            
-            if (winOrLoss === 'win') {
-                window.martingaleStep = 0;
-                window.cycleLosses = 0;
-                window.currentStake = window.baseStake;
-                
-                // Release Window: reset after WIN
-                if (window.releaseWindow) window.releaseWindow.inTrade = false;
-                window.frozenDigit = null;
-                window.freezeTick = null;
-log(`✅ WIN! Reset stake: $${window.currentStake.toFixed(2)}`, 'WIN');
-                
-                const payout = window.currentStake * 9;
-                trackTradePayout(payout);
-                log(`💰 Payout: $${payout.toFixed(2)}`, 'PNL');
-                
-                // Start extended PnL updates for 10 seconds
-                startExtendedPnlUpdate(payout);
-                
-                updateTradeStatus(
-                    'WIN 🎯',
-                    `WON! Digit matched - Payout: $${payout.toFixed(2)}`,
-                    'PnL updating for 10 seconds...',
-                    'win'
-                );
-                
-            } else if (winOrLoss === 'loss') {
-                window.martingaleStep = (window.martingaleStep || 0) + 1;
-                window.cycleLosses = (window.cycleLosses || 0) + 1;
-
-                const newStake = window.currentStake * window.multiplier;
-                window.currentStake = parseFloat(newStake.toFixed(2));
-
-                log(`❌ LOSS. Next stake: $${window.currentStake.toFixed(2)} (Step: ${window.martingaleStep})`, 'LOSS');
-                
-                updateTradeStatus(
-                    'LOSS ❌',
-                    `Lost - Next: $${window.currentStake.toFixed(2)}`,
-                    'Increasing stake',
-                    'loss'
-                );
-                
-                // Always update PnL
-                updatePnL();
-                
-            } else {
-                window.martingaleStep = 0;
-                window.cycleLosses = 0;
-                window.currentStake = window.baseStake;
-                log(`Starting. Base stake: $${window.currentStake.toFixed(2)}`, 'SYSTEM');
-                updateTradeStatus('STARTING', `Base stake: $${window.currentStake.toFixed(2)}`, 'Waiting for trades', 'normal');
-            }
-            
-            const stakeElem = document.getElementById('metricCurrentStake');
-            stakeElem.textContent = `$${window.currentStake.toFixed(2)}`;
-            stakeElem.className = winOrLoss === 'win' ? 'text-lg font-bold text-green-400' : 'text-lg font-bold text-white';
-        }
         
-        // START BOT - CRITICAL FUNCTION
+// WIN/LOSS HANDLERS (strict: no auto re-fire)
+function handleLoss() {
+    window.martingaleStep++;
+    window.currentStake = parseFloat((window.currentStake * window.multiplier).toFixed(2));
+}
+
+function handleWin() {
+    window.martingaleStep = 0;
+    window.currentStake = window.baseStake;
+    window.lockedDigit = null;
+}
+
+// UPDATE STAKE - UI + accounting (delegates to handleWin/handleLoss)
+function updateStake(winOrLoss) {
+    window.baseStake = parseFloat(document.getElementById('baseStake').value) || 1.0;
+    window.multiplier = parseFloat(document.getElementById('multiplier').value) || 1.15;
+    window.maxTrades = parseInt(document.getElementById('maxTrades').value) || 10;
+
+    if (winOrLoss === 'win') {
+        // Release Window: reset after WIN
+        if (window.releaseWindow) window.releaseWindow.inTrade = false;
+        window.frozenDigit = null;
+        window.freezeTick = null;
+
+        handleWin();
+        clearSessionDigitLock('Win reset');
+
+        log(`✅ WIN! Reset stake: $${window.currentStake.toFixed(2)}`, 'WIN');
+
+        const payout = window.currentStake * 9;
+        trackTradePayout(payout);
+        log(`💰 Payout: $${payout.toFixed(2)}`, 'PNL');
+
+        startExtendedPnlUpdate(payout);
+
+        updateTradeStatus(
+            'WIN 🎯',
+            `WON! Digit matched - Payout: $${payout.toFixed(2)}`,
+            'PnL updating for 10 seconds...',
+            'win'
+        );
+
+    } else if (winOrLoss === 'loss') {
+        handleLoss();
+
+        log(`❌ LOSS. Next stake: $${window.currentStake.toFixed(2)} (Step: ${window.martingaleStep})`, 'LOSS');
+
+        updateTradeStatus(
+            'LOSS ❌',
+            `Lost - Next: $${window.currentStake.toFixed(2)}`,
+            'Waiting for next tick (must still be in band)',
+            'loss'
+        );
+
+        updatePnL();
+    } else {
+        window.martingaleStep = 0;
+        window.currentStake = window.baseStake;
+        log(`Starting. Base stake: $${window.currentStake.toFixed(2)}`, 'SYSTEM');
+        updateTradeStatus('STARTING', `Base stake: $${window.currentStake.toFixed(2)}`, 'Waiting for trades', 'normal');
+    }
+
+    const stakeElem = document.getElementById('metricCurrentStake');
+    stakeElem.textContent = `$${window.currentStake.toFixed(2)}`;
+    stakeElem.className = winOrLoss === 'win' ? 'text-lg font-bold text-green-400' : 'text-lg font-bold text-white';
+}
+// START BOT - CRITICAL FUNCTION
         function startBot() {
             if (window.isBotRunning) {
                 stopBot();
@@ -3332,7 +3455,8 @@ log(`✅ WIN! Reset stake: $${window.currentStake.toFixed(2)}`, 'WIN');
                 sessionState.sessionStarted = true;
                 sessionState.manualOverride = true;
                 updateSessionDisplay();
-            } else {
+                            window.lockedDigit = sessionState.sessionDigit;
+} else {
                 // AI mode: preview exists while stopped, but lock happens only after START when engine is ready.
                 sessionState.manualOverride = false;
                 sessionState.sessionStarted = false;
@@ -3539,11 +3663,13 @@ window.isBotRunning = true;
             setInterval(() => {
                 if (!window.isBotRunning || window.stopAfterWin) return;
                 
-                while (window.tickQueue.length > 0 && !window.executionLock && window.nextTradeAllowed) {
-                    const tick = window.tickQueue.shift();
-                    processTickImmediately(tick);
+                
+                // Burst/continuous mode removed: we only keep a short queue for analytics/UI.
+                // Do NOT auto-fire trades from the queue.
+                if (window.tickQueue.length > window.maxQueueSize) {
+                    window.tickQueue = window.tickQueue.slice(-window.maxQueueSize);
                 }
-            }, 50);
+}, 50);
         }
         
         function sendRequest(request) {
