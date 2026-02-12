@@ -1114,10 +1114,9 @@
                     const pressureScore = Math.max(0, Math.min(1, (p90Ratio - 0.78) / (0.92 - 0.78)));
 
                     const score =
-                        0.55 * P5 +
-                        0.25 * P10 +
-                        0.20 * pressureScore +
-                        0.10 * (1 - s.persistenceScore / 100);
+                        0.70 * P5 +
+                        0.20 * P10 +
+                        0.10 * pressureScore;
 
                     if (!best || score > best.score) {
                         best = {
@@ -1227,60 +1226,25 @@
                             (2.0 * (s.pm5 || 0)) + (1.0 * (s.pm10 || 0)) - (2.5 * (s.s20 || 0)) - (0.05 * Math.min(Number.isFinite(s.etm) ? s.etm : 100, 100));
                         const survNorm = 1 / (1 + Math.exp(-raw));
 
-                        const base = Number.isFinite(candidate.score) ? candidate.score : 0.0;
-                        const historyFactor = Math.min(1, (window.lastDigits.length / windowSize));
-                        const wBase = (typeof window.SURVIVAL_BLEND === 'number') ? window.SURVIVAL_BLEND : 0.35;
-                        const w = Math.max(0.10, Math.min(0.55, wBase * historyFactor));
-
                         candidate.survival = { ...s, survivalScore: raw, survivalNorm: survNorm };
-                        candidate.source = 'HYBRID';
-                        candidate.score = Math.max(0, Math.min(1, ((1 - w) * base) + (w * survNorm)));
-                    } else {
-                        candidate.source = 'HYBRID';
+                        candidate.source = 'BASE_ONLY';
+} else {
+                        candidate.source = 'BASE_ONLY';
                         candidate.survival = null;
                     }
                     return candidate;
                 };
 
-                // If base engine has no pick, use survival's best digit (still HYBRID)
-                if (!best && hasSurvival && survivalTop) {
-                    best = {
-                        digit: survivalTop.digit,
-                        score: survivalTop.survivalNorm ?? (1 / (1 + Math.exp(-(survivalTop.survivalScore || 0)))),
-                        P10: survivalTop.pm10 ?? 0,
-                        P5: survivalTop.pm5 ?? 0,
-                        gap: survivalTop.gap ?? 0,
-                        persistenceScore: (this.digitStats[survivalTop.digit]?.persistenceScore ?? 0),
-                        isUnstable: (this.digitStats[survivalTop.digit]?.isUnstable ?? false),
-                        source: 'HYBRID',
-                        survival: survivalTop
-                    };
-                } else {
-                    best = attachHybrid(best);
+                best = attachHybrid(best);
+
+                if (!best) {
+                    this.currentRecommendation = null;
+                    document.getElementById('ai-recommended-digit').textContent = '-';
+                    document.getElementById('ai-digit-score').textContent = 'Score: 0.0% | P10: 0.0% | NO-TRADE';
+                    return;
                 }
 
-                // Optional override: if survival strongly prefers another digit, allow it to replace weak base picks.
-                if (best && hasSurvival && survivalTop && survivalTop.digit !== best.digit) {
-                    const baseScore = Number.isFinite(best.score) ? best.score : 0;
-                    const survTopNorm = survivalTop.survivalNorm ?? (1 / (1 + Math.exp(-(survivalTop.survivalScore || 0))));
-                    if (survTopNorm >= Math.max(0.62, baseScore + 0.08)) {
-                        best = {
-                            digit: survivalTop.digit,
-                            score: survTopNorm,
-                            P10: survivalTop.pm10 ?? 0,
-                            P5: survivalTop.pm5 ?? 0,
-                            gap: survivalTop.gap ?? 0,
-                            persistenceScore: (this.digitStats[survivalTop.digit]?.persistenceScore ?? 0),
-                            isUnstable: (this.digitStats[survivalTop.digit]?.isUnstable ?? false),
-                            source: 'HYBRID',
-                            survival: survivalTop
-                        };
-                    } else {
-                        // Ensure survival metrics are attached even if not overriding.
-                        best.survival = best.survival || survivalByDigit.get(best.digit) || null;
-                        best.source = 'HYBRID';
-                    }
-                }
+// Survival metrics are for diagnostics only (not used for ranking).
 
                 if (best) {
                     this.currentRecommendation = best;
@@ -1783,10 +1747,9 @@
 const pressureScore = Math.max(0, Math.min(1, (p90Ratio - 0.78) / (0.92 - 0.78)));
 
                 const score =
-                    0.45 * P10 +
-                    0.25 * P5 +
-                    0.20 * pressureScore +
-                    0.10 * (1 - s.persistenceScore / 100);
+                    0.70 * P5 +
+                    0.20 * P10 +
+                    0.10 * pressureScore;
 const passScore = score >= scoreCutoff;
 
                 const passAll =
