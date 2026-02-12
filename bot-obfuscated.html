@@ -1162,6 +1162,8 @@
             
             // Analyze and recommend digit
             analyzeAndRecommend: function() {
+                if (window.releaseWindow && window.releaseWindow.inTrade) return;
+
                 const regimeStatus = this.computeRegimeStatus();
 
                 if (!regimeStatus.ok) {
@@ -2957,28 +2959,35 @@ const isRecommended = engine.currentRecommendation && engine.currentRecommendati
             
             // Update connection status UI
             updateConnectionStatus();
+// ================= HARD RELEASE EXECUTION =================
+if (!window.releaseWindow.inTrade && window.isBotRunning && window.nextTradeAllowed && !window.executionLock) {
+    for (let d = 0; d < 10; d++) {
+        if (releaseWindowJustOpened(d)) {
+            console.log(`🚀 RELEASE ENTRY detected for digit ${d}`);
 
-            // ---- Release Window: ENTRY LOGIC (FROZEN DIGIT) ----
-            if (!RW.inTrade && window.isBotRunning && window.nextTradeAllowed && !window.executionLock && window.digitIntelligenceEngine.currentRecommendation) {
-                const d = window.digitIntelligenceEngine.currentRecommendation.digit;
-                if (releaseWindowJustOpened(d)) {
-                    RW.inTrade = true;
+            window.frozenDigit = d;
+            window.freezeTick = window.releaseWindow.tickIndex;
 
-                    // Patch 1: freeze digit + start tick (no re-evaluation)
-                    window.frozenDigit = d;
-                    window.freezeTick = RW.tickIndex;
+            window.releaseWindow.inTrade = true;
+            window.releaseWindow.activeDigit = d;
+            window.releaseWindow.freezeTick = window.releaseWindow.tickIndex;
+            window.releaseWindow.tradeStartTick = window.releaseWindow.tickIndex;
+            window.releaseWindow.tradeCount = 0;
 
-                    RW.activeDigit = d;
-                    RW.tradeStartTick = RW.tickIndex;
-                    RW.tradeCount = 0;
+            window.currentStake = window.baseStake;
 
-                    window.currentStake = window.baseStake;
+            window.releaseTickFired[d] = true;
 
-                    window.releaseTickFired[d] = true;
-                    log(`⚡ RELEASE WINDOW OPEN → DIGIT ${d} (FROZEN)`, 'STRAIN');
-                    executeReleaseTrade(d, tickData);
-                }
-            }
+            console.log(`🎯 Locked digit ${d} at band entry`);
+
+            // 🚨 FORCE execution (do NOT allow gate to block)
+            window.nextTradeAllowed = true;
+            executeReleaseTrade(d, tickData);
+
+            return; // 🔥 STOP ALL OTHER LOGIC ON THIS TICK
+        }
+    }
+}
 
             // ---- Release Window: HARD STOP (MATCH / MAX TRADES) ----
             if (RW.inTrade) {
