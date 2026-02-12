@@ -1929,12 +1929,11 @@ const isRecommended = engine.currentRecommendation && engine.currentRecommendati
         window.autoReconnectTimer = null;
         
         // Trading State
-        window.baseStake = 1.0;
-        window.currentStake = 1.0;
-        window.multiplier = 1.15;
-
-        
-        // Release Window: Digit freeze (Patch 1)
+        // Set from UI when the bot starts (no hard-coded staking)
+        window.baseStake = null;
+        window.currentStake = null;
+        window.multiplier = null;
+// Release Window: Digit freeze (Patch 1)
         window.frozenDigit = null;
         window.freezeTick = null;
 
@@ -1975,7 +1974,7 @@ const isRecommended = engine.currentRecommendation && engine.currentRecommendati
         window.martingaleStep = 0;
         window.cycleActive = false;
         window.cycleTradeCount = 0;
-        window.MAX_CYCLE_TRADES = 5;
+        window.MAX_CYCLE_TRADES = 6;
 
         window.cycleLosses = 0;
         window.accountBalance = 0.0;
@@ -3008,7 +3007,7 @@ if (sessionState.mode === 'ai' && window.digitIntelligenceEngine.currentRecommen
 
             window.cycleActive = true;
             window.cycleTradeCount = 0;
-            log("🚀 Starting 5-trade cycle on digit " + d + " (martingale step " + (window.martingaleStep || 0) + ")", "ENGINE");
+            log("🚀 Starting 6-trade cycle on digit " + d + " (martingale step " + (window.martingaleStep || 0) + ")", "ENGINE");
 
             // Update UI immediately
             const digitInput = document.getElementById('predictedDigit');
@@ -3048,7 +3047,7 @@ if (sessionState.mode === 'ai' && window.digitIntelligenceEngine.currentRecommen
                     window.frozenDigit = null;
                     window.freezeTick = null;
                     window.cycleActive = false;
-                    log('⏸ 5 trades completed — waiting for next band entry (keeping martingale)', 'SYSTEM');
+                    log('⏸ 6 trades completed — waiting for next band entry (keeping martingale)', 'SYSTEM');
                     return;
                 }
             }
@@ -3118,7 +3117,7 @@ if (sessionState.mode === 'ai' && window.digitIntelligenceEngine.currentRecommen
                 return;
             }
 
-            // Band-cycle gate (AI mode): do not trade unless a 5-trade cycle is active
+            // Band-cycle gate (AI mode): do not trade unless a 6-trade cycle is active
             if (sessionState.mode === 'ai') {
                 if (!window.cycleActive) return;
                 if (window.cycleTradeCount >= window.MAX_CYCLE_TRADES) {
@@ -3340,6 +3339,13 @@ log(`✅ WIN! Reset stake: $${window.currentStake.toFixed(2)}`, 'WIN');
             
             window.maxTrades = parseInt(document.getElementById('maxTrades').value) || 10;
             
+
+            // Pull latest stake settings before locking controls
+            const uiBaseStake = parseFloat(document.getElementById('baseStake')?.value);
+            const uiMultiplier = parseFloat(document.getElementById('multiplier')?.value);
+            window.baseStake = (Number.isFinite(uiBaseStake) && uiBaseStake > 0) ? uiBaseStake : 1.0;
+            window.multiplier = (Number.isFinite(uiMultiplier) && uiMultiplier >= 1.0) ? uiMultiplier : 1.15;
+            window.currentStake = window.baseStake;
             const token = localStorage.getItem('active_token') || localStorage.getItem('derivToken');
             if (!token) {
                 log('❌ No API token found. Please authenticate first.', 'CRITICAL');
@@ -3688,7 +3694,7 @@ window.isBotRunning = true;
             window.nextTradeAllowed = true;
             updateSessionDisplay();
 
-            // Release Window: 5-trade cycle accounting (do NOT stop bot; keep martingale)
+            // Release Window: 6-trade cycle accounting (do NOT stop bot; keep martingale)
             try {
                 const RW = window.releaseWindow;
                 if (RW && RW.inTrade && window.cycleActive) {
@@ -3697,7 +3703,7 @@ window.isBotRunning = true;
                         window.cycleActive = false;
                         RW.inTrade = false;
                         window.freezeTick = null;
-                        log('⏸ 5 trades completed — waiting for next band entry (keeping martingale)', 'SYSTEM');
+                        log('⏸ 6 trades completed — waiting for next band entry (keeping martingale)', 'SYSTEM');
                     }
                 }
             } catch (_) {}
@@ -3722,9 +3728,17 @@ window.isBotRunning = true;
         // Reset all state
         function resetAllState() {
             window.maxTrades = parseInt(document.getElementById('maxTrades').value) || 10;
-            
+
+            // Pull stake config from UI (user-controlled)
+            const uiBaseStake = parseFloat(document.getElementById('baseStake')?.value);
+            const uiMultiplier = parseFloat(document.getElementById('multiplier')?.value);
+
+            window.baseStake = (Number.isFinite(uiBaseStake) && uiBaseStake > 0) ? uiBaseStake : 1.0;
+            window.multiplier = (Number.isFinite(uiMultiplier) && uiMultiplier >= 1.0) ? uiMultiplier : 1.15;
+            window.currentStake = window.baseStake;
+
             updateStake('initial');
-            resetPnL();
+resetPnL();
             resetTradeStatus();
             
             window.startingBalance = 0.0;
