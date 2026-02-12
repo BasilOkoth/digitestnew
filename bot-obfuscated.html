@@ -1096,7 +1096,7 @@
                     if (extendRatio > MAX_EXTEND_RATIO) continue;
 
                     // PATCH 1: Pressure fallback removed completely — single hard band gate only
-                    if (p90Ratio < 0.82 || p90Ratio > 0.88) continue;
+                    if (p90Ratio < 0.80 || p90Ratio > 0.90) continue;
 
 
                     const P5  = this.conditionalReturnProb(d, g, 5);
