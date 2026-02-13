@@ -1,1434 +1,1219 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-    <title>Deriv Over/Under Smart Bot</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
-    <style>
-        /* --- Core Styles --- */
-        .sound-icon-btn{
-            display:inline-flex; align-items:center; justify-content:center; width:34px; height:30px; padding:0;
-            border-radius:9999px; border:1px solid rgba(148,163,184,0.35); background:rgba(30,41,59,0.6);
-            color:#e2e8f0; font-size:16px; line-height:1; transition:transform .05s ease, background .15s ease;
-        }
-        .sound-icon-btn:hover{ background:rgba(30,41,59,0.85); border-color:rgba(148,163,184,0.55); }
-        .sound-icon-btn:active{ transform:scale(0.97); }
-        
-        .status-chip{
-            display:inline-flex; align-items:center; gap:.45rem; padding:.40rem .70rem; border-radius:9999px;
-            font-weight:800; font-size:.78rem; background:#1f2937; border:1px solid rgba(255,255,255,.12);
-            color:#e5e7eb; user-select:none;
-        }
-        .status-dot{ width:.55rem; height:.55rem; border-radius:9999px; background:#22c55e; }
-        .status-chip.off .status-dot{ background:#ef4444; }
-        
-        #log-area::-webkit-scrollbar { width: 4px; }
-        #log-area::-webkit-scrollbar-thumb { background: #4ade80; border-radius: 2px; }
-        #log-area::-webkit-scrollbar-track { background: #374151; }
-        
-        body { font-family: 'Inter', sans-serif; background-color: #111827; }
-        
-        @keyframes tick-flash { 0% { transform: scale(1); } 50% { transform: scale(1.02); background: rgba(34,197,94,0.2); } 100% { transform: scale(1); } }
-        .tick-flash { animation: tick-flash 0.1s ease-out; }
-        
-        @keyframes win-pulse { 
-            0% { box-shadow: 0 0 5px #10B981; } 50% { box-shadow: 0 0 30px #10B981; } 100% { box-shadow: 0 0 5px #10B981; }
-        }
-        .win-glow { animation: win-pulse 1s infinite; }
-        
-        .connection-badge-connected { background: linear-gradient(90deg, #10b981, #059669) !important; }
-        .connection-badge-disconnected { background: linear-gradient(90deg, #dc2626, #b91c1c) !important; }
-        .connection-badge-connecting { background: linear-gradient(90deg, #f59e0b, #d97706) !important; }
-        
-        .profit-positive { color: #10b981 !important; font-weight: bold; }
-        .profit-negative { color: #ef4444 !important; font-weight: bold; }
-        
-        .switch-active-over { background: linear-gradient(135deg, #3b82f6, #1d4ed8) !important; }
-        .switch-active-under { background: linear-gradient(135deg, #8b5cf6, #6d28d9) !important; }
-        
-        .median-high { color: #f59e0b !important; font-weight: bold; }
-        .median-low { color: #3b82f6 !important; font-weight: bold; }
-        
-        .account-toggle-container { display: inline-flex; align-items: center; background: rgba(0,0,0,0.3); padding: 2px 10px; border-radius: 20px; }
-        .account-toggle { position: relative; display: inline-block; width: 44px; height: 22px; margin: 0 8px; }
-        .account-toggle input { opacity: 0; width: 0; height: 0; }
-        .account-toggle-slider {
-            position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0;
-            background-color: #1e40af; border-radius: 34px; transition: .4s;
-        }
-        .account-toggle-slider:before {
-            position: absolute; content: ""; height: 16px; width: 16px; left: 3px; bottom: 3px;
-            background-color: white; border-radius: 50%; transition: .4s;
-        }
-        input:checked + .account-toggle-slider { background-color: #059669; }
-        input:checked + .account-toggle-slider:before { transform: translateX(22px); }
-    </style>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Deriv Over/Under Smart Bot (Stop on Win / Max Trades)</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+
+  <style>
+    body { font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; background:#111827; }
+    #log-area::-webkit-scrollbar{ width:4px; }
+    #log-area::-webkit-scrollbar-thumb{ background:#4ade80; border-radius:2px; }
+    #log-area::-webkit-scrollbar-track{ background:#374151; }
+
+    .connection-badge-connected { background: linear-gradient(90deg, #10b981, #059669) !important; }
+    .connection-badge-disconnected { background: linear-gradient(90deg, #dc2626, #b91c1c) !important; }
+    .connection-badge-connecting { background: linear-gradient(90deg, #f59e0b, #d97706) !important; }
+
+    @keyframes tick-flash { 0%{transform:scale(1)} 50%{transform:scale(1.02);background:rgba(34,197,94,.2)} 100%{transform:scale(1)} }
+    .tick-flash{ animation:tick-flash .1s ease-out; }
+
+    @keyframes win-pulse { 0%{box-shadow:0 0 5px #10B981} 50%{box-shadow:0 0 30px #10B981} 100%{box-shadow:0 0 5px #10B981} }
+    .win-glow{ animation:win-pulse 1s infinite; }
+
+    .sound-icon-btn{
+      display:inline-flex; align-items:center; justify-content:center;
+      width:34px; height:30px; padding:0; border-radius:9999px;
+      border:1px solid rgba(148,163,184,0.35); background:rgba(30,41,59,0.6);
+      color:#e2e8f0; font-size:16px; line-height:1;
+      transition:transform .05s ease, background .15s ease;
+    }
+    .sound-icon-btn:hover{ background:rgba(30,41,59,0.85); border-color:rgba(148,163,184,0.55); }
+    .sound-icon-btn:active{ transform:scale(0.97); }
+
+    .account-toggle-container{ display:inline-flex; align-items:center; background:rgba(0,0,0,0.3); padding:2px 10px; border-radius:20px; }
+    .account-toggle{ position:relative; display:inline-block; width:44px; height:22px; margin:0 8px; }
+    .account-toggle input{ opacity:0; width:0; height:0; }
+    .account-toggle-slider{
+      position:absolute; cursor:pointer; top:0; left:0; right:0; bottom:0;
+      background-color:#1e40af; border-radius:34px; transition:.4s;
+    }
+    .account-toggle-slider:before{
+      position:absolute; content:""; height:16px; width:16px; left:3px; bottom:3px;
+      background-color:white; border-radius:50%; transition:.4s;
+    }
+    input:checked + .account-toggle-slider{ background-color:#059669; }
+    input:checked + .account-toggle-slider:before{ transform:translateX(22px); }
+  </style>
+
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
 </head>
+
 <body class="min-h-screen p-4 sm:p-8 flex items-start justify-center">
+  <div class="w-full max-w-6xl bg-gray-800 text-gray-100 shadow-2xl rounded-xl p-5 md:p-6">
+    <div class="flex justify-between items-center mb-4">
+      <h1 class="text-3xl font-extrabold text-blue-400 border-b border-gray-700 pb-2">
+        🔮 Over/Under Smart Bot
+        <span id="status-badge" class="ml-3 inline-flex items-center px-3 py-1 text-sm font-medium rounded-full connection-badge-disconnected text-white shadow-md">
+          🔴 DISCONNECTED
+        </span>
+        <button id="soundToggle" class="sound-icon-btn ml-2" title="Sound ON">🔊</button>
 
-    <div class="w-full max-w-6xl bg-gray-800 text-gray-100 shadow-2xl rounded-xl p-5 md:p-6">
-        <!-- Header -->
-        <div class="flex justify-between items-center mb-4">
-            <h1 class="text-3xl font-extrabold text-blue-400 border-b border-gray-700 pb-2">
-                🔮 Over/Under Smart Bot
-                <span id="status-badge" class="ml-3 inline-flex items-center px-3 py-1 text-sm font-medium rounded-full connection-badge-disconnected text-white shadow-md">
-                    🔴 DISCONNECTED
-                </span>
-                <button id="soundToggle" onclick="toggleSound()" class="sound-icon-btn ml-2" title="Sound ON">🔊</button>
-                
-                <!-- Account Toggle -->
-                <div class="account-toggle-container ml-3 inline-flex">
-                    <span class="text-xs text-blue-400 font-semibold">DEMO</span>
-                    <label class="account-toggle">
-                        <input type="checkbox" id="accTypeToggle" onchange="switchAccount()">
-                        <span class="account-toggle-slider"></span>
-                    </label>
-                    <span class="text-xs text-green-400 font-semibold">REAL</span>
-                </div>
-            </h1>
+        <div class="account-toggle-container ml-3 inline-flex">
+          <span class="text-xs text-blue-400 font-semibold">DEMO</span>
+          <label class="account-toggle">
+            <input type="checkbox" id="accTypeToggle">
+            <span class="account-toggle-slider"></span>
+          </label>
+          <span class="text-xs text-green-400 font-semibold">REAL</span>
         </div>
+      </h1>
+    </div>
 
-        <!-- Main Grid -->
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <!-- LEFT COLUMN: Market Analysis & Status -->
-            <div class="lg:col-span-1">
-                <div class="bg-gray-900 border border-gray-700 rounded-xl p-4 shadow-lg">
-                    <h2 class="text-lg font-bold text-cyan-400 mb-4 pb-2 border-b border-gray-700">
-                        📊 MARKET INTELLIGENCE
-                    </h2>
-                    
-                    <!-- Connection Status -->
-                    <div class="mb-4 p-3 bg-gray-800 rounded-lg border border-gray-600">
-                        <h3 class="text-sm font-bold text-gray-300 mb-2">Connection</h3>
-                        <div class="grid grid-cols-2 gap-2 text-xs">
-                            <div><span class="text-gray-400">Status:</span> <span id="market_status" class="ml-2 font-bold text-red-400">Offline</span></div>
-                            <div><span class="text-gray-400">Symbol:</span> <span id="current_symbol" class="ml-2 font-bold text-cyan-400">V. 100 Index</span></div>
-                            <div><span class="text-gray-400">Ticks:</span> <span id="ticks_received" class="ml-2 font-bold text-green-400">0</span></div>
-                            <div><span class="text-gray-400">Rate:</span> <span id="current_tick_rate" class="ml-2 font-bold text-blue-400">0/s</span></div>
-                        </div>
-                    </div>
-                    
-                    <!-- Intelligence Engine Panel -->
-                    <div class="mb-4 p-3 bg-gray-800 rounded-lg border border-blue-500/50">
-                        <h3 class="text-sm font-bold text-blue-400 mb-3 flex items-center">
-                            🧠 MEDIAN ANALYSIS ENGINE
-                            <span id="analysis-progress" class="ml-auto text-xs bg-gray-700 px-2 py-1 rounded">
-                                0/100
-                            </span>
-                        </h3>
-                        
-                        <!-- Current Analysis -->
-                        <div class="mb-3 p-2 bg-gray-900 rounded border border-gray-700">
-                            <div class="text-xs font-semibold text-gray-300 mb-1">Window Status:</div>
-                            <div id="window-status" class="text-sm font-bold text-yellow-400">Collecting data...</div>
-                        </div>
-                        
-                        <!-- Median Value -->
-                        <div class="mb-3 p-3 bg-gray-900 rounded border border-green-500/30 text-center">
-                            <div class="text-xs font-semibold text-green-400 mb-1">Current Median (Last 100)</div>
-                            <div id="median-value" class="text-4xl font-bold text-white">-</div>
-                            <div id="median-interpretation" class="text-xs text-gray-400 mt-1">Waiting for data</div>
-                        </div>
-                        
-                        <!-- Recommended Side -->
-                        <div class="mb-3 p-3 bg-gray-900 rounded border border-purple-500/30 text-center">
-                            <div class="text-xs font-semibold text-purple-400 mb-1">SMART RECOMMENDATION</div>
-                            <div id="recommended-side" class="text-2xl font-bold text-white">---</div>
-                            <div id="confidence-score" class="text-xs text-gray-400 mt-1">Confidence: --</div>
-                        </div>
-                        
-                        <!-- Digit Distribution Preview -->
-                        <div class="mt-2">
-                            <button onclick="toggleDistribution()" class="w-full text-xs bg-gray-700 hover:bg-gray-600 px-2 py-1 rounded mb-2">
-                                📊 Show Digit Distribution <span id="dist-toggle">▼</span>
-                            </button>
-                            <div id="distribution-panel" class="hidden p-2 bg-gray-900 rounded border border-gray-700">
-                                <div id="distribution-content" class="text-xs text-gray-400">
-                                    Collecting data...
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- Active Session Display -->
-                    <div id="session_display" class="mt-4 p-3 bg-gray-800 rounded border border-blue-500/30">
-                        <h3 class="text-sm font-bold text-blue-300 mb-2">Active Session</h3>
-                        <div class="flex items-center justify-between">
-                            <div>
-                                <div class="text-xs text-gray-300">Trading:</div>
-                                <div id="session_side" class="text-xl font-bold text-blue-400">-</div>
-                            </div>
-                            <div>
-                                <div class="text-xs text-gray-300">Trades:</div>
-                                <div id="session_trades" class="text-sm font-bold text-yellow-400">0/0</div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <!-- LEFT -->
+      <div class="lg:col-span-1">
+        <div class="bg-gray-900 border border-gray-700 rounded-xl p-4 shadow-lg">
+          <h2 class="text-lg font-bold text-cyan-400 mb-4 pb-2 border-b border-gray-700">📊 MARKET INTELLIGENCE</h2>
+
+          <div class="mb-4 p-3 bg-gray-800 rounded-lg border border-gray-600">
+            <h3 class="text-sm font-bold text-gray-300 mb-2">Connection</h3>
+            <div class="grid grid-cols-2 gap-2 text-xs">
+              <div><span class="text-gray-400">Status:</span> <span id="market_status" class="ml-2 font-bold text-red-400">Offline</span></div>
+              <div><span class="text-gray-400">Symbol:</span> <span id="current_symbol" class="ml-2 font-bold text-cyan-400">V. 100 Index</span></div>
+              <div><span class="text-gray-400">Ticks:</span> <span id="ticks_received" class="ml-2 font-bold text-green-400">0</span></div>
+              <div><span class="text-gray-400">Rate:</span> <span id="current_tick_rate" class="ml-2 font-bold text-blue-400">0/s</span></div>
             </div>
-            
-            <!-- RIGHT COLUMN: Trading Controls & Metrics -->
-            <div class="lg:col-span-2">
-                <!-- Stake Calculator -->
-                <div class="mb-6 p-4 bg-gray-900 rounded-xl border border-purple-500/50 shadow-lg">
-                    <h2 class="text-lg font-bold text-purple-400 mb-3 pb-2 border-b border-gray-700 flex items-center">
-                        🧮 MARTINGALE CALCULATOR
-                        <button onclick="toggleCalculator()" class="ml-auto text-xs bg-gray-700 hover:bg-gray-600 px-2 py-1 rounded">
-                            <span id="calcToggleIcon">−</span>
-                        </button>
-                    </h2>
-                    
-                    <div id="calculatorContent">
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div class="space-y-3">
-                                <div>
-                                    <label class="block text-xs font-semibold text-gray-300 mb-1">Base Stake ($)</label>
-                                    <input type="number" id="calc_base_stake" value="1.0" min="0.1" step="0.1" 
-                                        class="w-full rounded-md bg-gray-700 border border-gray-600 text-white px-2 py-1 text-sm">
-                                </div>
-                                <div>
-                                    <label class="block text-xs font-semibold text-gray-300 mb-1">Multiplier</label>
-                                    <input type="number" id="calc_multiplier" value="1.5" min="1.1" step="0.1" 
-                                        class="w-full rounded-md bg-gray-700 border border-gray-600 text-white px-2 py-1 text-sm">
-                                </div>
-                                <div>
-                                    <label class="block text-xs font-semibold text-gray-300 mb-1">Max Steps</label>
-                                    <input type="number" id="calc_max_steps" value="3" min="1" max="5" 
-                                        class="w-full rounded-md bg-gray-700 border border-gray-600 text-white px-2 py-1 text-sm">
-                                </div>
-                                <button onclick="calculateStakes()" 
-                                    class="w-full mt-2 px-4 py-2 bg-purple-600 text-white font-bold rounded-lg hover:bg-purple-700 transition">
-                                    CALCULATE
-                                </button>
-                            </div>
-                            
-                            <div class="space-y-3">
-                                <div class="p-3 bg-gray-800 rounded-lg border border-green-500/50">
-                                    <div class="text-xs text-green-400">Total Required</div>
-                                    <div id="calc_total" class="text-xl font-bold text-white">$0.00</div>
-                                </div>
-                                <div class="p-3 bg-gray-800 rounded-lg border border-blue-500/50">
-                                    <div class="text-xs text-blue-400">Max Stake</div>
-                                    <div id="calc_max_stake" class="text-lg font-bold text-white">$0.00</div>
-                                </div>
-                                <div class="p-3 bg-gray-800 rounded-lg border border-yellow-500/50">
-                                    <div class="text-xs text-yellow-400">Win Payout</div>
-                                    <div id="calc_payout" class="text-lg font-bold text-white">$0.00</div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- Main Controls -->
-                <div class="grid grid-cols-2 gap-3 mb-6">
-                    <div>
-                        <label for="symbol" class="block text-xs font-semibold text-gray-300 mb-1">Symbol</label>
-                        <select id="symbol" class="w-full rounded-md bg-gray-700 border border-gray-600 text-white px-2 py-1.5 text-sm">
-                            <option value="R_10">V. 10 Index</option>
-                            <option value="R_25">V. 25 Index</option>
-                            <option value="R_50">V. 50 Index</option>
-                            <option value="R_75">V. 75 Index</option>
-                            <option value="R_100" selected>V. 100 Index</option>
-                        </select>
-                    </div>
-                    
-                    <div>
-                        <label for="analysis_window" class="block text-xs font-semibold text-gray-300 mb-1">Analysis Window</label>
-                        <select id="analysis_window" class="w-full rounded-md bg-gray-700 border border-gray-600 text-white px-2 py-1.5 text-sm">
-                            <option value="50">50 Ticks (Faster)</option>
-                            <option value="100" selected>100 Ticks (Balanced)</option>
-                            <option value="200">200 Ticks (Smoother)</option>
-                        </select>
-                    </div>
-                    
-                    <div class="col-span-2">
-                        <label class="block text-xs font-semibold text-gray-300 mb-2">Trading Strategy</label>
-                        <div class="grid grid-cols-2 gap-2">
-                            <button id="mode_smart" onclick="setStrategy('smart')" 
-                                class="px-4 py-2 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 transition">
-                                🧠 SMART SWITCH
-                            </button>
-                            <button id="mode_fixed" onclick="setStrategy('fixed')" 
-                                class="px-4 py-2 bg-gray-600 text-white font-bold rounded-lg hover:bg-gray-700 transition">
-                                🔒 FIXED SIDE
-                            </button>
-                        </div>
-                    </div>
-                    
-                    <div class="col-span-2" id="fixed_side_container" style="display: none;">
-                        <label class="block text-xs font-semibold text-gray-300 mb-1">Fixed Side</label>
-                        <div class="grid grid-cols-2 gap-2">
-                            <button id="side_over" onclick="setFixedSide('OVER')" 
-                                class="px-4 py-2 bg-blue-600 text-white font-bold rounded-lg">
-                                OVER 2
-                            </button>
-                            <button id="side_under" onclick="setFixedSide('UNDER')" 
-                                class="px-4 py-2 bg-purple-600 text-white font-bold rounded-lg">
-                                UNDER 7
-                            </button>
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- Live Metrics -->
-                <div class="grid grid-cols-4 gap-2 mb-4">
-                    <div class="bg-gray-700 rounded-lg p-2 col-span-2">
-                        <p class="text-[10px] text-green-500">Current Tick</p>
-                        <p id="metricLiveTick" class="text-lg font-bold text-white">---</p>
-                        <p id="metricLastDigit" class="text-xs text-green-300">Digit: ?</p>
-                    </div>
-                    
-                    <div class="bg-gray-700 rounded-lg p-2">
-                        <p class="text-[10px] text-green-500">Balance</p>
-                        <p id="metricBalance" class="text-lg font-bold text-green-400">$---</p>
-                    </div>
-                    
-                    <div class="bg-gray-700 rounded-lg p-2">
-                        <p class="text-[10px] text-green-500">Trades</p>
-                        <p id="metricTradeCount" class="text-lg font-bold text-white">0</p>
-                    </div>
-                    
-                    <div class="bg-gray-700 rounded-lg p-2 col-span-2">
-                        <p class="text-[10px] text-lime-400">P/L</p>
-                        <p id="metricTotalProfit" class="text-lg font-bold text-white">$0.00</p>
-                    </div>
-                    
-                    <div class="bg-gray-700 rounded-lg p-2 col-span-2">
-                        <p class="text-[10px] text-green-500">Current Stake</p>
-                        <p id="metricCurrentStake" class="text-lg font-bold text-white">$0.00</p>
-                    </div>
-                </div>
-                
-                <!-- Trade Status -->
-                <div id="trade-status" class="bg-gray-900 rounded-lg p-3 border border-yellow-500/50 mb-4">
-                    <div class="flex justify-between items-center mb-1">
-                        <p class="text-xs font-semibold text-yellow-500">TRADE STATUS</p>
-                        <p id="status-badge-small" class="text-xs text-gray-400">READY</p>
-                    </div>
-                    <p id="status-message" class="text-sm font-bold text-gray-300">Waiting for connection...</p>
-                    <p id="next-action" class="text-xs text-yellow-400 mt-1">Start bot to begin</p>
-                </div>
+          </div>
+
+          <div class="mb-4 p-3 bg-gray-800 rounded-lg border border-blue-500/50">
+            <h3 class="text-sm font-bold text-blue-400 mb-3 flex items-center">
+              🧠 MEDIAN ANALYSIS ENGINE
+              <span id="analysis-progress" class="ml-auto text-xs bg-gray-700 px-2 py-1 rounded">0/100</span>
+            </h3>
+
+            <div class="mb-3 p-2 bg-gray-900 rounded border border-gray-700">
+              <div class="text-xs font-semibold text-gray-300 mb-1">Window Status:</div>
+              <div id="window-status" class="text-sm font-bold text-yellow-400">Collecting data...</div>
             </div>
+
+            <div class="mb-3 p-3 bg-gray-900 rounded border border-green-500/30 text-center">
+              <div class="text-xs font-semibold text-green-400 mb-1">Current Median (Window)</div>
+              <div id="median-value" class="text-4xl font-bold text-white">-</div>
+              <div id="median-interpretation" class="text-xs text-gray-400 mt-1">Waiting for data</div>
+            </div>
+
+            <div class="mb-3 p-3 bg-gray-900 rounded border border-purple-500/30 text-center">
+              <div class="text-xs font-semibold text-purple-400 mb-1">SMART RECOMMENDATION</div>
+              <div id="recommended-side" class="text-2xl font-bold text-white">---</div>
+              <div id="confidence-score" class="text-xs text-gray-400 mt-1">Confidence: --</div>
+            </div>
+
+            <div class="mt-2">
+              <button id="distBtn" class="w-full text-xs bg-gray-700 hover:bg-gray-600 px-2 py-1 rounded mb-2">
+                📊 Show Digit Distribution <span id="dist-toggle">▼</span>
+              </button>
+              <div id="distribution-panel" class="hidden p-2 bg-gray-900 rounded border border-gray-700">
+                <div id="distribution-content" class="text-xs text-gray-400">Collecting data...</div>
+              </div>
+            </div>
+          </div>
+
+          <div id="session_display" class="mt-4 p-3 bg-gray-800 rounded border border-blue-500/30">
+            <h3 class="text-sm font-bold text-blue-300 mb-2">Active Session</h3>
+            <div class="flex items-center justify-between">
+              <div>
+                <div class="text-xs text-gray-300">Trading:</div>
+                <div id="session_side" class="text-xl font-bold text-blue-400">-</div>
+              </div>
+              <div>
+                <div class="text-xs text-gray-300">Trades:</div>
+                <div id="session_trades" class="text-sm font-bold text-yellow-400">0/0</div>
+              </div>
+            </div>
+
+            <div class="mt-3 flex items-center justify-between text-xs bg-gray-900 rounded border border-gray-700 px-3 py-2">
+              <span class="text-gray-300 font-semibold">Keep analysis between Start/Stop</span>
+              <label class="inline-flex items-center gap-2">
+                <input id="persist_analysis" type="checkbox" checked class="accent-blue-500">
+                <span class="text-gray-400">ON</span>
+              </label>
+            </div>
+          </div>
+
+          <div class="mt-3 text-xs text-gray-400">
+            ✅ Bot stops on: <span class="text-green-400 font-bold">FIRST WIN</span> or <span class="text-yellow-400 font-bold">Max Trades</span>
+          </div>
         </div>
-        
-        <!-- Start/Stop Button -->
-        <div class="flex justify-center my-5">
-            <button id="toggleButton" onclick="toggleBot()"
-                class="w-full md:w-1/2 px-6 py-3 bg-green-600 text-white font-bold text-lg rounded-lg shadow-xl hover:bg-green-700 transition">
-                🚀 START BOT
+      </div>
+
+      <!-- RIGHT -->
+      <div class="lg:col-span-2">
+        <div class="mb-6 p-4 bg-gray-900 rounded-xl border border-purple-500/50 shadow-lg">
+          <h2 class="text-lg font-bold text-purple-400 mb-3 pb-2 border-b border-gray-700 flex items-center">
+            🧮 MARTINGALE CALCULATOR
+            <button id="calcToggle" class="ml-auto text-xs bg-gray-700 hover:bg-gray-600 px-2 py-1 rounded">
+              <span id="calcToggleIcon">−</span>
             </button>
+          </h2>
+
+          <div id="calculatorContent">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div class="space-y-3">
+                <div>
+                  <label class="block text-xs font-semibold text-gray-300 mb-1">Base Stake ($)</label>
+                  <input type="number" id="calc_base_stake" value="1.0" min="0.1" step="0.1"
+                         class="w-full rounded-md bg-gray-700 border border-gray-600 text-white px-2 py-1 text-sm">
+                </div>
+                <div>
+                  <label class="block text-xs font-semibold text-gray-300 mb-1">Multiplier</label>
+                  <input type="number" id="calc_multiplier" value="1.5" min="1.1" step="0.1"
+                         class="w-full rounded-md bg-gray-700 border border-gray-600 text-white px-2 py-1 text-sm">
+                </div>
+                <div>
+                  <label class="block text-xs font-semibold text-gray-300 mb-1">Max Steps</label>
+                  <input type="number" id="calc_max_steps" value="3" min="1" max="5"
+                         class="w-full rounded-md bg-gray-700 border border-gray-600 text-white px-2 py-1 text-sm">
+                </div>
+                <button id="calcBtn"
+                        class="w-full mt-2 px-4 py-2 bg-purple-600 text-white font-bold rounded-lg hover:bg-purple-700 transition">
+                  CALCULATE
+                </button>
+              </div>
+
+              <div class="space-y-3">
+                <div class="p-3 bg-gray-800 rounded-lg border border-green-500/50">
+                  <div class="text-xs text-green-400">Total Required</div>
+                  <div id="calc_total" class="text-xl font-bold text-white">$0.00</div>
+                </div>
+                <div class="p-3 bg-gray-800 rounded-lg border border-blue-500/50">
+                  <div class="text-xs text-blue-400">Max Stake</div>
+                  <div id="calc_max_stake" class="text-lg font-bold text-white">$0.00</div>
+                </div>
+                <div class="p-3 bg-gray-800 rounded-lg border border-yellow-500/50">
+                  <div class="text-xs text-yellow-400">Win Payout</div>
+                  <div id="calc_payout" class="text-lg font-bold text-white">$0.00</div>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
 
-        <!-- Log Area -->
-        <div id="log-column">
-            <h2 class="text-lg font-bold text-gray-300 mb-2 border-b border-gray-700 pb-1">Live Log</h2>
-            <div id="log-area" class="h-80 bg-gray-900 text-lime-400 p-2.5 rounded-lg overflow-y-scroll text-xs">
+        <div class="grid grid-cols-2 gap-3 mb-6">
+          <div>
+            <label for="symbol" class="block text-xs font-semibold text-gray-300 mb-1">Symbol</label>
+            <select id="symbol" class="w-full rounded-md bg-gray-700 border border-gray-600 text-white px-2 py-1.5 text-sm">
+              <option value="R_10">V. 10 Index</option>
+              <option value="R_25">V. 25 Index</option>
+              <option value="R_50">V. 50 Index</option>
+              <option value="R_75">V. 75 Index</option>
+              <option value="R_100" selected>V. 100 Index</option>
+            </select>
+          </div>
+
+          <div>
+            <label for="analysis_window" class="block text-xs font-semibold text-gray-300 mb-1">Analysis Window</label>
+            <select id="analysis_window" class="w-full rounded-md bg-gray-700 border border-gray-600 text-white px-2 py-1.5 text-sm">
+              <option value="50">50 Ticks (Faster)</option>
+              <option value="100" selected>100 Ticks (Balanced)</option>
+              <option value="200">200 Ticks (Smoother)</option>
+            </select>
+          </div>
+
+          <div>
+            <label for="max_trades" class="block text-xs font-semibold text-gray-300 mb-1">Max Trades (session)</label>
+            <input type="number" id="max_trades" value="20" min="1" max="500"
+                   class="w-full rounded-md bg-gray-700 border border-gray-600 text-white px-2 py-1.5 text-sm">
+          </div>
+
+          <div>
+            <label class="block text-xs font-semibold text-gray-300 mb-1"> </label>
+            <div class="w-full rounded-md bg-gray-900 border border-gray-700 text-gray-300 px-2 py-1.5 text-sm flex items-center justify-between">
+              <span>Limit</span>
+              <span class="text-yellow-400 font-bold" id="max_trades_hint">20</span>
+            </div>
+          </div>
+
+          <div class="col-span-2">
+            <label class="block text-xs font-semibold text-gray-300 mb-2">Trading Strategy</label>
+            <div class="grid grid-cols-2 gap-2">
+              <button id="mode_smart" class="px-4 py-2 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 transition">
+                🧠 SMART SWITCH
+              </button>
+              <button id="mode_fixed" class="px-4 py-2 bg-gray-600 text-white font-bold rounded-lg hover:bg-gray-700 transition">
+                🔒 FIXED SIDE
+              </button>
+            </div>
+          </div>
+
+          <div class="col-span-2" id="fixed_side_container" style="display:none;">
+            <label class="block text-xs font-semibold text-gray-300 mb-1">Fixed Side</label>
+            <div class="grid grid-cols-2 gap-2">
+              <button id="side_over" class="px-4 py-2 bg-blue-600 text-white font-bold rounded-lg">OVER 2</button>
+              <button id="side_under" class="px-4 py-2 bg-purple-600 text-white font-bold rounded-lg">UNDER 7</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-4 gap-2 mb-4">
+          <div class="bg-gray-700 rounded-lg p-2 col-span-2">
+            <p class="text-[10px] text-green-500">Current Tick</p>
+            <p id="metricLiveTick" class="text-lg font-bold text-white">---</p>
+            <p id="metricLastDigit" class="text-xs text-green-300">Digit: ?</p>
+          </div>
+          <div class="bg-gray-700 rounded-lg p-2">
+            <p class="text-[10px] text-green-500">Balance</p>
+            <p id="metricBalance" class="text-lg font-bold text-green-400">$---</p>
+          </div>
+          <div class="bg-gray-700 rounded-lg p-2">
+            <p class="text-[10px] text-green-500">Trades</p>
+            <p id="metricTradeCount" class="text-lg font-bold text-white">0</p>
+          </div>
+          <div class="bg-gray-700 rounded-lg p-2 col-span-2">
+            <p class="text-[10px] text-lime-400">P/L</p>
+            <p id="metricTotalProfit" class="text-lg font-bold text-white">$0.00</p>
+          </div>
+          <div class="bg-gray-700 rounded-lg p-2 col-span-2">
+            <p class="text-[10px] text-green-500">Current Stake</p>
+            <p id="metricCurrentStake" class="text-lg font-bold text-white">$0.00</p>
+          </div>
+        </div>
+
+        <div id="trade-status" class="bg-gray-900 rounded-lg p-3 border border-yellow-500/50 mb-4">
+          <div class="flex justify-between items-center mb-1">
+            <p class="text-xs font-semibold text-yellow-500">TRADE STATUS</p>
+            <p id="status-badge-small" class="text-xs text-gray-400">READY</p>
+          </div>
+          <p id="status-message" class="text-sm font-bold text-gray-300">Waiting for connection...</p>
+          <p id="next-action" class="text-xs text-yellow-400 mt-1">Start bot to begin</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="flex justify-center my-5">
+      <button id="toggleButton"
+              class="w-full md:w-1/2 px-6 py-3 bg-green-600 text-white font-bold text-lg rounded-lg shadow-xl hover:bg-green-700 transition">
+        🚀 START BOT
+      </button>
+    </div>
+
+    <div id="log-column">
+      <h2 class="text-lg font-bold text-gray-300 mb-2 border-b border-gray-700 pb-1">Live Log</h2>
+      <div id="log-area" class="h-80 bg-gray-900 text-lime-400 p-2.5 rounded-lg overflow-y-scroll text-xs">
 [00:00:00] 🤖 Over/Under Smart Bot Initialized
 [00:00:00] 📊 Ready for market connection
 [00:00:00] 🧠 Median analysis engine loaded
-            </div>
-        </div>
+      </div>
     </div>
+  </div>
 
-    <script>
-        // ============================================================================
-        // OVER/UNDER SMART BOT - COMPLETE IMPLEMENTATION
-        // ============================================================================
-        
-        // --- GLOBAL STATE ---
-        window.ws = null;
-        window.req_id = 0;
-        window.isBotRunning = false;
+  <script>
+    // =====================================================================================
+    // Core state
+    // =====================================================================================
+    window.ws = null;
+    window.req_id = 0;
+
+    window.isBotRunning = false;
+    window.isConnecting = false;
+
+    window.soundEnabled = true;
+    window.ToneInitialized = false;
+    window.synth = null;
+
+    window.baseStake = 1.0;
+    window.currentStake = 1.0;
+    window.multiplier = 1.5;
+    window.maxSteps = 3;
+    window.currentStep = 0;
+
+    window.maxTrades = 20;
+    window.tradeCount = 0;
+
+    window.strategy = "smart"; // smart|fixed
+    window.fixedSide = "OVER";
+    window.currentSide = null;
+
+    window.lastTradeResult = null;
+    window.stats = { wins: 0, losses: 0 };
+
+    window.pnlTracker = { totalInvestment: 0, totalPayout: 0 };
+    window.netProfit = 0;
+
+    window.totalTicksReceived = 0;
+    window.tickTimestamps = [];
+    window.tickQueue = [];
+    window.maxQueueSize = 30;
+
+    window.executionLock = false;
+    window.nextTradeAllowed = true;
+
+    window.tickSubscriptionSent = false;
+    window.pendingProposals = new Map();
+
+    window.analysisState = { lastSymbol: null, lastWindowSize: null };
+
+    // ALWAYS stop on first win OR max trades
+    window.stopOnWin = true;
+
+    // =====================================================================================
+    // Helpers
+    // =====================================================================================
+    function $(id){ return document.getElementById(id); }
+    function getNextReqId(){ return ++window.req_id; }
+
+    function log(message, type = "INFO") {
+      const logArea = $("log-area");
+      const time = new Date().toLocaleTimeString("en-US", { hour12:false, hour:"2-digit", minute:"2-digit", second:"2-digit" });
+
+      let color = "text-lime-400";
+      if (type === "ERROR") color = "text-red-500";
+      if (type === "STRATEGY") color = "text-blue-300";
+      if (type === "TRADE") color = "text-yellow-300";
+      if (type === "WIN") color = "text-green-400 font-bold";
+      if (type === "LOSS") color = "text-red-400";
+      if (type === "SYSTEM") color = "text-white";
+      if (type === "PROFIT") color = "text-purple-300";
+      if (type === "CALC") color = "text-orange-300";
+      if (type === "ENGINE") color = "text-cyan-300";
+
+      logArea.innerHTML += `\n[${time}] <span class="${color}">${message}</span>`;
+      logArea.scrollTop = logArea.scrollHeight;
+    }
+
+    function updateTradeStatus(status, message, action, type = "normal") {
+      const container = $("trade-status");
+      const badge = $("status-badge-small");
+      const msgElem = $("status-message");
+      const actionElem = $("next-action");
+
+      container.classList.remove("win-glow");
+      msgElem.textContent = message;
+      actionElem.textContent = action;
+
+      if (type === "win") {
+        badge.textContent = "WIN 🎯";
+        badge.className = "text-xs font-bold text-green-400";
+        msgElem.className = "text-sm font-bold text-green-400";
+        container.classList.add("win-glow");
+      } else if (type === "loss") {
+        badge.textContent = "LOSS ❌";
+        badge.className = "text-xs font-bold text-red-400";
+        msgElem.className = "text-sm font-bold text-red-400";
+      } else if (type === "trade") {
+        badge.textContent = "TRADING ⚡";
+        badge.className = "text-xs font-bold text-yellow-400";
+        msgElem.className = "text-sm font-bold text-yellow-400";
+      } else {
+        badge.textContent = status;
+        badge.className = "text-xs font-bold text-gray-400";
+        msgElem.className = "text-sm font-bold text-gray-300";
+      }
+    }
+
+    function updatePnL() {
+      const el = $("metricTotalProfit");
+      el.textContent = `$${window.netProfit.toFixed(2)}`;
+      el.className = window.netProfit >= 0 ? "text-lg font-bold text-green-400" : "text-lg font-bold text-red-400";
+    }
+
+    function updateSessionTradesUI() {
+      $("session_trades").textContent = `${window.tradeCount}/${window.maxTrades}`;
+      $("max_trades_hint").textContent = `${window.maxTrades}`;
+      $("metricTradeCount").textContent = `${window.tradeCount}`;
+    }
+
+    function updateButtonState() {
+      const btn = $("toggleButton");
+      if (window.isBotRunning) {
+        btn.innerHTML = '<span class="flex items-center justify-center"><span class="mr-2">⏹️</span> STOP BOT</span>';
+        btn.classList.remove("bg-green-600","hover:bg-green-700");
+        btn.classList.add("bg-red-600","hover:bg-red-700");
+      } else {
+        btn.innerHTML = '<span class="flex items-center justify-center"><span class="mr-2">🚀</span> START BOT</span>';
+        btn.classList.remove("bg-red-600","hover:bg-red-700");
+        btn.classList.add("bg-green-600","hover:bg-green-700");
+      }
+    }
+
+    function updateConnectionStatus() {
+      const isConnected = window.ws && window.ws.readyState === WebSocket.OPEN;
+      const badge = $("status-badge");
+      const marketStatus = $("market_status");
+
+      if (isConnected) {
+        badge.textContent = "🟢 CONNECTED";
+        badge.className = "ml-3 inline-flex items-center px-3 py-1 text-sm font-medium rounded-full connection-badge-connected text-white shadow-md";
+        marketStatus.textContent = "Live";
+        marketStatus.className = "ml-2 font-bold text-green-400";
+      } else if (window.isConnecting) {
+        badge.textContent = "🟡 CONNECTING";
+        badge.className = "ml-3 inline-flex items-center px-3 py-1 text-sm font-medium rounded-full connection-badge-connecting text-white shadow-md";
+        marketStatus.textContent = "Connecting...";
+        marketStatus.className = "ml-2 font-bold text-yellow-400";
+      } else {
+        badge.textContent = "🔴 DISCONNECTED";
+        badge.className = "ml-3 inline-flex items-center px-3 py-1 text-sm font-medium rounded-full connection-badge-disconnected text-white shadow-md";
+        marketStatus.textContent = "Offline";
+        marketStatus.className = "ml-2 font-bold text-red-400";
+      }
+
+      $("current_symbol").textContent = $("symbol").options[$("symbol").selectedIndex].text;
+
+      const now = Date.now();
+      const recent = window.tickTimestamps.filter(ts => now - ts < 5000);
+      $("current_tick_rate").textContent = (recent.length / 5).toFixed(1) + "/s";
+      $("ticks_received").textContent = window.totalTicksReceived;
+    }
+
+    // =====================================================================================
+    // Sound
+    // =====================================================================================
+    async function initTone() {
+      if (typeof Tone === "undefined") return;
+      try {
+        await Tone.start();
+        window.synth = new Tone.Synth().toDestination();
+        window.ToneInitialized = true;
+      } catch {}
+    }
+    function playTickSound(){ if(window.ToneInitialized && window.synth) { try{ window.synth.triggerAttackRelease("C4","32n",Tone.now(),0.2);}catch{} } }
+    function playWinSound(){ if(window.ToneInitialized && window.synth) { try{ window.synth.triggerAttackRelease("C5","8n"); setTimeout(()=>window.synth.triggerAttackRelease("E5","8n"),100); setTimeout(()=>window.synth.triggerAttackRelease("G5","8n"),200);}catch{} } }
+    function playLossSound(){ if(window.ToneInitialized && window.synth) { try{ window.synth.triggerAttackRelease("G4","8n",Tone.now(),0.3); setTimeout(()=>window.synth.triggerAttackRelease("D4","8n"),150);}catch{} } }
+
+    // =====================================================================================
+    // Analysis Engine (incremental window; not resetting to 100 every start)
+    // =====================================================================================
+    window.overUnderEngine = {
+      digitWindow: [],
+      windowSize: 100,
+      median: null,
+      distribution: Array(10).fill(0),
+      recommendedSide: null,
+      confidence: 0,
+
+      init() {
+        this.updateWindowSize();
+        this.updateProgress();
+        this.updateUI();
+        log("🧠 Over/Under Intelligence Engine initialized", "ENGINE");
+      },
+
+      resetWindow(reason) {
+        this.digitWindow = [];
+        this.median = null;
+        this.distribution = Array(10).fill(0);
+        this.recommendedSide = null;
+        this.confidence = 0;
+        this.updateProgress();
+        this.updateUI();
+        if (reason) log(`🧹 Analysis reset: ${reason}`, "ENGINE");
+      },
+
+      updateWindowSize() {
+        this.windowSize = parseInt($("analysis_window").value, 10) || 100;
+        if (this.digitWindow.length > this.windowSize) {
+          this.digitWindow = this.digitWindow.slice(this.digitWindow.length - this.windowSize);
+        }
+        this.updateDistribution();
+        this.recompute();
+      },
+
+      addDigit(d) {
+        if (Number.isNaN(d) || d < 0 || d > 9) return;
+        this.digitWindow.push(d);
+        if (this.digitWindow.length > this.windowSize) this.digitWindow.shift();
+        this.updateDistribution();
+        this.recompute();
+      },
+
+      updateDistribution() {
+        this.distribution = Array(10).fill(0);
+        for (const d of this.digitWindow) this.distribution[d]++;
+      },
+
+      computeMedian() {
+        if (this.digitWindow.length < this.windowSize) { this.median = null; return; }
+        const sorted = [...this.digitWindow].sort((a,b)=>a-b);
+        const mid = Math.floor(sorted.length / 2);
+        this.median = (sorted.length % 2 === 0) ? (sorted[mid-1] + sorted[mid]) / 2 : sorted[mid];
+      },
+
+      computeRecommendation() {
+        if (this.median === null) { this.recommendedSide = null; this.confidence = 0; return; }
+        const recommended = this.median > 4.5 ? "OVER" : "UNDER";
+        const distance = Math.abs(this.median - 4.5);
+        this.confidence = Math.min(100, Math.round((distance / 4.5) * 100));
+        this.recommendedSide = this.confidence >= 20 ? recommended : null;
+
+        if (window.strategy === "smart" && window.isBotRunning) {
+          if (this.recommendedSide && this.recommendedSide !== window.currentSide) {
+            if (window.lastTradeResult === "loss") this.switchSide(this.recommendedSide, "Smart switch after loss");
+          }
+        }
+      },
+
+      switchSide(newSide, reason) {
+        if (!newSide || newSide === window.currentSide) return;
+        window.currentSide = newSide;
+        log(`🔄 Switching to ${newSide}${reason ? " ("+reason+")" : ""}`, "STRATEGY");
+        const s = $("session_side");
+        s.textContent = newSide;
+        s.className = newSide === "OVER" ? "text-xl font-bold text-blue-400" : "text-xl font-bold text-purple-400";
+      },
+
+      getPrediction() {
+        if (window.strategy === "fixed") return window.fixedSide || "OVER";
+        return window.currentSide || this.recommendedSide || "OVER";
+      },
+
+      recompute() {
+        this.computeMedian();
+        this.computeRecommendation();
+        this.updateProgress();
+        this.updateUI();
+        if (!$("distribution-panel").classList.contains("hidden")) this.updateDistributionDisplay();
+      },
+
+      updateProgress() {
+        $("analysis-progress").textContent = `${this.digitWindow.length}/${this.windowSize}`;
+        if (this.digitWindow.length < this.windowSize) {
+          $("window-status").textContent = `Collecting data... (${this.digitWindow.length}/${this.windowSize})`;
+          $("window-status").className = "text-sm font-bold text-yellow-400";
+        } else {
+          $("window-status").textContent = "Analysis Active";
+          $("window-status").className = "text-sm font-bold text-green-400";
+        }
+      },
+
+      updateUI() {
+        if (this.median === null) {
+          $("median-value").textContent = "-";
+          $("median-value").className = "text-4xl font-bold text-white";
+          $("median-interpretation").textContent = "Waiting for data";
+          $("recommended-side").textContent = "---";
+          $("recommended-side").className = "text-2xl font-bold text-white";
+          $("confidence-score").textContent = "Confidence: --";
+          return;
+        }
+
+        $("median-value").textContent = this.median.toFixed(1);
+        if (this.median > 4.5) {
+          $("median-value").className = "text-4xl font-bold text-orange-400";
+          $("median-interpretation").textContent = "↗️ Trending HIGH";
+        } else {
+          $("median-value").className = "text-4xl font-bold text-blue-400";
+          $("median-interpretation").textContent = "↙️ Trending LOW";
+        }
+
+        if (this.recommendedSide) {
+          $("recommended-side").textContent = this.recommendedSide === "OVER" ? "OVER 2" : "UNDER 7";
+          $("recommended-side").className = this.recommendedSide === "OVER" ? "text-2xl font-bold text-blue-400" : "text-2xl font-bold text-purple-400";
+          $("confidence-score").textContent = `Confidence: ${this.confidence}%`;
+        } else {
+          $("recommended-side").textContent = "---";
+          $("recommended-side").className = "text-2xl font-bold text-white";
+          $("confidence-score").textContent = `Confidence: ${this.confidence}%`;
+        }
+      },
+
+      updateDistributionDisplay() {
+        const content = $("distribution-content");
+        let html = '<div class="space-y-1">';
+        for (let d = 0; d < 10; d++) {
+          const count = this.distribution[d];
+          const pct = this.digitWindow.length ? ((count / this.digitWindow.length) * 100).toFixed(1) : "0.0";
+          const barWidth = Math.min(100, Number(pct) * 2);
+          const barColor = d <= 6 ? "bg-blue-500" : "bg-purple-500";
+          html += `<div class="flex items-center gap-2">
+            <span class="w-6 text-right">${d}</span>
+            <div class="flex-1 bg-gray-700 h-4 rounded">
+              <div class="${barColor} h-4 rounded" style="width:${barWidth}%"></div>
+            </div>
+            <span class="w-12 text-right">${pct}%</span>
+          </div>`;
+        }
+        html += "</div>";
+        content.innerHTML = html;
+      }
+    };
+
+    // =====================================================================================
+    // Strategy UI
+    // =====================================================================================
+    function setStrategy(mode) {
+      window.strategy = mode;
+      if (mode === "smart") {
+        $("mode_smart").classList.add("bg-blue-600");
+        $("mode_fixed").classList.remove("bg-blue-600");
+        $("mode_fixed").classList.add("bg-gray-600");
+        $("fixed_side_container").style.display = "none";
+        log("🧠 Strategy: Smart Switching activated", "STRATEGY");
+      } else {
+        $("mode_fixed").classList.add("bg-blue-600");
+        $("mode_smart").classList.remove("bg-blue-600");
+        $("mode_smart").classList.add("bg-gray-600");
+        $("fixed_side_container").style.display = "block";
+        log(`🔒 Strategy: Fixed Side activated (${window.fixedSide})`, "STRATEGY");
+      }
+    }
+
+    function setFixedSide(side) {
+      window.fixedSide = side;
+      window.currentSide = side;
+
+      if (side === "OVER") {
+        $("side_over").classList.add("bg-blue-600");
+        $("side_over").classList.remove("bg-gray-600");
+        $("side_under").classList.add("bg-gray-600");
+        $("side_under").classList.remove("bg-purple-600");
+      } else {
+        $("side_under").classList.add("bg-purple-600");
+        $("side_under").classList.remove("bg-gray-600");
+        $("side_over").classList.add("bg-gray-600");
+        $("side_over").classList.remove("bg-blue-600");
+      }
+
+      $("session_side").textContent = side;
+      $("session_side").className = side === "OVER" ? "text-xl font-bold text-blue-400" : "text-xl font-bold text-purple-400";
+      log(`🔒 Fixed side set to ${side}`, "STRATEGY");
+    }
+
+    // =====================================================================================
+    // Calculator
+    // =====================================================================================
+    function calculateStakes() {
+      const base = parseFloat($("calc_base_stake").value) || 1.0;
+      const mult = parseFloat($("calc_multiplier").value) || 1.5;
+      const steps = parseInt($("calc_max_steps").value, 10) || 3;
+
+      window.baseStake = base;
+      window.multiplier = mult;
+      window.maxSteps = steps;
+
+      let total = 0;
+      let cur = base;
+      let maxStake = base;
+
+      for (let i = 0; i < steps; i++) {
+        total += cur;
+        maxStake = Math.max(maxStake, cur);
+        if (i < steps - 1) cur *= mult;
+      }
+
+      $("calc_total").textContent = `$${total.toFixed(2)}`;
+      $("calc_max_stake").textContent = `$${maxStake.toFixed(2)}`;
+      $("calc_payout").textContent = `$${(maxStake * 1.23).toFixed(2)}`;
+
+      log(`🧮 Calculator: Total $${total.toFixed(2)} for ${steps} steps`, "CALC");
+    }
+
+    // =====================================================================================
+    // WebSocket / Deriv API
+    // =====================================================================================
+    function sendRequest(req) {
+      if (window.ws && window.ws.readyState === WebSocket.OPEN) {
+        window.ws.send(JSON.stringify(req));
+        return req.req_id;
+      }
+      return null;
+    }
+
+    function connectWebSocket() {
+      if (window.ws) { try { window.ws.close(); } catch {} }
+      window.isConnecting = true;
+      updateConnectionStatus();
+
+      window.ws = new WebSocket("wss://ws.binaryws.com/websockets/v3?app_id=120389");
+
+      window.ws.onopen = () => {
         window.isConnecting = false;
-        window.soundEnabled = true;
-        window.ToneInitialized = false;
-        window.synth = null;
-        
-        // Trading Parameters
-        window.baseStake = 1.0;
-        window.currentStake = 1.0;
-        window.multiplier = 1.5;
-        window.maxSteps = 3;
+        updateConnectionStatus();
+        log("✅ WebSocket connected", "SYSTEM");
+
+        const token = localStorage.getItem("active_token") || localStorage.getItem("derivToken");
+        if (token) sendRequest({ authorize: token, req_id: getNextReqId() });
+      };
+
+      window.ws.onmessage = (msg) => {
+        let data;
+        try { data = JSON.parse(msg.data); } catch { return; }
+
+        if (data.msg_type === "tick") {
+          handleTick(data.tick);
+        } else if (data.msg_type === "authorize") {
+          if (data.authorize) {
+            log(`🔐 Authorized as ${data.authorize.loginid}`, "SYSTEM");
+            subscribeToTicks($("symbol").value);
+            subscribeToBalance();
+          }
+        } else if (data.msg_type === "balance") {
+          handleBalance(data.balance);
+        } else if (data.msg_type === "proposal") {
+          handleProposal(data.proposal, data.req_id);
+        } else if (data.msg_type === "buy") {
+          handleBuy(data.buy);
+        } else if (data.error) {
+          log(`❌ API Error: ${data.error.message}`, "ERROR");
+          window.executionLock = false;
+          window.nextTradeAllowed = true;
+        }
+      };
+
+      window.ws.onclose = () => {
+        window.isConnecting = false;
+        updateConnectionStatus();
+        log("🔌 WebSocket disconnected", "SYSTEM");
+      };
+
+      window.ws.onerror = () => {
+        log("❌ WebSocket connection error", "ERROR");
+      };
+    }
+
+    function subscribeToTicks(symbol) {
+      if (window.tickSubscriptionSent) return;
+      sendRequest({ ticks: symbol, subscribe: 1, req_id: getNextReqId() });
+      window.tickSubscriptionSent = true;
+      log(`✅ Subscribed to ${symbol}`, "SYSTEM");
+    }
+
+    function subscribeToBalance() {
+      sendRequest({ balance: 1, subscribe: 1, req_id: getNextReqId() });
+    }
+
+    function handleBalance(bal) {
+      if (!bal || typeof bal.balance === "undefined") return;
+      const balance = parseFloat(bal.balance);
+      $("metricBalance").textContent = `$${balance.toFixed(2)}`;
+    }
+
+    // =====================================================================================
+    // Tick handling
+    // =====================================================================================
+    function getLastDigit(quote) {
+      const s = quote.toString();
+      return parseInt(s[s.length - 1], 10);
+    }
+
+    function handleTick(tick) {
+      if (!window.isBotRunning || !tick || typeof tick.quote === "undefined") return;
+
+      const price = parseFloat(tick.quote);
+      const digit = getLastDigit(tick.quote);
+      if (Number.isNaN(digit) || digit < 0 || digit > 9) return;
+
+      window.totalTicksReceived++;
+      window.tickTimestamps.push(Date.now());
+
+      $("metricLiveTick").textContent = price.toFixed(3);
+      $("metricLastDigit").textContent = `Digit: ${digit}`;
+      $("metricLiveTick").classList.add("tick-flash");
+      setTimeout(() => $("metricLiveTick").classList.remove("tick-flash"), 50);
+
+      window.overUnderEngine.addDigit(digit);
+
+      window.tickQueue.push({ digit, price, time: Date.now() });
+      if (window.tickQueue.length > window.maxQueueSize) window.tickQueue.shift();
+
+      updateConnectionStatus();
+      if (window.soundEnabled) playTickSound();
+    }
+
+    // =====================================================================================
+    // Trading logic (STOP on WIN or MAX reached)
+    // =====================================================================================
+    function isImmediateWin(digit, side) {
+      if (side === "OVER") return digit >= 3 && digit <= 9;
+      return digit >= 0 && digit <= 6; // UNDER
+    }
+
+    function processTick() {
+      if (!window.isBotRunning || window.executionLock || !window.nextTradeAllowed) return;
+      if (window.tickQueue.length === 0) return;
+
+      if (window.tradeCount >= window.maxTrades) {
+        log(`🛑 Max trades reached (${window.maxTrades})`, "SYSTEM");
+        stopBot(`Max trades reached (${window.maxTrades})`);
+        return;
+      }
+
+      if (window.overUnderEngine.digitWindow.length < window.overUnderEngine.windowSize) {
+        updateTradeStatus("COLLECTING", `Collecting data: ${window.overUnderEngine.digitWindow.length}/${window.overUnderEngine.windowSize}`, "Please wait", "normal");
+        return;
+      }
+
+      const side = window.overUnderEngine.getPrediction();
+      if (!window.currentSide) window.currentSide = side;
+
+      // Only trade on LOSS condition: if digit is NOT immediate-win, place 1-tick contract.
+      // If digit is immediate-win, we treat it as a "win event" (as your original logic did).
+      const peek = window.tickQueue[0];
+      if (isImmediateWin(peek.digit, side)) {
+        window.tickQueue.shift();
+        handleWin(side, /*virtual*/true);
+        return;
+      }
+
+      // Place real trade (1 tick)
+      window.executionLock = true;
+      window.nextTradeAllowed = false;
+
+      const stake = window.currentStake;
+      const tickData = window.tickQueue.shift();
+
+      log(`📈 Trade #${window.tradeCount + 1}: ${side} with $${stake.toFixed(2)}`, "TRADE");
+      updateTradeStatus("TRADING", `${side} trade #${window.tradeCount + 1}`, `Stake: $${stake.toFixed(2)}`, "trade");
+
+      window.pnlTracker.totalInvestment += stake;
+
+      const contractType = side === "OVER" ? "OVER" : "UNDER";
+      const barrier = side === "OVER" ? "2" : "7";
+
+      const proposal = {
+        proposal: 1,
+        amount: stake.toFixed(2),
+        basis: "stake",
+        contract_type: contractType,
+        currency: "USD",
+        duration: 1,
+        duration_unit: "t",
+        symbol: $("symbol").value,
+        barrier: barrier,
+        req_id: getNextReqId()
+      };
+
+      window.pendingProposals.set(proposal.req_id, { side, stake, tick: tickData, tradeNumber: window.tradeCount + 1 });
+      sendRequest(proposal);
+    }
+
+    function handleWin(side, virtual = false) {
+      window.tradeCount++;
+      window.stats.wins++;
+      window.lastTradeResult = "win";
+
+      const payout = window.currentStake * 1.23;
+      window.pnlTracker.totalPayout += payout;
+      window.netProfit = window.pnlTracker.totalPayout - window.pnlTracker.totalInvestment;
+
+      window.currentStep = 0;
+      window.currentStake = window.baseStake;
+
+      $("metricCurrentStake").textContent = `$${window.currentStake.toFixed(2)}`;
+      updatePnL();
+      updateSessionTradesUI();
+
+      log(`✅ WIN${virtual ? " (immediate)" : ""}! Payout $${payout.toFixed(2)} | Net $${window.netProfit.toFixed(2)}`, "WIN");
+      updateTradeStatus("WIN", `Won $${payout.toFixed(2)}!`, "Stopping (stop-on-win)", "win");
+      if (window.soundEnabled) playWinSound();
+
+      window.executionLock = false;
+      window.nextTradeAllowed = true;
+
+      if (window.stopOnWin) {
+        stopBot("Stopped on first WIN");
+      } else if (window.tradeCount >= window.maxTrades) {
+        stopBot(`Max trades reached (${window.maxTrades})`);
+      }
+    }
+
+    function handleLoss(side) {
+      window.tradeCount++;
+      window.stats.losses++;
+      window.lastTradeResult = "loss";
+
+      window.currentStep++;
+      if (window.currentStep <= window.maxSteps) {
+        window.currentStake = Math.round((window.baseStake * Math.pow(window.multiplier, window.currentStep)) * 100) / 100;
+      } else {
+        log("⚠️ Max steps reached, resetting stake", "SYSTEM");
         window.currentStep = 0;
-        window.maxTrades = 20;
-        window.tradeCount = 0;
-        
-        // Strategy State
-        window.strategy = 'smart'; // 'smart' or 'fixed'
-        window.fixedSide = null; // 'OVER' or 'UNDER' for fixed mode
-        window.currentSide = null; // Current trading side
-        window.lastTradeResult = null;
-        window.consecutiveWins = 0;
-        window.consecutiveLosses = 0;
-        
-        // Financial Tracking
-        window.startingBalance = 0;
-        window.currentBalance = 0;
-        window.netProfit = 0;
-        window.pnlTracker = { totalInvestment: 0, totalPayout: 0 };
-        
-        // Tick Tracking
-        window.totalTicksReceived = 0;
-        window.tickTimestamps = [];
-        window.botTickTimestamps = [];
-        window.lastDigit = null;
-        
-        // Queue System
-        window.tickQueue = [];
-        window.maxQueueSize = 30;
+        window.currentStake = window.baseStake;
+      }
+
+      window.netProfit = window.pnlTracker.totalPayout - window.pnlTracker.totalInvestment;
+
+      $("metricCurrentStake").textContent = `$${window.currentStake.toFixed(2)}`;
+      updatePnL();
+      updateSessionTradesUI();
+
+      log(`❌ LOSS. Next stake: $${window.currentStake.toFixed(2)}`, "LOSS");
+      updateTradeStatus("LOSS", "Lost", `Next stake: $${window.currentStake.toFixed(2)}`, "loss");
+      if (window.soundEnabled) playLossSound();
+
+      window.executionLock = false;
+      window.nextTradeAllowed = true;
+
+      if (window.tradeCount >= window.maxTrades) {
+        stopBot(`Max trades reached (${window.maxTrades})`);
+      }
+    }
+
+    function handleProposal(proposal, req_id) {
+      const pending = window.pendingProposals.get(req_id);
+      if (!pending) return;
+
+      if (proposal && proposal.id) {
+        const buyReq = { buy: proposal.id, price: proposal.ask_price, req_id: getNextReqId() };
+        window.pendingProposals.set(buyReq.req_id, pending);
+        sendRequest(buyReq);
+      } else {
+        log("❌ Proposal failed", "ERROR");
         window.executionLock = false;
         window.nextTradeAllowed = true;
-        
-        // WebSocket State
-        window.tickSubscriptionSent = false;
-        window.pendingProposals = new Map();
-        
-        // ============================================================================
-        // OVER/UNDER INTELLIGENCE ENGINE
-        // ============================================================================
-        window.overUnderEngine = {
-            // Data Collection
-            digitWindow: [],
-            windowSize: 100,
-            
-            // Analysis Results
-            median: null,
-            sortedDigits: [],
-            distribution: Array(10).fill(0),
-            
-            // Recommendation
-            recommendedSide: null,
-            confidence: 0,
-            
-            // Historical Performance
-            sidePerformance: {
-                OVER: { wins: 0, losses: 0, trades: 0 },
-                UNDER: { wins: 0, losses: 0, trades: 0 }
-            },
-            
-            // Initialize engine
-            init: function() {
-                this.digitWindow = [];
-                this.median = null;
-                this.recommendedSide = null;
-                this.updateWindowSize();
-                log('🧠 Over/Under Intelligence Engine initialized', 'ENGINE');
-            },
-            
-            // Update window size from UI
-            updateWindowSize: function() {
-                const select = document.getElementById('analysis_window');
-                if (select) {
-                    this.windowSize = parseInt(select.value) || 100;
-                }
-                this.updateProgress();
-            },
-            
-            // Add new digit to analysis
-            addDigit: function(digit) {
-                if (isNaN(digit) || digit < 0 || digit > 9) return;
-                
-                this.digitWindow.push(digit);
-                
-                // Maintain window size
-                if (this.digitWindow.length > this.windowSize) {
-                    const removed = this.digitWindow.shift();
-                }
-                
-                // Update distribution
-                this.updateDistribution();
-                
-                // Recalculate median when window is full
-                if (this.digitWindow.length === this.windowSize) {
-                    this.calculateMedian();
-                    this.calculateRecommendation();
-                }
-                
-                this.updateProgress();
-                this.updateUI();
-            },
-            
-            // Update digit distribution
-            updateDistribution: function() {
-                this.distribution = Array(10).fill(0);
-                this.digitWindow.forEach(d => this.distribution[d]++);
-            },
-            
-            // Calculate median of current window
-            calculateMedian: function() {
-                if (this.digitWindow.length === 0) return;
-                
-                this.sortedDigits = [...this.digitWindow].sort((a, b) => a - b);
-                const mid = Math.floor(this.sortedDigits.length / 2);
-                
-                if (this.sortedDigits.length % 2 === 0) {
-                    // Even length: average of two middle numbers
-                    this.median = (this.sortedDigits[mid - 1] + this.sortedDigits[mid]) / 2;
-                } else {
-                    // Odd length: middle number
-                    this.median = this.sortedDigits[mid];
-                }
-            },
-            
-            // Calculate recommendation based on median
-            calculateRecommendation: function() {
-                if (this.median === null) return;
-                
-                // Core logic: median > 4.5 suggests OVER 2, otherwise UNDER 7
-                const recommended = this.median > 4.5 ? 'OVER' : 'UNDER';
-                
-                // Calculate confidence based on how far median is from threshold
-                const distance = Math.abs(this.median - 4.5);
-                const maxDistance = 4.5; // Max possible distance (0 to 9)
-                this.confidence = Math.min(100, Math.round((distance / maxDistance) * 100));
-                
-                // Only change recommendation if confidence is meaningful
-                if (this.confidence >= 20) {
-                    this.recommendedSide = recommended;
-                }
-                
-                // Auto-switch in smart mode
-                if (window.strategy === 'smart' && window.isBotRunning) {
-                    if (this.recommendedSide && this.recommendedSide !== window.currentSide) {
-                        // Only switch after a loss in smart mode
-                        if (window.lastTradeResult === 'loss') {
-                            this.switchSide(this.recommendedSide, 'Smart switch after loss');
-                        }
-                    }
-                }
-            },
-            
-            // Switch trading side
-            switchSide: function(newSide, reason) {
-                if (newSide === window.currentSide) return;
-                
-                window.currentSide = newSide;
-                log(`🔄 Switching to ${newSide} ${reason ? '(' + reason + ')' : ''}`, 'STRATEGY');
-                
-                // Update UI
-                const sessionSide = document.getElementById('session_side');
-                if (sessionSide) {
-                    sessionSide.textContent = newSide;
-                    sessionSide.className = newSide === 'OVER' ? 'text-xl font-bold text-blue-400' : 'text-xl font-bold text-purple-400';
-                }
-            },
-            
-            // Update progress indicator
-            updateProgress: function() {
-                const progress = document.getElementById('analysis-progress');
-                if (progress) {
-                    progress.textContent = `${this.digitWindow.length}/${this.windowSize}`;
-                }
-                
-                const windowStatus = document.getElementById('window-status');
-                if (windowStatus) {
-                    if (this.digitWindow.length < this.windowSize) {
-                        windowStatus.textContent = `Collecting data... (${this.digitWindow.length}/${this.windowSize})`;
-                        windowStatus.className = 'text-sm font-bold text-yellow-400';
-                    } else {
-                        windowStatus.textContent = 'Analysis Active';
-                        windowStatus.className = 'text-sm font-bold text-green-400';
-                    }
-                }
-            },
-            
-            // Update UI with current analysis
-            updateUI: function() {
-                // Median value
-                const medianElem = document.getElementById('median-value');
-                const medianInterp = document.getElementById('median-interpretation');
-                if (medianElem) {
-                    if (this.median !== null) {
-                        medianElem.textContent = this.median.toFixed(1);
-                        medianElem.className = this.median > 4.5 ? 'text-4xl font-bold text-orange-400' : 'text-4xl font-bold text-blue-400';
-                        
-                        if (medianInterp) {
-                            medianInterp.textContent = this.median > 4.5 ? '↗️ Trending HIGH' : '↙️ Trending LOW';
-                        }
-                    } else {
-                        medianElem.textContent = '-';
-                    }
-                }
-                
-                // Recommended side
-                const recSide = document.getElementById('recommended-side');
-                const confidenceElem = document.getElementById('confidence-score');
-                if (recSide) {
-                    if (this.recommendedSide) {
-                        recSide.textContent = this.recommendedSide === 'OVER' ? 'OVER 2' : 'UNDER 7';
-                        recSide.className = this.recommendedSide === 'OVER' ? 'text-2xl font-bold text-blue-400' : 'text-2xl font-bold text-purple-400';
-                        
-                        if (confidenceElem) {
-                            confidenceElem.textContent = `Confidence: ${this.confidence}%`;
-                        }
-                    } else {
-                        recSide.textContent = '---';
-                    }
-                }
-            },
-            
-            // Get prediction for current trade
-            getPrediction: function() {
-                if (window.strategy === 'smart') {
-                    return window.currentSide || this.recommendedSide || 'OVER';
-                } else {
-                    return window.fixedSide || 'OVER';
-                }
-            },
-            
-            // Record trade result
-            recordTradeResult: function(isWin, side) {
-                if (!side) side = window.currentSide;
-                if (!side) return;
-                
-                if (isWin) {
-                    this.sidePerformance[side].wins++;
-                    window.consecutiveWins++;
-                    window.consecutiveLosses = 0;
-                } else {
-                    this.sidePerformance[side].losses++;
-                    window.consecutiveLosses++;
-                    window.consecutiveWins = 0;
-                }
-                this.sidePerformance[side].trades++;
-                
-                // Update distribution display if open
-                if (!document.getElementById('distribution-panel').classList.contains('hidden')) {
-                    this.updateDistributionDisplay();
-                }
-            },
-            
-            // Update distribution display
-            updateDistributionDisplay: function() {
-                const content = document.getElementById('distribution-content');
-                if (!content) return;
-                
-                let html = '<div class="space-y-1">';
-                for (let d = 0; d < 10; d++) {
-                    const count = this.distribution[d];
-                    const percentage = this.digitWindow.length ? ((count / this.digitWindow.length) * 100).toFixed(1) : 0;
-                    const barWidth = percentage * 2; // Scale for display
-                    
-                    let barColor = 'bg-gray-600';
-                    if (d >= 7) barColor = 'bg-purple-500'; // Under 7 range (0-6) - wait, 7 is special
-                    if (d <= 6) barColor = 'bg-blue-500'; // Over 2 range (3-9) - adjusted
-                    
-                    html += `<div class="flex items-center gap-2">
-                        <span class="w-6 text-right">${d}</span>
-                        <div class="flex-1 bg-gray-700 h-4 rounded">
-                            <div class="${barColor} h-4 rounded" style="width: ${barWidth}%"></div>
-                        </div>
-                        <span class="w-12 text-right">${percentage}%</span>
-                    </div>`;
-                }
-                html += '</div>';
-                content.innerHTML = html;
-            }
-        };
+      }
 
-        // ============================================================================
-        // UI FUNCTIONS
-        // ============================================================================
-        
-        function toggleCalculator() {
-            const content = document.getElementById('calculatorContent');
-            const icon = document.getElementById('calcToggleIcon');
-            if (content.classList.contains('hidden')) {
-                content.classList.remove('hidden');
-                icon.textContent = '−';
-            } else {
-                content.classList.add('hidden');
-                icon.textContent = '+';
-            }
+      window.pendingProposals.delete(req_id);
+    }
+
+    function handleBuy(buy) {
+      // NOTE: Your original file simulated results. Keeping same behavior:
+      // If you want REAL settlement: you must subscribe to contract updates and evaluate profit/loss from API.
+      // For now: simulate after 2s.
+      let pending = null;
+      for (const [id, p] of window.pendingProposals.entries()) {
+        if (p && p.tradeNumber === window.tradeCount + 1) { pending = p; window.pendingProposals.delete(id); break; }
+      }
+      if (!pending) {
+        window.executionLock = false;
+        window.nextTradeAllowed = true;
+        return;
+      }
+
+      setTimeout(() => {
+        const isWin = Math.random() > 0.4;
+        if (isWin) handleWin(pending.side, false);
+        else handleLoss(pending.side);
+      }, 2000);
+    }
+
+    // =====================================================================================
+    // Start / Stop (analysis incremental)
+    // =====================================================================================
+    function shouldResetAnalysisForStart() {
+      const persist = $("persist_analysis")?.checked ?? true;
+      if (!persist) return { reset: true, reason: "Persist disabled" };
+
+      const symbol = $("symbol").value;
+      const windowSize = parseInt($("analysis_window").value, 10) || 100;
+
+      if (window.analysisState.lastSymbol && window.analysisState.lastSymbol !== symbol) {
+        return { reset: true, reason: "Symbol changed" };
+      }
+
+      if (window.analysisState.lastWindowSize && window.analysisState.lastWindowSize !== windowSize) {
+        return { reset: false, reason: null };
+      }
+
+      return { reset: false, reason: null };
+    }
+
+    function disableInputs(disabled) {
+      ["symbol","analysis_window","calc_base_stake","calc_multiplier","calc_max_steps","max_trades"].forEach(id => {
+        const el = $(id);
+        if (el) el.disabled = disabled;
+      });
+    }
+
+    function startBot() {
+      if (window.isBotRunning) return;
+
+      window.baseStake = parseFloat($("calc_base_stake").value) || 1.0;
+      window.multiplier = parseFloat($("calc_multiplier").value) || 1.5;
+      window.maxSteps = parseInt($("calc_max_steps").value, 10) || 3;
+
+      window.maxTrades = Math.max(1, parseInt($("max_trades").value, 10) || 20);
+      window.tradeCount = 0;
+      window.currentStake = window.baseStake;
+      window.currentStep = 0;
+
+      window.executionLock = false;
+      window.nextTradeAllowed = true;
+      window.tickQueue = [];
+
+      window.pnlTracker = { totalInvestment: 0, totalPayout: 0 };
+      window.netProfit = 0;
+      updatePnL();
+      $("metricCurrentStake").textContent = `$${window.currentStake.toFixed(2)}`;
+      updateSessionTradesUI();
+
+      const decision = shouldResetAnalysisForStart();
+      window.overUnderEngine.updateWindowSize();
+      if (decision.reset) window.overUnderEngine.resetWindow(decision.reason);
+
+      window.analysisState.lastSymbol = $("symbol").value;
+      window.analysisState.lastWindowSize = parseInt($("analysis_window").value, 10) || 100;
+
+      if (window.strategy === "fixed") window.currentSide = window.fixedSide;
+      else window.currentSide = window.overUnderEngine.getPrediction();
+
+      $("session_side").textContent = window.currentSide || "-";
+      $("session_side").className = (window.currentSide === "OVER") ? "text-xl font-bold text-blue-400" : "text-xl font-bold text-purple-400";
+
+      const token = localStorage.getItem("active_token") || localStorage.getItem("derivToken");
+      if (!token) {
+        log("❌ No API token found. Please authenticate first.", "ERROR");
+        return;
+      }
+
+      window.isBotRunning = true;
+      updateButtonState();
+      disableInputs(true);
+
+      log("🚀 Starting bot...", "SYSTEM");
+      log(`🧾 Max trades: ${window.maxTrades}`, "SYSTEM");
+      log(`🏁 Stop on WIN: ON`, "SYSTEM");
+      if (!decision.reset) log("🧠 Keeping analysis window (incremental)", "ENGINE");
+
+      updateTradeStatus("STARTING", "Initializing bot...", "Connecting to market", "normal");
+      connectWebSocket();
+    }
+
+    function stopBot(reason = "Stopped") {
+      if (!window.isBotRunning) return;
+
+      window.isBotRunning = false;
+      window.executionLock = false;
+      window.nextTradeAllowed = false;
+
+      try { if (window.ws) window.ws.close(); } catch {}
+      window.ws = null;
+      window.tickSubscriptionSent = false;
+      window.pendingProposals.clear();
+
+      disableInputs(false);
+      updateButtonState();
+      updateConnectionStatus();
+
+      log(`⏹️ Bot stopped: ${reason}`, "SYSTEM");
+      updateTradeStatus("STOPPED", `${reason} | Net: $${window.netProfit.toFixed(2)}`, "Ready", window.netProfit > 0 ? "win" : "normal");
+    }
+
+    function toggleBot() {
+      if (window.isBotRunning) stopBot("Manual stop");
+      else startBot();
+    }
+
+    // =====================================================================================
+    // Account toggle (kept minimal; requires deriv_accounts storage)
+    // =====================================================================================
+    function switchAccount() {
+      const isReal = $("accTypeToggle").checked;
+      const accounts = JSON.parse(localStorage.getItem("deriv_accounts")) || [];
+      const target = accounts.find(acc => isReal ? !acc.account.startsWith("VR") : acc.account.startsWith("VR"));
+
+      if (target) {
+        localStorage.setItem("active_token", target.token);
+        log(`🔄 Switched to ${isReal ? "REAL" : "DEMO"} account`, "SYSTEM");
+        if (window.isBotRunning) {
+          stopBot("Account switched");
+          setTimeout(() => startBot(), 700);
         }
-        
-        function calculateStakes() {
-            const base = parseFloat(document.getElementById('calc_base_stake').value) || 1.0;
-            const mult = parseFloat(document.getElementById('calc_multiplier').value) || 1.5;
-            const steps = parseInt(document.getElementById('calc_max_steps').value) || 3;
-            
-            // Update main controls
-            document.getElementById('baseStake').value = base.toFixed(2);
-            document.getElementById('multiplier').value = mult.toFixed(2);
-            document.getElementById('maxSteps').value = steps;
-            
-            window.baseStake = base;
-            window.multiplier = mult;
-            window.maxSteps = steps;
-            
-            // Calculate progression
-            let total = 0;
-            let current = base;
-            let maxStake = base;
-            
-            for (let i = 0; i < steps; i++) {
-                total += current;
-                maxStake = Math.max(maxStake, current);
-                if (i < steps - 1) current *= mult;
-            }
-            
-            const payout = maxStake * 1.23; // Approximate payout for Over/Under
-            
-            document.getElementById('calc_total').textContent = `$${total.toFixed(2)}`;
-            document.getElementById('calc_max_stake').textContent = `$${maxStake.toFixed(2)}`;
-            document.getElementById('calc_payout').textContent = `$${payout.toFixed(2)}`;
-            
-            log(`🧮 Calculator: Total $${total.toFixed(2)} for ${steps} steps`, 'CALC');
+      } else {
+        alert(`No ${isReal ? "Real" : "Demo"} account found`);
+        $("accTypeToggle").checked = !isReal;
+      }
+    }
+
+    function initializeToggleState() {
+      const token = localStorage.getItem("active_token");
+      const accounts = JSON.parse(localStorage.getItem("deriv_accounts")) || [];
+      if (!token || accounts.length === 0) return;
+      const current = accounts.find(acc => acc.token === token);
+      if (!current) return;
+      $("accTypeToggle").checked = !current.account.startsWith("VR");
+    }
+
+    // =====================================================================================
+    // UI toggles
+    // =====================================================================================
+    function toggleDistribution() {
+      const panel = $("distribution-panel");
+      const icon = $("dist-toggle");
+      if (panel.classList.contains("hidden")) {
+        panel.classList.remove("hidden");
+        icon.textContent = "▲";
+        window.overUnderEngine.updateDistributionDisplay();
+      } else {
+        panel.classList.add("hidden");
+        icon.textContent = "▼";
+      }
+    }
+
+    function toggleCalculator() {
+      const content = $("calculatorContent");
+      const icon = $("calcToggleIcon");
+      if (content.classList.contains("hidden")) {
+        content.classList.remove("hidden");
+        icon.textContent = "−";
+      } else {
+        content.classList.add("hidden");
+        icon.textContent = "+";
+      }
+    }
+
+    function toggleSound() {
+      window.soundEnabled = !window.soundEnabled;
+      $("soundToggle").textContent = window.soundEnabled ? "🔊" : "🔇";
+      log(`🔊 Sound ${window.soundEnabled ? "ON" : "OFF"}`, "SYSTEM");
+      if (window.soundEnabled && !window.ToneInitialized) initTone();
+    }
+
+    // =====================================================================================
+    // Init
+    // =====================================================================================
+    document.addEventListener("DOMContentLoaded", () => {
+      window.overUnderEngine.init();
+
+      // defaults
+      setStrategy("smart");
+      setFixedSide("OVER");
+
+      // hooks
+      $("toggleButton").addEventListener("click", toggleBot);
+      $("soundToggle").addEventListener("click", toggleSound);
+      $("accTypeToggle").addEventListener("change", switchAccount);
+
+      $("distBtn").addEventListener("click", toggleDistribution);
+      $("calcToggle").addEventListener("click", toggleCalculator);
+      $("calcBtn").addEventListener("click", calculateStakes);
+
+      $("analysis_window").addEventListener("change", () => {
+        window.overUnderEngine.updateWindowSize();
+        window.analysisState.lastWindowSize = parseInt($("analysis_window").value, 10) || 100;
+      });
+
+      $("max_trades").addEventListener("input", () => {
+        const v = Math.max(1, parseInt($("max_trades").value, 10) || 20);
+        $("max_trades_hint").textContent = `${v}`;
+        if (!window.isBotRunning) {
+          window.maxTrades = v;
+          updateSessionTradesUI();
         }
-        
-        function toggleDistribution() {
-            const panel = document.getElementById('distribution-panel');
-            const toggle = document.getElementById('dist-toggle');
-            
-            if (panel.classList.contains('hidden')) {
-                panel.classList.remove('hidden');
-                toggle.textContent = '▲';
-                window.overUnderEngine.updateDistributionDisplay();
-            } else {
-                panel.classList.add('hidden');
-                toggle.textContent = '▼';
-            }
-        }
-        
-        function setStrategy(mode) {
-            window.strategy = mode;
-            
-            // Update button styles
-            document.getElementById('mode_smart').classList.remove('bg-blue-600', 'bg-gray-600');
-            document.getElementById('mode_fixed').classList.remove('bg-blue-600', 'bg-gray-600');
-            
-            if (mode === 'smart') {
-                document.getElementById('mode_smart').classList.add('bg-blue-600');
-                document.getElementById('mode_fixed').classList.add('bg-gray-600');
-                document.getElementById('fixed_side_container').style.display = 'none';
-                log('🧠 Strategy: Smart Switching activated', 'STRATEGY');
-            } else {
-                document.getElementById('mode_fixed').classList.add('bg-blue-600');
-                document.getElementById('mode_smart').classList.add('bg-gray-600');
-                document.getElementById('fixed_side_container').style.display = 'block';
-                log('🔒 Strategy: Fixed Side activated', 'STRATEGY');
-            }
-        }
-        
-        function setFixedSide(side) {
-            window.fixedSide = side;
-            window.currentSide = side;
-            
-            // Update button styles
-            document.getElementById('side_over').classList.remove('bg-blue-600', 'bg-gray-600');
-            document.getElementById('side_under').classList.remove('bg-purple-600', 'bg-gray-600');
-            
-            if (side === 'OVER') {
-                document.getElementById('side_over').classList.add('bg-blue-600');
-                document.getElementById('side_under').classList.add('bg-gray-600');
-                log('🔒 Fixed side set to OVER 2', 'STRATEGY');
-            } else {
-                document.getElementById('side_under').classList.add('bg-purple-600');
-                document.getElementById('side_over').classList.add('bg-gray-600');
-                log('🔒 Fixed side set to UNDER 7', 'STRATEGY');
-            }
-            
-            // Update session display
-            const sessionSide = document.getElementById('session_side');
-            if (sessionSide) {
-                sessionSide.textContent = side;
-                sessionSide.className = side === 'OVER' ? 'text-xl font-bold text-blue-400' : 'text-xl font-bold text-purple-400';
-            }
-        }
-        
-        // ============================================================================
-        // ACCOUNT FUNCTIONS
-        // ============================================================================
-        
-        function switchAccount() {
-            const isReal = document.getElementById('accTypeToggle').checked;
-            const accounts = JSON.parse(localStorage.getItem('deriv_accounts')) || [];
-            
-            const target = accounts.find(acc => isReal ? !acc.account.startsWith('VR') : acc.account.startsWith('VR'));
-            
-            if (target) {
-                localStorage.setItem('active_token', target.token);
-                log(`🔄 Switched to ${isReal ? 'REAL' : 'DEMO'} account`, 'SYSTEM');
-                if (window.isBotRunning) {
-                    stopBot();
-                    setTimeout(() => startBot(), 1000);
-                }
-            } else {
-                alert(`No ${isReal ? 'Real' : 'Demo'} account found`);
-                document.getElementById('accTypeToggle').checked = !isReal;
-            }
-        }
-        
-        // ============================================================================
-        // TICK HANDLING
-        // ============================================================================
-        
-        function getLastDigit(quote) {
-            if (!quote) return NaN;
-            const str = quote.toString();
-            const last = str[str.length - 1];
-            return parseInt(last, 10);
-        }
-        
-        function handleTick(tick) {
-            if (!window.isBotRunning || !tick || !tick.quote) return;
-            
-            const price = parseFloat(tick.quote);
-            const digit = getLastDigit(tick.quote);
-            
-            if (isNaN(digit) || digit < 0 || digit > 9) return;
-            
-            window.lastDigit = digit;
-            window.totalTicksReceived++;
-            window.tickTimestamps.push(Date.now());
-            
-            // Update UI
-            document.getElementById('metricLiveTick').textContent = price.toFixed(3);
-            document.getElementById('metricLastDigit').textContent = `Digit: ${digit}`;
-            document.getElementById('metricLiveTick').classList.add('tick-flash');
-            setTimeout(() => document.getElementById('metricLiveTick').classList.remove('tick-flash'), 50);
-            
-            // Update intelligence engine
-            window.overUnderEngine.addDigit(digit);
-            
-            // Add to queue for processing
-            window.tickQueue.push({ digit, price, time: Date.now() });
-            if (window.tickQueue.length > window.maxQueueSize) window.tickQueue.shift();
-            
-            // Update connection status
-            updateConnectionStatus();
-            
-            // Play sound
-            if (window.soundEnabled) playTickSound();
-        }
-        
-        // ============================================================================
-        // TRADE EXECUTION
-        // ============================================================================
-        
-        function processTick() {
-            if (!window.isBotRunning || window.executionLock || !window.nextTradeAllowed) return;
-            if (window.tickQueue.length === 0) return;
-            
-            // Check if we have enough data
-            if (window.overUnderEngine.digitWindow.length < window.overUnderEngine.windowSize) {
-                updateTradeStatus('COLLECTING', `Collecting data: ${window.overUnderEngine.digitWindow.length}/${window.overUnderEngine.windowSize}`, 'Please wait', 'normal');
-                return;
-            }
-            
-            // Get current prediction
-            const side = window.overUnderEngine.getPrediction();
-            if (!side) return;
-            
-            // Check if we've hit max trades
-            if (window.tradeCount >= window.maxTrades) {
-                log(`🛑 Max trades reached (${window.maxTrades})`, 'SYSTEM');
-                stopBot();
-                return;
-            }
-            
-            // Check for immediate win (digit matches current side)
-            const tick = window.tickQueue[0];
-            const isImmediateWin = checkImmediateWin(tick.digit, side);
-            if (isImmediateWin) {
-                window.tickQueue.shift();
-                return;
-            }
-            
-            // Execute trade
-            window.executionLock = true;
-            window.nextTradeAllowed = false;
-            
-            const stake = window.currentStake;
-            const tickData = window.tickQueue.shift();
-            
-            log(`📈 Trade #${window.tradeCount + 1}: ${side} with $${stake.toFixed(2)}`, 'TRADE');
-            updateTradeStatus('TRADING', `${side} trade #${window.tradeCount + 1}`, `Stake: $${stake.toFixed(2)}`, 'trade');
-            
-            // Track investment
-            window.pnlTracker.totalInvestment += stake;
-            
-            // Send proposal
-            const contractType = side === 'OVER' ? 'OVER' : 'UNDER';
-            const barrier = side === 'OVER' ? '2' : '7';
-            
-            const proposal = {
-                proposal: 1,
-                amount: stake.toFixed(2),
-                basis: 'stake',
-                contract_type: contractType,
-                currency: 'USD',
-                duration: 1,
-                duration_unit: 't',
-                symbol: document.getElementById('symbol').value,
-                barrier: barrier,
-                req_id: getNextReqId()
-            };
-            
-            window.pendingProposals.set(proposal.req_id, {
-                side: side,
-                stake: stake,
-                tick: tickData,
-                tradeNumber: window.tradeCount + 1
-            });
-            
-            sendRequest(proposal);
-        }
-        
-        function checkImmediateWin(digit, side) {
-            let isWin = false;
-            
-            if (side === 'OVER' && digit >= 3 && digit <= 9) isWin = true;
-            if (side === 'UNDER' && digit >= 0 && digit <= 6) isWin = true;
-            
-            if (isWin) {
-                log(`🎯 IMMEDIATE WIN! Digit ${digit} matches ${side}`, 'WIN');
-                handleWin(side);
-                return true;
-            }
-            
-            return false;
-        }
-        
-        function handleWin(side) {
-            window.tradeCount++;
-            window.stats.wins++;
-            window.lastTradeResult = 'win';
-            
-            // Record in engine
-            window.overUnderEngine.recordTradeResult(true, side);
-            
-            // Calculate payout
-            const payout = window.currentStake * 1.23; // Approximate
-            window.pnlTracker.totalPayout += payout;
-            window.netProfit = window.pnlTracker.totalPayout - window.pnlTracker.totalInvestment;
-            
-            // Reset stake
-            window.currentStep = 0;
-            window.currentStake = window.baseStake;
-            window.consecutiveWins++;
-            window.consecutiveLosses = 0;
-            
-            // Update UI
-            updatePnL();
-            document.getElementById('metricCurrentStake').textContent = `$${window.currentStake.toFixed(2)}`;
-            document.getElementById('metricTradeCount').textContent = window.tradeCount;
-            
-            log(`💰 Won $${payout.toFixed(2)}! Net: $${window.netProfit.toFixed(2)}`, 'PROFIT');
-            updateTradeStatus('WIN', `Won $${payout.toFixed(2)}!`, 'Resetting stake', 'win');
-            
-            if (window.soundEnabled) playWinSound();
-            
-            window.executionLock = false;
-            window.nextTradeAllowed = true;
-            
-            // Check if we've hit max trades
-            if (window.tradeCount >= window.maxTrades) {
-                log(`🏁 Target reached: ${window.maxTrades} trades`, 'SYSTEM');
-                stopBot();
-            }
-        }
-        
-        function handleLoss(side) {
-            window.tradeCount++;
-            window.stats.losses++;
-            window.lastTradeResult = 'loss';
-            
-            // Record in engine
-            window.overUnderEngine.recordTradeResult(false, side);
-            
-            // Increase stake for next trade
-            window.currentStep++;
-            if (window.currentStep <= window.maxSteps) {
-                window.currentStake = window.baseStake * Math.pow(window.multiplier, window.currentStep);
-                window.currentStake = Math.round(window.currentStake * 100) / 100;
-            } else {
-                log('⚠️ Max steps reached, resetting', 'WARNING');
-                window.currentStep = 0;
-                window.currentStake = window.baseStake;
-            }
-            
-            window.consecutiveLosses++;
-            window.consecutiveWins = 0;
-            
-            // Update net profit
-            window.netProfit = window.pnlTracker.totalPayout - window.pnlTracker.totalInvestment;
-            
-            // Update UI
-            updatePnL();
-            document.getElementById('metricCurrentStake').textContent = `$${window.currentStake.toFixed(2)}`;
-            document.getElementById('metricTradeCount').textContent = window.tradeCount;
-            
-            log(`❌ Loss. Next stake: $${window.currentStake.toFixed(2)}`, 'LOSS');
-            updateTradeStatus('LOSS', `Lost - Step ${window.currentStep}`, `Next stake: $${window.currentStake.toFixed(2)}`, 'loss');
-            
-            if (window.soundEnabled) playLossSound();
-            
-            window.executionLock = false;
-            window.nextTradeAllowed = true;
-            
-            // Check if we've hit max trades
-            if (window.tradeCount >= window.maxTrades) {
-                log(`🏁 Target reached: ${window.maxTrades} trades`, 'SYSTEM');
-                stopBot();
-            }
-        }
-        
-        // ============================================================================
-        // BOT CONTROL
-        // ============================================================================
-        
-        function startBot() {
-            if (window.isBotRunning) return;
-            
-            // Get parameters from UI
-            window.baseStake = parseFloat(document.getElementById('calc_base_stake').value) || 1.0;
-            window.multiplier = parseFloat(document.getElementById('calc_multiplier').value) || 1.5;
-            window.maxSteps = parseInt(document.getElementById('calc_max_steps').value) || 3;
-            window.maxTrades = 20; // Default, could add to UI
-            
-            window.currentStake = window.baseStake;
-            window.currentStep = 0;
-            window.tradeCount = 0;
-            
-            // Reset engine
-            window.overUnderEngine.init();
-            
-            // Reset PnL
-            window.pnlTracker = { totalInvestment: 0, totalPayout: 0 };
-            window.netProfit = 0;
-            window.startingBalance = 0;
-            window.currentBalance = 0;
-            
-            // Set initial side for fixed mode
-            if (window.strategy === 'fixed' && window.fixedSide) {
-                window.currentSide = window.fixedSide;
-                document.getElementById('session_side').textContent = window.fixedSide;
-            }
-            
-            // Check token
-            const token = localStorage.getItem('active_token') || localStorage.getItem('derivToken');
-            if (!token) {
-                log('❌ No API token found. Please authenticate first.', 'ERROR');
-                return;
-            }
-            
-            window.isBotRunning = true;
-            updateButtonState();
-            
-            log('🚀 Starting bot...', 'SYSTEM');
-            log(`📊 Strategy: ${window.strategy === 'smart' ? 'Smart Switching' : 'Fixed ' + window.fixedSide}`, 'SYSTEM');
-            log(`💰 Base stake: $${window.baseStake}, Multiplier: ${window.multiplier}x`, 'SYSTEM');
-            
-            updateTradeStatus('STARTING', 'Initializing bot...', 'Connecting to market', 'normal');
-            
-            // Connect WebSocket
-            connectWebSocket();
-            
-            // Disable inputs
-            document.querySelectorAll('#symbol, #analysis_window, #calc_base_stake, #calc_multiplier, #calc_max_steps').forEach(el => {
-                if (el) el.disabled = true;
-            });
-        }
-        
-        function stopBot() {
-            if (!window.isBotRunning) return;
-            
-            window.isBotRunning = false;
-            window.executionLock = false;
-            window.nextTradeAllowed = false;
-            
-            log('⏹️ Bot stopped', 'SYSTEM');
-            
-            // Close WebSocket
-            if (window.ws) {
-                window.ws.close();
-                window.ws = null;
-            }
-            window.tickSubscriptionSent = false;
-            
-            // Enable inputs
-            document.querySelectorAll('#symbol, #analysis_window, #calc_base_stake, #calc_multiplier, #calc_max_steps').forEach(el => {
-                if (el) el.disabled = false;
-            });
-            
-            updateButtonState();
-            updateConnectionStatus();
-            
-            const finalPnL = window.netProfit;
-            updateTradeStatus('STOPPED', `Final PnL: $${finalPnL.toFixed(2)}`, 'Bot stopped - Ready', finalPnL > 0 ? 'win' : 'normal');
-        }
-        
-        function toggleBot() {
-            if (window.isBotRunning) {
-                stopBot();
-            } else {
-                startBot();
-            }
-        }
-        
-        // ============================================================================
-        // WEBSOCKET FUNCTIONS
-        // ============================================================================
-        
-        function connectWebSocket() {
-            if (window.ws) {
-                try { window.ws.close(); } catch (e) {}
-            }
-            
-            window.isConnecting = true;
-            updateConnectionStatus();
-            
-            window.ws = new WebSocket('wss://ws.binaryws.com/websockets/v3?app_id=120389');
-            
-            window.ws.onopen = () => {
-                window.isConnecting = false;
-                log('✅ WebSocket connected', 'SYSTEM');
-                updateConnectionStatus();
-                
-                const token = localStorage.getItem('active_token') || localStorage.getItem('derivToken');
-                if (token) {
-                    sendRequest({ authorize: token, req_id: getNextReqId() });
-                }
-            };
-            
-            window.ws.onmessage = (msg) => {
-                try {
-                    const data = JSON.parse(msg.data);
-                    
-                    if (data.msg_type === 'tick') {
-                        handleTick(data.tick);
-                    } else if (data.msg_type === 'authorize') {
-                        if (data.authorize) {
-                            log(`🔐 Authorized as ${data.authorize.loginid}`, 'SYSTEM');
-                            subscribeToTicks(document.getElementById('symbol').value);
-                            subscribeToBalance();
-                        }
-                    } else if (data.msg_type === 'proposal') {
-                        handleProposal(data.proposal, data.req_id);
-                    } else if (data.msg_type === 'buy') {
-                        handleBuy(data.buy);
-                    } else if (data.msg_type === 'balance') {
-                        handleBalance(data.balance);
-                    } else if (data.error) {
-                        log(`❌ API Error: ${data.error.message}`, 'ERROR');
-                    }
-                } catch (e) {
-                    console.error('Message error:', e);
-                }
-            };
-            
-            window.ws.onclose = () => {
-                window.isConnecting = false;
-                updateConnectionStatus();
-                log('🔌 WebSocket disconnected', 'SYSTEM');
-            };
-            
-            window.ws.onerror = () => {
-                log('❌ WebSocket connection error', 'ERROR');
-            };
-        }
-        
-        function sendRequest(request) {
-            if (window.ws && window.ws.readyState === WebSocket.OPEN) {
-                window.ws.send(JSON.stringify(request));
-                return request.req_id;
-            }
-            return null;
-        }
-        
-        function getNextReqId() {
-            return ++window.req_id;
-        }
-        
-        function subscribeToTicks(symbol) {
-            if (window.tickSubscriptionSent) return;
-            sendRequest({ ticks: symbol, subscribe: 1, req_id: getNextReqId() });
-            window.tickSubscriptionSent = true;
-            log(`✅ Subscribed to ${symbol}`, 'SYSTEM');
-        }
-        
-        function subscribeToBalance() {
-            sendRequest({ balance: 1, subscribe: 1, req_id: getNextReqId() });
-        }
-        
-        function handleBalance(data) {
-            if (data && data.balance) {
-                const balance = parseFloat(data.balance);
-                if (window.startingBalance === 0) {
-                    window.startingBalance = balance;
-                    log(`💰 Starting balance: $${balance.toFixed(2)}`, 'BALANCE');
-                }
-                window.currentBalance = balance;
-                document.getElementById('metricBalance').textContent = `$${balance.toFixed(2)}`;
-            }
-        }
-        
-        function handleProposal(proposal, req_id) {
-            const pending = window.pendingProposals.get(req_id);
-            if (!pending) return;
-            
-            if (proposal && proposal.id) {
-                const buyRequest = {
-                    buy: proposal.id,
-                    price: proposal.ask_price,
-                    req_id: getNextReqId()
-                };
-                window.pendingProposals.set(buyRequest.req_id, pending);
-                sendRequest(buyRequest);
-            } else {
-                log('❌ Proposal failed', 'ERROR');
-                window.executionLock = false;
-                window.nextTradeAllowed = true;
-            }
-            
-            window.pendingProposals.delete(req_id);
-        }
-        
-        function handleBuy(data) {
-            if (data && data.contract_id) {
-                // Find pending trade
-                let pending = null;
-                for (let [id, p] of window.pendingProposals) {
-                    if (p.tradeNumber === window.tradeCount + 1) {
-                        pending = p;
-                        window.pendingProposals.delete(id);
-                        break;
-                    }
-                }
-                
-                if (pending) {
-                    // Determine win/loss based on contract result
-                    // For demo, we'll simulate with a delay
-                    setTimeout(() => {
-                        // This is where you'd check actual contract result
-                        // For now, we'll use a random result for testing
-                        const isWin = Math.random() > 0.4; // 60% win rate for testing
-                        
-                        if (isWin) {
-                            handleWin(pending.side);
-                        } else {
-                            handleLoss(pending.side);
-                        }
-                    }, 2000);
-                }
-            } else {
-                log('❌ Buy failed', 'ERROR');
-                window.executionLock = false;
-                window.nextTradeAllowed = true;
-            }
-        }
-        
-        // ============================================================================
-        // UI UPDATE FUNCTIONS
-        // ============================================================================
-        
-        function updateConnectionStatus() {
-            const isConnected = window.ws && window.ws.readyState === WebSocket.OPEN;
-            const isConnecting = window.isConnecting;
-            
-            const badge = document.getElementById('status-badge');
-            const marketStatus = document.getElementById('market_status');
-            
-            if (isConnected) {
-                badge.textContent = '🟢 CONNECTED';
-                badge.className = 'ml-3 inline-flex items-center px-3 py-1 text-sm font-medium rounded-full connection-badge-connected text-white shadow-md';
-                marketStatus.textContent = 'Live';
-                marketStatus.className = 'ml-2 font-bold text-green-400';
-            } else if (isConnecting) {
-                badge.textContent = '🟡 CONNECTING';
-                badge.className = 'ml-3 inline-flex items-center px-3 py-1 text-sm font-medium rounded-full connection-badge-connecting text-white shadow-md';
-                marketStatus.textContent = 'Connecting...';
-                marketStatus.className = 'ml-2 font-bold text-yellow-400';
-            } else {
-                badge.textContent = '🔴 DISCONNECTED';
-                badge.className = 'ml-3 inline-flex items-center px-3 py-1 text-sm font-medium rounded-full connection-badge-disconnected text-white shadow-md';
-                marketStatus.textContent = 'Offline';
-                marketStatus.className = 'ml-2 font-bold text-red-400';
-            }
-            
-            document.getElementById('current_symbol').textContent = 
-                document.getElementById('symbol').options[document.getElementById('symbol').selectedIndex].text;
-            
-            // Calculate tick rate
-            const now = Date.now();
-            const recent = window.tickTimestamps.filter(ts => now - ts < 5000);
-            const rate = recent.length / 5;
-            document.getElementById('current_tick_rate').textContent = rate.toFixed(1) + '/s';
-            document.getElementById('ticks_received').textContent = window.totalTicksReceived;
-        }
-        
-        function updateTradeStatus(status, message, action, type = 'normal') {
-            const container = document.getElementById('trade-status');
-            const badge = document.getElementById('status-badge-small');
-            const msgElem = document.getElementById('status-message');
-            const actionElem = document.getElementById('next-action');
-            
-            container.classList.remove('win-glow');
-            msgElem.textContent = message;
-            actionElem.textContent = action;
-            
-            switch(type) {
-                case 'win':
-                    badge.textContent = 'WIN 🎯';
-                    badge.className = 'text-xs font-bold text-green-400';
-                    msgElem.className = 'text-sm font-bold text-green-400';
-                    container.classList.add('win-glow');
-                    break;
-                case 'loss':
-                    badge.textContent = 'LOSS ❌';
-                    badge.className = 'text-xs font-bold text-red-400';
-                    msgElem.className = 'text-sm font-bold text-red-400';
-                    break;
-                case 'trade':
-                    badge.textContent = 'TRADING ⚡';
-                    badge.className = 'text-xs font-bold text-yellow-400';
-                    msgElem.className = 'text-sm font-bold text-yellow-400';
-                    break;
-                default:
-                    badge.textContent = status;
-                    badge.className = 'text-xs font-bold text-gray-400';
-                    msgElem.className = 'text-sm font-bold text-gray-300';
-                    break;
-            }
-        }
-        
-        function updatePnL() {
-            const elem = document.getElementById('metricTotalProfit');
-            if (elem) {
-                elem.textContent = `$${window.netProfit.toFixed(2)}`;
-                elem.className = window.netProfit >= 0 ? 'text-lg font-bold text-green-400' : 'text-lg font-bold text-red-400';
-            }
-        }
-        
-        function updateButtonState() {
-            const btn = document.getElementById('toggleButton');
-            if (btn) {
-                if (window.isBotRunning) {
-                    btn.innerHTML = '<span class="flex items-center justify-center"><span class="mr-2">⏹️</span> STOP BOT</span>';
-                    btn.classList.remove('bg-green-600', 'hover:bg-green-700');
-                    btn.classList.add('bg-red-600', 'hover:bg-red-700');
-                } else {
-                    btn.innerHTML = '<span class="flex items-center justify-center"><span class="mr-2">🚀</span> START BOT</span>';
-                    btn.classList.remove('bg-red-600', 'hover:bg-red-700');
-                    btn.classList.add('bg-green-600', 'hover:bg-green-700');
-                }
-            }
-        }
-        
-        // ============================================================================
-        // SOUND FUNCTIONS
-        // ============================================================================
-        
-        function toggleSound() {
-            window.soundEnabled = !window.soundEnabled;
-            document.getElementById('soundToggle').textContent = window.soundEnabled ? '🔊' : '🔇';
-            log(`🔊 Sound ${window.soundEnabled ? 'ON' : 'OFF'}`, 'SYSTEM');
-        }
-        
-        async function initTone() {
-            if (!window.soundEnabled || typeof Tone === 'undefined') return;
-            try {
-                await Tone.start();
-                window.synth = new Tone.Synth().toDestination();
-                window.ToneInitialized = true;
-            } catch (e) {
-                console.error('Audio init error:', e);
-            }
-        }
-        
-        function playTickSound() {
-            if (!window.ToneInitialized || !window.synth) return;
-            try {
-                window.synth.triggerAttackRelease('C4', '32n', Tone.now(), 0.2);
-            } catch (e) {}
-        }
-        
-        function playWinSound() {
-            if (!window.ToneInitialized || !window.synth) return;
-            try {
-                window.synth.triggerAttackRelease('C5', '8n');
-                setTimeout(() => window.synth.triggerAttackRelease('E5', '8n'), 100);
-                setTimeout(() => window.synth.triggerAttackRelease('G5', '8n'), 200);
-            } catch (e) {}
-        }
-        
-        function playLossSound() {
-            if (!window.ToneInitialized || !window.synth) return;
-            try {
-                window.synth.triggerAttackRelease('G4', '8n', Tone.now(), 0.3);
-                setTimeout(() => window.synth.triggerAttackRelease('D4', '8n'), 150);
-            } catch (e) {}
-        }
-        
-        // ============================================================================
-        // LOGGING
-        // ============================================================================
-        
-        function log(message, type = 'INFO') {
-            const logArea = document.getElementById('log-area');
-            const time = new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
-            
-            let color = 'text-lime-400';
-            if (type === 'ERROR') color = 'text-red-500';
-            if (type === 'STRATEGY') color = 'text-blue-300';
-            if (type === 'TRADE') color = 'text-yellow-300';
-            if (type === 'WIN') color = 'text-green-400 font-bold';
-            if (type === 'LOSS') color = 'text-red-400';
-            if (type === 'SYSTEM') color = 'text-white';
-            if (type === 'PROFIT') color = 'text-purple-300';
-            if (type === 'CALC') color = 'text-orange-300';
-            if (type === 'ENGINE') color = 'text-cyan-300';
-            
-            logArea.innerHTML += `\n[${time}] <span class="${color}">${message}</span>`;
-            logArea.scrollTop = logArea.scrollHeight;
-        }
-        
-        // ============================================================================
-        // INITIALIZATION
-        // ============================================================================
-        
-        document.addEventListener('DOMContentLoaded', () => {
-            // Initialize engine
-            window.overUnderEngine.init();
-            
-            // Set default strategy
-            setStrategy('smart');
-            setFixedSide('OVER');
-            
-            // Initialize tone
-            initTone();
-            
-            // Start queue processor
-            setInterval(() => processTick(), 100);
-            
-            // Update tick rate
-            setInterval(() => {
-                const now = Date.now();
-                window.botTickTimestamps = window.botTickTimestamps.filter(ts => now - ts < 5000);
-            }, 1000);
-            
-            // Load account state
-            initializeToggleState();
-            
-            log('🤖 Over/Under Smart Bot ready', 'SYSTEM');
-        });
-        
-        function initializeToggleState() {
-            const token = localStorage.getItem('active_token');
-            const accounts = JSON.parse(localStorage.getItem('deriv_accounts')) || [];
-            if (token && accounts.length > 0) {
-                const current = accounts.find(acc => acc.token === token);
-                if (current) {
-                    const isReal = !current.account.startsWith('VR');
-                    document.getElementById('accTypeToggle').checked = isReal;
-                }
-            }
-        }
-    </script>
+      });
+
+      $("mode_smart").addEventListener("click", () => setStrategy("smart"));
+      $("mode_fixed").addEventListener("click", () => setStrategy("fixed"));
+      $("side_over").addEventListener("click", () => setFixedSide("OVER"));
+      $("side_under").addEventListener("click", () => setFixedSide("UNDER"));
+
+      initializeToggleState();
+      initTone();
+
+      // processing loop
+      setInterval(processTick, 100);
+
+      // initial UI
+      window.maxTrades = Math.max(1, parseInt($("max_trades").value, 10) || 20);
+      updateSessionTradesUI();
+      $("metricCurrentStake").textContent = `$${window.baseStake.toFixed(2)}`;
+      updatePnL();
+      updateConnectionStatus();
+
+      log("🤖 Ready. Stops on first WIN or max trades.", "SYSTEM");
+    });
+  </script>
 </body>
 </html>
