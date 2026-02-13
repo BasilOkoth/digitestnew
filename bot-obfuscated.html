@@ -592,7 +592,7 @@
                     <!-- Max Cycle Trades (Progression Cap) -->
                     <div>
                         <label for="maxCycleTrades" class="block text-xs font-semibold text-gray-300 mb-1">Max Cycle Trades</label>
-                        <input type="number" id="maxCycleTrades" value="10" min="1" max="50"
+                        <input type="number" id="maxCycleTrades" value="4" min="1" max="50"
                             class="block w-full rounded-md bg-gray-700 border border-gray-600 text-white shadow-sm focus:border-green-500 focus:ring-green-500 py-1.5 px-2 text-sm">
                     </div>
                     
@@ -715,6 +715,9 @@
                         // Hard floor: never recommend if gap is far from P90 (prevents "gap 4, p90 20" type picks)
             pressureZoneMinFloorP90Ratio: 0.60,
         };
+
+        // Entry mode for pressure gating: "strict" or "early"
+        window.ENTRY_MODE = window.ENTRY_MODE || "early";
 
 
         // ============================================================================
@@ -1078,10 +1081,6 @@
                     regimeStatus.label === "STABLE"
                         ? thresholds.maxPersistenceStable
                         : thresholds.maxPersistenceUnstable;
-
-                const MAX_EXTEND_RATIO = 1.9;
-
-
                 // --- survival metrics (tail-risk cap) ---
                 const MAX_S20 = 0.08;  // 8% tail cap
                 let _survivalByDigit = null;
@@ -1107,17 +1106,23 @@
                     const p90 = Math.max(s.p90Gap, 1);
                     const p90Ratio = g / p90;
                     const extendRatio = (s.avgGap && s.avgGap > 0) ? (g / s.avgGap) : Infinity;
+// ================= ENTRY MODE TOGGLE =================
+// "strict" = old pressure band, but safer extend cap
+// "early"  = earlier entry, no tail expansion allowed
+let PRESSURE_MIN, PRESSURE_MAX;
 
-                    // PATCH 2: ExtendRatio is a SINGLE hard rule
-                    if (extendRatio > MAX_EXTEND_RATIO) continue;
+if (window.ENTRY_MODE === "early") {
+    PRESSURE_MIN = 0.60;
+    PRESSURE_MAX = 0.90;
+    if (extendRatio >= 1) continue;
+} else {
+    PRESSURE_MIN = 0.70;
+    PRESSURE_MAX = 0.95;
+    if (extendRatio > 1.3) continue;
+}
 
-                    // PATCH 1: Synchronize pressure band with UI (single hard gate)
-                    const PRESSURE_MIN = 0.70;
-                    const PRESSURE_MAX = 0.95;
-
-                    if (p90Ratio < PRESSURE_MIN || p90Ratio > PRESSURE_MAX) continue;
-
-
+// Must be inside pressure window
+if (p90Ratio < PRESSURE_MIN || p90Ratio > PRESSURE_MAX) continue;
                     const P5  = this.conditionalReturnProb(d, g, 5);
                     const P10 = this.conditionalReturnProb(d, g, 10);
 
@@ -1980,7 +1985,7 @@ const isRecommended = engine.currentRecommendation && engine.currentRecommendati
         window.releaseLatency = [];
 
         window.maxTrades = 20;
-        window.maxCycleTrades = 10;
+        window.maxCycleTrades = 4;
         window.cycleRotations = 0;
         window.tradeCount = 0;
         window.martingaleStep = 0;
@@ -3145,6 +3150,40 @@ const isRecommended = engine.currentRecommendation && engine.currentRecommendati
             const contractType = document.getElementById('contractType').value;
             const symbol = document.getElementById('symbol').value;
             const predictedDigit = getExecutionDigit();
+
+// Revalidate edge before each trade (prevents post-compression drift)
+try {
+    const activeDigit = predictedDigit;
+    const engine = window.digitIntelligenceEngine;
+    const s = engine && engine.digitStats ? engine.digitStats[activeDigit] : null;
+
+    const g = s ? Number(s.currentGap) : NaN;
+    const p90 = s ? Math.max(Number(s.p90Gap) || 0, 1) : NaN;
+
+    const ratio = g / p90;
+    const ext = (s && Number(s.avgGap) > 0) ? (g / Number(s.avgGap)) : Infinity;
+
+    if (!Number.isFinite(ratio) || !Number.isFinite(ext) || ratio < 0.60 || ratio > 0.90 || ext >= 1) {
+        log('🛑 Edge invalidated — aborting window', 'ENGINE');
+
+        try {
+            const RW = window.releaseWindow;
+            if (RW) {
+                window.releaseTickFired[activeDigit] = false;
+                RW.inTrade = false;
+                RW.tradeCount = 0;
+            }
+        } catch (_) {}
+
+        window.frozenDigit = null;
+        window.freezeTick = null;
+
+        updateStake('initial');
+        window.executionLock = false;
+        window.nextTradeAllowed = true;
+        return;
+    }
+} catch (_) {}
             
             let stake = window.currentStake;
             trackTradeInvestment(stake);
@@ -3218,7 +3257,7 @@ const isRecommended = engine.currentRecommendation && engine.currentRecommendati
             window.baseStake = parseFloat(document.getElementById('baseStake').value) || 1.0;
             window.multiplier = parseFloat(document.getElementById('multiplier').value) || 1.15;
             window.maxTrades = parseInt(document.getElementById('maxTrades').value) || 10;
-            window.maxCycleTrades = parseInt(document.getElementById('maxCycleTrades')?.value) || 10;
+            window.maxCycleTrades = parseInt(document.getElementById('maxCycleTrades')?.value) || 4;
             
             if (winOrLoss === 'win') {
                 window.martingaleStep = 0;
@@ -3293,7 +3332,7 @@ const isRecommended = engine.currentRecommendation && engine.currentRecommendati
             }
             
             window.maxTrades = parseInt(document.getElementById('maxTrades').value) || 10;
-            window.maxCycleTrades = parseInt(document.getElementById('maxCycleTrades')?.value) || 10;
+            window.maxCycleTrades = parseInt(document.getElementById('maxCycleTrades')?.value) || 4;
             
             const token = localStorage.getItem('active_token') || localStorage.getItem('derivToken');
             if (!token) {
@@ -3678,7 +3717,7 @@ window.isBotRunning = true;
         // Reset all state
         function resetAllState() {
             window.maxTrades = parseInt(document.getElementById('maxTrades').value) || 10;
-            window.maxCycleTrades = parseInt(document.getElementById('maxCycleTrades')?.value) || 10;
+            window.maxCycleTrades = parseInt(document.getElementById('maxCycleTrades')?.value) || 4;
             window.cycleRotations = 0;
             
             updateStake('initial');
