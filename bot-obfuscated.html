@@ -1972,13 +1972,6 @@
         function executeReleaseTrade(d, tick) {
             const digitToTrade = (window.frozenDigit !== null) ? window.frozenDigit : d;
             if (!window.cycleActive || window.cycleTradeCount >= window.cycleLimit) return;
-            // Band gate: only trade while inside pressure zone
-            const activeDigitStats = buildDigitStatsForCycle(digitToTrade);
-            if (!isDigitInsideBand(activeDigitStats)) {
-                window.nextTradeAllowed = true;
-                window.executionLock = false;
-                return;
-            }
             document.getElementById('predictedDigit').value = digitToTrade;
             window.nextTradeAllowed = false;
             window.executionLock = true;
@@ -2113,11 +2106,6 @@
             const contractType = document.getElementById('contractType').value;
             const symbol = document.getElementById('symbol').value;
             const predictedDigit = getExecutionDigit();
-            let stake = window.currentStake;
-            // Band gate: only trade while inside pressure zone for the active digit
-            const activeDigitStats = buildDigitStatsForCycle(predictedDigit);
-            if (!isDigitInsideBand(activeDigitStats)) return;
-
             let stake = window.currentStake;
             trackTradeInvestment(stake);
             const proposalRequest = {
