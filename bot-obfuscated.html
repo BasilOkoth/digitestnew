@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Deriv DIGITDIFF Bot (Real Trades + Token + Correct PnL)</title>
+  <title>Deriv DIGITDIFF Bot (Volatility + Cluster AI + Real PnL)</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
     body { font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; background:#111827; }
@@ -11,20 +11,24 @@
     #log::-webkit-scrollbar-thumb{ background:#4ade80; border-radius:2px; }
     #log::-webkit-scrollbar-track{ background:#374151; }
     .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
+    .badge-ok { background: linear-gradient(90deg, #10b981, #059669) !important; }
+    .badge-bad { background: linear-gradient(90deg, #dc2626, #b91c1c) !important; }
+    .badge-warn { background: linear-gradient(90deg, #f59e0b, #d97706) !important; }
   </style>
 </head>
 
 <body class="min-h-screen p-4 sm:p-8 flex items-start justify-center">
-  <div class="w-full max-w-5xl bg-gray-800 text-gray-100 shadow-2xl rounded-xl p-5 md:p-6 space-y-5">
+  <div class="w-full max-w-6xl bg-gray-800 text-gray-100 shadow-2xl rounded-xl p-5 md:p-6 space-y-5">
     <div class="flex items-center justify-between">
       <h1 class="text-2xl sm:text-3xl font-extrabold text-blue-400">
-        🎲 Deriv DIGITDIFF Bot
-        <span id="badge" class="ml-3 inline-flex items-center px-3 py-1 text-sm font-medium rounded-full bg-red-600 text-white shadow-md">
+        🎲 Deriv DIGITDIFF Bot (Balanced AI)
+        <span id="badge" class="ml-3 inline-flex items-center px-3 py-1 text-sm font-medium rounded-full badge-bad text-white shadow-md">
           DISCONNECTED
         </span>
       </h1>
     </div>
 
+    <!-- TOKEN -->
     <div class="bg-gray-900 border border-gray-700 rounded-xl p-4">
       <div class="grid grid-cols-1 md:grid-cols-3 gap-3 items-end">
         <div class="md:col-span-2">
@@ -41,6 +45,7 @@
     </div>
 
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+      <!-- LEFT: METRICS -->
       <div class="bg-gray-900 border border-gray-700 rounded-xl p-4 space-y-3">
         <div class="grid grid-cols-2 gap-2 text-xs">
           <div class="p-2 bg-gray-800 rounded border border-gray-700">
@@ -67,10 +72,23 @@
           <div id="digit" class="text-xs text-green-300">Digit: ?</div>
         </div>
 
+        <div class="grid grid-cols-2 gap-2">
+          <div class="p-3 bg-gray-800 rounded border border-gray-700 text-center">
+            <div class="text-xs text-gray-400">Volatility</div>
+            <div id="vol" class="text-lg font-bold text-white mono">-</div>
+            <div id="volNote" class="text-[11px] text-gray-400">needs ≥ 10 ticks</div>
+          </div>
+          <div class="p-3 bg-gray-800 rounded border border-gray-700 text-center">
+            <div class="text-xs text-gray-400">Cluster</div>
+            <div id="cluster" class="text-lg font-bold text-white mono">-</div>
+            <div class="text-[11px] text-gray-400">last 20 ticks</div>
+          </div>
+        </div>
+
         <div class="p-3 bg-gray-800 rounded border border-gray-700">
-          <div class="text-xs text-gray-400">AI Barrier (least frequent digit)</div>
+          <div class="text-xs text-gray-400">AI Barrier (DIGITDIFF)</div>
           <div id="barrier" class="text-2xl font-bold text-orange-300 mono">-</div>
-          <div class="text-[11px] text-gray-400 mt-1">Uses rolling digit frequency window.</div>
+          <div id="mode" class="text-[11px] text-gray-400 mt-1">Mode: -</div>
         </div>
 
         <div class="p-3 bg-gray-800 rounded border border-gray-700">
@@ -80,6 +98,7 @@
         </div>
       </div>
 
+      <!-- RIGHT: CONTROLS + LOGS -->
       <div class="lg:col-span-2 bg-gray-900 border border-gray-700 rounded-xl p-4 space-y-3">
         <div class="grid grid-cols-2 md:grid-cols-3 gap-3">
           <div>
@@ -102,6 +121,12 @@
           <div>
             <label class="block text-xs font-semibold text-gray-300 mb-1">Min Ticks</label>
             <input id="minTicks" type="number" min="1" max="500" value="20"
+                   class="w-full rounded-md bg-gray-700 border border-gray-600 text-white px-2 py-2 text-sm" />
+          </div>
+
+          <div>
+            <label class="block text-xs font-semibold text-gray-300 mb-1">Vol Threshold</label>
+            <input id="volTh" type="number" min="0" step="0.1" value="4.5"
                    class="w-full rounded-md bg-gray-700 border border-gray-600 text-white px-2 py-2 text-sm" />
           </div>
 
@@ -154,28 +179,33 @@
 
         <div>
           <h2 class="text-sm font-bold text-gray-300 mb-2 border-b border-gray-700 pb-1">Logs</h2>
-          <div id="log" class="h-72 bg-gray-950 border border-gray-800 rounded-lg p-3 text-xs text-lime-300 overflow-y-scroll whitespace-pre-wrap"></div>
+          <div id="log" class="h-80 bg-gray-950 border border-gray-800 rounded-lg p-3 text-xs text-lime-300 overflow-y-scroll whitespace-pre-wrap"></div>
         </div>
       </div>
     </div>
   </div>
 
   <script>
-    // --------------------------------------------
-    // Plan (pseudocode)
-    // 1) UI: token save/clear + controls (symbol/window/minTicks/stake/martingale/maxTrades/stopMode)
-    // 2) Connect WS → authorize(token)
-    // 3) Subscribe: ticks(symbol) + balance
-    // 4) Maintain rolling last-digit window + frequency counts
-    // 5) Barrier AI: pick least frequent digit (tie => random) once minTicks reached
-    // 6) Trading loop (one contract at a time):
-    //    - proposal: DIGITDIFF barrier=aiDigit amount=stake duration=1t
-    //    - buy: proposal.id
-    //    - subscribe proposal_open_contract(contract_id) until is_sold
-    //    - realizedProfit = sell_price - buy_price (fallback to oc.profit)
-    //    - update session PnL, martingale on loss, reset on win
-    //    - enforce stop rules and maxTrades
-    // --------------------------------------------
+    // ============================================================
+    // Pseudocode plan
+    // 1) Read inputs + token, reset session.
+    // 2) WS connect → authorize(token).
+    // 3) Subscribe ticks(symbol) + balance.
+    // 4) Maintain rolling last-digit list.
+    // 5) AI:
+    //    - calculateVolatility() from digits diffs
+    //    - detectExtremeCluster() (>=6 highs 8-9, or >=6 lows 0-1 in last 20)
+    //    - decideDiffBarrier():
+    //       - if not enough ticks → null
+    //       - if volatility > threshold → null
+    //       - if extreme cluster → barrier = most frequent digit in last 20 (hot digit)
+    //       - else → barrier = most frequent digit in rolling window
+    // 6) Trading loop (one at a time):
+    //    proposal(DIGITDIFF, barrier, stake, 1 tick) → buy → subscribe open_contract until is_sold
+    //    realizedProfit = sell_price - buy_price (fallback oc.profit)
+    //    martingale on loss, reset on win
+    //    apply stop rules (firstWin / breakEven / targetProfit) + maxTrades.
+    // ============================================================
 
     const $ = (id) => document.getElementById(id);
     const logBox = $("log");
@@ -184,12 +214,13 @@
       ws: null,
       reqId: 0,
       running: false,
-      authorized: false,
 
       token: "",
       symbol: "R_100",
+
       window: 100,
       minTicks: 20,
+      volThreshold: 4.5,
 
       baseStake: 1.0,
       mult: 1.5,
@@ -204,8 +235,6 @@
       targetProfit: 1.0,
 
       digits: [],
-      freq: Array(10).fill(0),
-
       inContract: false,
       liveContractId: null,
 
@@ -231,10 +260,18 @@
       logBox.scrollTop = logBox.scrollHeight;
     }
 
-    function setBadge(text, color) {
+    function setBadge(status) {
       const b = $("badge");
-      b.textContent = text;
-      b.className = `ml-3 inline-flex items-center px-3 py-1 text-sm font-medium rounded-full ${color} text-white shadow-md`;
+      if (status === "connected") {
+        b.textContent = "CONNECTED";
+        b.className = "ml-3 inline-flex items-center px-3 py-1 text-sm font-medium rounded-full badge-ok text-white shadow-md";
+      } else if (status === "connecting") {
+        b.textContent = "CONNECTING";
+        b.className = "ml-3 inline-flex items-center px-3 py-1 text-sm font-medium rounded-full badge-warn text-white shadow-md";
+      } else {
+        b.textContent = "DISCONNECTED";
+        b.className = "ml-3 inline-flex items-center px-3 py-1 text-sm font-medium rounded-full badge-bad text-white shadow-md";
+      }
     }
 
     function uiStatus(main, sub) {
@@ -254,17 +291,24 @@
     }
     function round2(n) { return Math.round(n * 100) / 100; }
 
+    function disableInputs(disabled) {
+      ["token","symbol","window","minTicks","volTh","baseStake","mult","steps","maxTrades","stopMode","targetProfit","saveToken","clearToken"].forEach(id => {
+        $(id).disabled = disabled;
+        $(id).classList.toggle("opacity-60", disabled);
+      });
+    }
+
     function readInputs() {
       state.symbol = $("symbol").value;
       state.window = clampInt($("window").value, 10, 500, 100);
       state.minTicks = clampInt($("minTicks").value, 1, 500, 20);
+      state.volThreshold = clampNum($("volTh").value, 0, 100, 4.5);
 
       state.baseStake = clampNum($("baseStake").value, 0.35, 100000, 1.0);
       state.mult = clampNum($("mult").value, 1.0, 10.0, 1.5);
       state.maxSteps = clampInt($("steps").value, 0, 20, 3);
 
       state.maxTrades = clampInt($("maxTrades").value, 1, 500, 10);
-
       state.stopMode = $("stopMode").value;
       state.targetProfit = clampNum($("targetProfit").value, 0, 100000, 1.0);
 
@@ -272,15 +316,12 @@
 
       $("symLabel").textContent = state.symbol;
       $("trades").textContent = `${state.trades}/${state.maxTrades}`;
-      $("pnl").textContent = `$${state.pnl.toFixed(2)}`;
-      $("pnl").className = state.pnl >= 0 ? "font-bold text-green-400" : "font-bold text-red-400";
+      renderPnL();
     }
 
-    function disableInputs(disabled) {
-      ["token","symbol","window","minTicks","baseStake","mult","steps","maxTrades","stopMode","targetProfit","saveToken","clearToken"].forEach(id => {
-        $(id).disabled = disabled;
-        $(id).classList.toggle("opacity-60", disabled);
-      });
+    function renderPnL() {
+      $("pnl").textContent = `$${state.pnl.toFixed(2)}`;
+      $("pnl").className = state.pnl >= 0 ? "font-bold text-green-400" : "font-bold text-red-400";
     }
 
     function nextReqId() { state.reqId += 1; return state.reqId; }
@@ -297,51 +338,101 @@
 
     function resetWindow() {
       state.digits = [];
-      state.freq = Array(10).fill(0);
       $("barrier").textContent = "-";
+      $("vol").textContent = "-";
+      $("cluster").textContent = "-";
+      $("mode").textContent = "Mode: -";
     }
 
     function pushDigit(d) {
       state.digits.push(d);
-      state.freq[d] += 1;
+      while (state.digits.length > state.window) state.digits.shift();
+    }
 
-      while (state.digits.length > state.window) {
-        const old = state.digits.shift();
-        state.freq[old] -= 1;
+    // =========================
+    // Volatility + Cluster AI
+    // =========================
+    function calculateVolatility() {
+      if (state.digits.length < 10) return 0;
+      let sum = 0;
+      for (let i = 1; i < state.digits.length; i++) {
+        sum += Math.abs(state.digits[i] - state.digits[i - 1]);
       }
+      return sum / state.digits.length;
     }
 
-    function pickLeastFrequentDigit() {
-      if (state.digits.length < state.minTicks) return null;
-
-      let min = Infinity;
-      for (let i = 0; i < 10; i++) min = Math.min(min, state.freq[i]);
-
-      const candidates = [];
-      for (let i = 0; i < 10; i++) if (state.freq[i] === min) candidates.push(i);
-
-      const chosen = candidates[Math.floor(Math.random() * candidates.length)];
-      return chosen;
+    function detectExtremeCluster() {
+      if (state.digits.length < 20) return null;
+      const recent = state.digits.slice(-20);
+      const high = recent.filter(d => d >= 8).length;
+      const low = recent.filter(d => d <= 1).length;
+      if (high >= 6) return "HIGH";
+      if (low >= 6) return "LOW";
+      return null;
     }
 
-    function updateTopUI(digitValue, quote) {
-      $("tick").textContent = Number(quote).toFixed(3);
-      $("digit").textContent = `Digit: ${digitValue}`;
-      $("trades").textContent = `${state.trades}/${state.maxTrades}`;
-      $("pnl").textContent = `$${state.pnl.toFixed(2)}`;
-      $("pnl").className = state.pnl >= 0 ? "font-bold text-green-400" : "font-bold text-red-400";
-      if (state.lastBalance != null) $("bal").textContent = `$${state.lastBalance.toFixed(2)}`;
+    function mostFrequentDigit(arr) {
+      const counts = Array(10).fill(0);
+      for (const d of arr) counts[d] += 1;
+
+      let best = 0;
+      for (let i = 1; i < 10; i++) if (counts[i] > counts[best]) best = i;
+
+      const max = counts[best];
+      const ties = [];
+      for (let i = 0; i < 10; i++) if (counts[i] === max) ties.push(i);
+
+      return ties[Math.floor(Math.random() * ties.length)];
     }
 
+    function decideDiffBarrier() {
+      if (state.digits.length < state.minTicks) return { barrier: null, mode: "COLLECT" };
+
+      const vol = calculateVolatility();
+      const extreme = detectExtremeCluster();
+
+      if (vol > state.volThreshold) return { barrier: null, mode: "SKIP_VOL" };
+
+      if (extreme) {
+        const recent = state.digits.slice(-20);
+        return { barrier: mostFrequentDigit(recent), mode: `STRIKE_${extreme}` };
+      }
+
+      const window = state.digits.slice(-Math.min(state.window, state.digits.length));
+      return { barrier: mostFrequentDigit(window), mode: "STABLE" };
+    }
+
+    // =========================
+    // Martingale
+    // =========================
+    function applyAfterLoss() {
+      state.step += 1;
+      if (state.step > state.maxSteps) {
+        state.step = 0;
+        state.stake = state.baseStake;
+        return;
+      }
+      state.stake = round2(state.baseStake * Math.pow(state.mult, state.step));
+    }
+
+    function resetAfterWin() {
+      state.step = 0;
+      state.stake = state.baseStake;
+    }
+
+    // =========================
+    // WS connect + trade lifecycle
+    // =========================
     function connect() {
       if (state.ws) { try { state.ws.close(); } catch {} }
-      setBadge("CONNECTING", "bg-yellow-600");
+
+      setBadge("connecting");
       uiStatus("Connecting…", "Authorizing…");
 
       state.ws = new WebSocket("wss://ws.binaryws.com/websockets/v3?app_id=120389");
 
       state.ws.onopen = () => {
-        setBadge("CONNECTED", "bg-green-600");
+        setBadge("connected");
         log("WS connected");
         if (!state.token) {
           log("ERROR: missing token");
@@ -364,7 +455,6 @@
 
         switch (data.msg_type) {
           case "authorize":
-            state.authorized = true;
             log(`Authorized as ${data.authorize.loginid}`);
             uiStatus("Live", "Subscribed to ticks + balance");
             send({ ticks: state.symbol, subscribe: 1, req_id: nextReqId() });
@@ -399,12 +489,12 @@
 
       state.ws.onerror = () => {
         log("WS error");
-        setBadge("DISCONNECTED", "bg-red-600");
+        setBadge("disconnected");
       };
 
       state.ws.onclose = () => {
         log("WS disconnected");
-        setBadge("DISCONNECTED", "bg-red-600");
+        setBadge("disconnected");
       };
     }
 
@@ -435,10 +525,8 @@
         state.inContract = false;
         return;
       }
-
       const buyReqId = nextReqId();
       pending.buyReqId = buyReqId;
-
       send({ buy: proposal.id, price: proposal.ask_price, req_id: buyReqId });
     }
 
@@ -470,21 +558,6 @@
       log(`BUY contract=${state.liveContractId} barrier=${pending.barrier} buy=$${buyPrice.toFixed(2)}`);
     }
 
-    function applyAfterLoss() {
-      state.step += 1;
-      if (state.step > state.maxSteps) {
-        state.step = 0;
-        state.stake = state.baseStake;
-        return;
-      }
-      state.stake = round2(state.baseStake * Math.pow(state.mult, state.step));
-    }
-
-    function resetAfterWin() {
-      state.step = 0;
-      state.stake = state.baseStake;
-    }
-
     function onOpenContract(oc) {
       if (!oc) return;
       if (String(oc.contract_id) !== String(state.liveContractId)) return;
@@ -510,26 +583,23 @@
       send({ balance: 1, req_id: nextReqId() });
 
       $("trades").textContent = `${state.trades}/${state.maxTrades}`;
-      $("pnl").textContent = `$${state.pnl.toFixed(2)}`;
-      $("pnl").className = state.pnl >= 0 ? "font-bold text-green-400" : "font-bold text-red-400";
+      renderPnL();
 
       log(`SETTLE contract=${cid} buy=$${buyPrice.toFixed(2)} sell=$${sellPrice.toFixed(2)} pnl=$${realized.toFixed(2)} (session=$${state.pnl.toFixed(2)})`);
 
       if (isWin) {
         resetAfterWin();
-        uiStatus("WIN", `Profit $${realized.toFixed(2)} | session $${state.pnl.toFixed(2)}`);
+        uiStatus("WIN", `+$${realized.toFixed(2)} | session $${state.pnl.toFixed(2)}`);
       } else {
         applyAfterLoss();
-        uiStatus("LOSS", `Profit $${realized.toFixed(2)} | next stake $${state.stake.toFixed(2)}`);
+        uiStatus("LOSS", `${realized.toFixed(2)} | next stake $${state.stake.toFixed(2)}`);
       }
 
       state.contracts.delete(cid);
       state.inContract = false;
       state.liveContractId = null;
 
-      // Stop rules
       if (state.trades >= state.maxTrades) return stop(`Max trades reached (${state.maxTrades})`);
-
       if (state.stopMode === "firstWin" && isWin) return stop("Stopped on first WIN");
       if (state.stopMode === "breakEven" && state.pnl >= 0) return stop("Stopped at break-even (PnL ≥ 0)");
       if (state.stopMode === "targetProfit" && state.pnl >= state.targetProfit) {
@@ -544,27 +614,43 @@
       if (d == null) return;
 
       pushDigit(d);
-      updateTopUI(d, tick.quote);
 
-      const barrierDigit = pickLeastFrequentDigit();
-      $("barrier").textContent = barrierDigit == null ? "-" : String(barrierDigit);
+      $("tick").textContent = Number(tick.quote).toFixed(3);
+      $("digit").textContent = `Digit: ${d}`;
+
+      const vol = calculateVolatility();
+      const cluster = detectExtremeCluster();
+
+      $("vol").textContent = state.digits.length >= 10 ? vol.toFixed(2) : "-";
+      $("cluster").textContent = cluster ?? "-";
+
+      const decision = decideDiffBarrier();
+      $("barrier").textContent = decision.barrier == null ? "-" : String(decision.barrier);
+      $("mode").textContent = `Mode: ${decision.mode}`;
 
       if (state.digits.length < state.minTicks) {
         uiStatus("Collecting ticks…", `${state.digits.length}/${state.minTicks}`);
         return;
       }
+
+      if (decision.barrier == null) {
+        uiStatus("Skipping trade", decision.mode === "SKIP_VOL" ? `Vol=${vol.toFixed(2)} > ${state.volThreshold.toFixed(2)}` : "No signal");
+        return;
+      }
+
       if (state.trades >= state.maxTrades) return stop(`Max trades reached (${state.maxTrades})`);
       if (state.inContract) return;
 
-      if (barrierDigit == null) return;
-
       state.inContract = true;
-      uiStatus("Placing trade…", `DIGITDIFF barrier=${barrierDigit} stake=$${state.stake.toFixed(2)}`);
-      log(`TRADE #${state.trades + 1} DIGITDIFF barrier=${barrierDigit} stake=$${state.stake.toFixed(2)}`);
+      uiStatus("Placing trade…", `DIGITDIFF barrier=${decision.barrier} stake=$${state.stake.toFixed(2)} (${decision.mode})`);
+      log(`TRADE #${state.trades + 1} DIGITDIFF barrier=${decision.barrier} stake=$${state.stake.toFixed(2)} mode=${decision.mode}`);
 
-      makeProposalDigitDiff(barrierDigit, state.stake);
+      makeProposalDigitDiff(decision.barrier, state.stake);
     }
 
+    // =========================
+    // Start/Stop
+    // =========================
     function start() {
       if (state.running) return;
 
@@ -577,19 +663,19 @@
         return;
       }
 
-      // Reset session
       state.trades = 0;
       state.pnl = 0;
       state.step = 0;
       state.stake = state.baseStake;
+
       state.inContract = false;
       state.liveContractId = null;
       state.contracts.clear();
+
       resetWindow();
 
       $("trades").textContent = `${state.trades}/${state.maxTrades}`;
-      $("pnl").textContent = `$${state.pnl.toFixed(2)}`;
-      $("pnl").className = "font-bold text-white";
+      renderPnL();
 
       disableInputs(true);
 
@@ -598,7 +684,8 @@
       $("toggle").classList.add("bg-red-600","hover:bg-red-700");
 
       state.running = true;
-      log(`START symbol=${state.symbol} window=${state.window} minTicks=${state.minTicks} maxTrades=${state.maxTrades} base=$${state.baseStake.toFixed(2)}`);
+
+      log(`START symbol=${state.symbol} window=${state.window} minTicks=${state.minTicks} volTh=${state.volThreshold} maxTrades=${state.maxTrades} base=$${state.baseStake.toFixed(2)}`);
       connect();
     }
 
@@ -618,10 +705,12 @@
       try { if (state.ws) state.ws.close(); } catch {}
       state.ws = null;
 
-      setBadge("DISCONNECTED", "bg-red-600");
+      setBadge("disconnected");
     }
 
-    // Token buttons
+    // =========================
+    // UI wiring
+    // =========================
     $("saveToken").addEventListener("click", () => {
       const t = ($("token").value || "").trim();
       if (!t) return log("Token empty (not saved)");
@@ -637,7 +726,6 @@
       log("Token cleared");
     });
 
-    // Toggle
     $("toggle").addEventListener("click", () => {
       if (state.running) stop("Manual stop");
       else start();
@@ -647,10 +735,11 @@
     (function init() {
       const saved = (localStorage.getItem("deriv_token") || "").trim();
       if (saved) $("token").value = saved;
+
       readInputs();
-      setBadge("DISCONNECTED", "bg-red-600");
+      setBadge("disconnected");
       uiStatus("Ready", "Paste token → Start");
-      log("Bot initialized (DIGITDIFF)");
+      log("Bot initialized (DIGITDIFF + volatility+cluster barrier AI)");
     })();
   </script>
 </body>
