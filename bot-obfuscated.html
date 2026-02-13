@@ -3,9 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Deriv Over/Under Bot (Incremental Median, Stop on Win / Max Trades)</title>
+  <title>Deriv Over/Under Bot (Token UI + Real Trades)</title>
   <script src="https://cdn.tailwindcss.com"></script>
-
   <style>
     body { font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; background:#111827; }
     #log-area::-webkit-scrollbar{ width:4px; }
@@ -32,6 +31,24 @@
       </h1>
     </div>
 
+    <!-- TOKEN BAR -->
+    <div class="bg-gray-900 border border-gray-700 rounded-xl p-4 shadow-lg mb-6">
+      <div class="flex flex-col md:flex-row gap-3 md:items-end">
+        <div class="flex-1">
+          <label for="token" class="block text-xs font-semibold text-gray-300 mb-1">Deriv API Token</label>
+          <input id="token" type="password" placeholder="Paste your token here"
+                 class="w-full rounded-md bg-gray-700 border border-gray-600 text-white px-3 py-2 text-sm" />
+          <div class="text-[11px] text-gray-400 mt-1">
+            Stored locally in your browser if you click “Save Token”.
+          </div>
+        </div>
+        <div class="flex gap-2">
+          <button id="saveTokenBtn" class="px-4 py-2 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 transition">Save Token</button>
+          <button id="clearTokenBtn" class="px-4 py-2 bg-gray-600 text-white font-bold rounded-lg hover:bg-gray-700 transition">Clear</button>
+        </div>
+      </div>
+    </div>
+
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
       <!-- LEFT -->
       <div class="lg:col-span-1">
@@ -49,7 +66,7 @@
 
           <div class="mb-4 p-3 bg-gray-800 rounded-lg border border-blue-500/50">
             <h3 class="text-sm font-bold text-blue-400 mb-3 flex items-center">
-              🧠 INCREMENTAL MEDIAN ENGINE
+              🧠 INCREMENTAL MEDIAN
               <span id="analysis-progress" class="ml-auto text-xs bg-gray-700 px-2 py-1 rounded">0/100</span>
             </h3>
 
@@ -60,7 +77,7 @@
             </div>
 
             <div class="mb-3 p-3 bg-gray-900 rounded border border-green-500/30 text-center">
-              <div class="text-xs font-semibold text-green-400 mb-1">Current Median (so far)</div>
+              <div class="text-xs font-semibold text-green-400 mb-1">Median (rolling window)</div>
               <div id="median-value" class="text-4xl font-bold text-white">-</div>
               <div id="median-interpretation" class="text-xs text-gray-400 mt-1">Waiting for data</div>
             </div>
@@ -106,7 +123,7 @@
           </div>
 
           <div>
-            <label for="analysis_window" class="block text-xs font-semibold text-gray-300 mb-1">Analysis Window (rolling)</label>
+            <label for="analysis_window" class="block text-xs font-semibold text-gray-300 mb-1">Rolling Window</label>
             <select id="analysis_window" class="w-full rounded-md bg-gray-700 border border-gray-600 text-white px-2 py-1.5 text-sm">
               <option value="20">20</option>
               <option value="50">50</option>
@@ -141,7 +158,7 @@
 
           <div>
             <label for="max_steps" class="block text-xs font-semibold text-gray-300 mb-1">Max Steps</label>
-            <input id="max_steps" type="number" min="0" max="10" step="1" value="3"
+            <input id="max_steps" type="number" min="0" max="20" step="1" value="3"
                    class="w-full rounded-md bg-gray-700 border border-gray-600 text-white px-2 py-1.5 text-sm">
           </div>
 
@@ -177,11 +194,11 @@
             <p id="metricTradeCount" class="text-lg font-bold text-white">0</p>
           </div>
           <div class="bg-gray-700 rounded-lg p-2 col-span-2">
-            <p class="text-[10px] text-lime-400">P/L</p>
+            <p class="text-[10px] text-lime-400">P/L (sum of contract profits)</p>
             <p id="metricTotalProfit" class="text-lg font-bold text-white">$0.00</p>
           </div>
           <div class="bg-gray-700 rounded-lg p-2 col-span-2">
-            <p class="text-[10px] text-green-500">Current Stake</p>
+            <p class="text-[10px] text-green-500">Next Stake</p>
             <p id="metricCurrentStake" class="text-lg font-bold text-white">$0.00</p>
           </div>
         </div>
@@ -213,15 +230,9 @@
   </div>
 
   <script>
-    /**
-     * Deriv Digit Over/Under:
-     * - OVER 2 wins if last digit > 2 (3-9)
-     * - UNDER 7 wins if last digit < 7 (0-6)
-     */
-
-    // -----------------------------
+    // ============================================
     // State
-    // -----------------------------
+    // ============================================
     const state = {
       ws: null,
       reqId: 0,
@@ -229,6 +240,8 @@
       isRunning: false,
       isConnecting: false,
       authorized: false,
+
+      token: "",
 
       symbol: "R_100",
       analysisWindow: 100,
@@ -247,29 +260,32 @@
       maxTrades: 10,
       trades: 0,
 
-      // Stop rule
       stopOnFirstWin: true,
 
-      // Market data
       tickCount: 0,
       tickTimes: [],
       lastDigit: null,
 
-      // Analysis digits (rolling)
       digits: [],
 
-      // One live contract at a time
       inContract: false,
       liveContractId: null,
       openContractSubId: null,
 
-      // PnL (approx from Deriv profit)
       profit: 0,
     };
 
-    // -----------------------------
+    const pending = {
+      proposalReqId: null,
+      buyReqId: null,
+      proposalId: null,
+      side: null,
+      stake: null,
+    };
+
+    // ============================================
     // DOM helpers
-    // -----------------------------
+    // ============================================
     const $ = (id) => document.getElementById(id);
 
     function nowTime() {
@@ -285,7 +301,6 @@
       if (type === "WIN") cls = "text-green-400 font-bold";
       if (type === "LOSS") cls = "text-red-400";
       if (type === "ENGINE") cls = "text-cyan-300";
-
       area.innerHTML += `\n[${nowTime()}] <span class="${cls}">${msg}</span>`;
       area.scrollTop = area.scrollHeight;
     }
@@ -366,9 +381,9 @@
       $("session_side").className = side === "OVER" ? "text-xl font-bold text-blue-400" : "text-xl font-bold text-purple-400";
     }
 
-    // -----------------------------
-    // Incremental median + recommendation
-    // -----------------------------
+    // ============================================
+    // Incremental median
+    // ============================================
     function pushDigit(d) {
       state.digits.push(d);
       if (state.digits.length > state.analysisWindow) state.digits.shift();
@@ -427,9 +442,9 @@
       return r.side || "OVER";
     }
 
-    // -----------------------------
+    // ============================================
     // Deriv WS helpers
-    // -----------------------------
+    // ============================================
     function nextReqId() {
       state.reqId += 1;
       return state.reqId;
@@ -448,7 +463,6 @@
       state.isConnecting = true;
       setBadge("connecting");
 
-      // app_id can be changed to yours if you have one
       state.ws = new WebSocket("wss://ws.binaryws.com/websockets/v3?app_id=120389");
 
       state.ws.onopen = () => {
@@ -456,18 +470,19 @@
         setBadge("connected");
         log("✅ WebSocket connected", "SYSTEM");
 
-        const token = localStorage.getItem("active_token") || localStorage.getItem("derivToken");
-        if (!token) {
-          log("❌ No token found in localStorage (active_token or derivToken).", "ERROR");
+        if (!state.token) {
+          log("❌ Token missing. Paste token and click Save Token.", "ERROR");
           stop("Missing token");
           return;
         }
-        send({ authorize: token, req_id: nextReqId() });
+
+        send({ authorize: state.token, req_id: nextReqId() });
       };
 
       state.ws.onmessage = (ev) => {
         let data;
         try { data = JSON.parse(ev.data); } catch { return; }
+
         if (data.error) {
           log(`❌ API Error: ${data.error.message}`, "ERROR");
           state.inContract = false;
@@ -522,18 +537,13 @@
       };
     }
 
-    // -----------------------------
-    // Trading lifecycle: proposal -> buy -> open_contract (until is_sold)
-    // -----------------------------
-    const pending = {
-      proposalReqId: null,
-      buyReqId: null,
-      proposalId: null,
-      side: null,
-      stake: null,
-    };
-
+    // ============================================
+    // Trading lifecycle (REAL)
+    // ============================================
     function makeProposal(side, stake) {
+      // Digit contracts:
+      // - OVER 2 => DIGITOVER barrier 2
+      // - UNDER 7 => DIGITUNDER barrier 7
       const contractType = side === "OVER" ? "DIGITOVER" : "DIGITUNDER";
       const barrier = side === "OVER" ? "2" : "7";
 
@@ -585,39 +595,35 @@
 
       state.liveContractId = buy.contract_id;
 
-      // Subscribe to settlement for this contract
-      const subId = nextReqId();
-      state.openContractSubId = subId;
+      // Subscribe to contract updates until it is_sold
+      const subReq = nextReqId();
+      state.openContractSubId = subReq;
+
       send({
         proposal_open_contract: 1,
         contract_id: state.liveContractId,
         subscribe: 1,
-        req_id: subId,
+        req_id: subReq,
       });
 
-      log(`🧾 Bought contract #${state.liveContractId}`, "TRADE");
+      log(`🧾 Bought contract ${state.liveContractId} (${pending.side}) stake $${pending.stake.toFixed(2)}`, "TRADE");
       updateTradeStatus("LIVE", `Contract live (${pending.side})`, "Waiting settlement...", "trade");
-    }
-
-    function unsubscribeOpenContract() {
-      if (!state.openContractSubId) return;
-      // Deriv supports "forget" with subscription id (returned in "subscription.id").
-      // We'll use forget_all on stop, and rely on stop to close ws; safe enough.
-      state.openContractSubId = null;
     }
 
     function onOpenContract(oc) {
       if (!oc) return;
       if (String(oc.contract_id) !== String(state.liveContractId)) return;
-
       if (!oc.is_sold) return;
 
-      // Settlement
       const profit = Number(oc.profit || 0);
       const isWin = profit > 0;
 
       state.trades += 1;
       state.profit += profit;
+
+      // keep balance tight after settlement
+      send({ balance: 1, req_id: nextReqId() });
+
       updatePnL();
       updateRateAndCounts();
 
@@ -625,32 +631,34 @@
         log(`✅ WIN! Profit $${profit.toFixed(2)} | Trades ${state.trades}/${state.maxTrades}`, "WIN");
         updateTradeStatus("WIN", `WIN +$${profit.toFixed(2)}`, "Stopping (stop-on-win)", "win");
         resetAfterWin();
-        if (state.stopOnFirstWin) return stop("Stopped on first WIN");
+        finalizeContract();
+
+        if (state.stopOnFirstWin) {
+          stop("Stopped on first WIN");
+          return;
+        }
       } else {
         log(`❌ LOSS. Profit $${profit.toFixed(2)} | Trades ${state.trades}/${state.maxTrades}`, "LOSS");
-        updateTradeStatus("LOSS", `LOSS ${profit.toFixed(2)}`, `Next stake: $${nextStakeAfterLoss().toFixed(2)}`, "loss");
         applyAfterLoss();
+        updateTradeStatus("LOSS", `LOSS ${profit.toFixed(2)}`, `Next stake: $${state.stake.toFixed(2)}`, "loss");
+        finalizeContract();
       }
-
-      state.inContract = false;
-      state.liveContractId = null;
-      unsubscribeOpenContract();
 
       if (state.trades >= state.maxTrades) {
         stop(`Max trades reached (${state.maxTrades})`);
       }
     }
 
+    function finalizeContract() {
+      state.inContract = false;
+      state.liveContractId = null;
+      state.openContractSubId = null;
+    }
+
     function resetAfterWin() {
       state.step = 0;
       state.stake = state.baseStake;
       updateStakeUI();
-    }
-
-    function nextStakeAfterLoss() {
-      const nextStep = state.step + 1;
-      if (nextStep > state.maxSteps) return state.baseStake;
-      return round2(state.baseStake * Math.pow(state.multiplier, nextStep));
     }
 
     function applyAfterLoss() {
@@ -668,9 +676,9 @@
       return Math.round(n * 100) / 100;
     }
 
-    // -----------------------------
-    // Tick handler + trade trigger
-    // -----------------------------
+    // ============================================
+    // Tick -> trade trigger
+    // ============================================
     function lastDigitOfQuote(q) {
       const s = String(q);
       const ch = s[s.length - 1];
@@ -696,22 +704,19 @@
 
       updateRateAndCounts();
 
-      // gate: need min ticks
       if (state.digits.length < state.minTicks) {
         updateTradeStatus("COLLECTING", `Collecting ticks (${state.digits.length}/${state.minTicks})`, "Waiting...", "normal");
         return;
       }
 
-      // stop rule
       if (state.trades >= state.maxTrades) {
         stop(`Max trades reached (${state.maxTrades})`);
         return;
       }
 
-      // only 1 contract at a time
       if (state.inContract) return;
 
-      // place a trade on EVERY tick once ready
+      // Place a real contract each time we are idle and eligible
       const side = decideSide();
       setSessionSide(side);
 
@@ -723,9 +728,21 @@
       makeProposal(side, state.stake);
     }
 
-    // -----------------------------
-    // UI actions
-    // -----------------------------
+    // ============================================
+    // UI / controls
+    // ============================================
+    function clampInt(v, min, max, fallback) {
+      const n = parseInt(v, 10);
+      if (!Number.isFinite(n)) return fallback;
+      return Math.max(min, Math.min(max, n));
+    }
+
+    function clampNum(v, min, max, fallback) {
+      const n = parseFloat(v);
+      if (!Number.isFinite(n)) return fallback;
+      return Math.max(min, Math.min(max, n));
+    }
+
     function readInputs() {
       state.symbol = $("symbol").value;
       state.analysisWindow = clampInt($("analysis_window").value, 5, 500, 100);
@@ -739,29 +756,21 @@
       state.stake = state.baseStake;
       updateStakeUI();
 
+      if (state.digits.length > state.analysisWindow) {
+        state.digits = state.digits.slice(state.digits.length - state.analysisWindow);
+      }
+
       $("current_symbol").textContent = $("symbol").options[$("symbol").selectedIndex].text;
       $("analysis-progress").textContent = `${state.digits.length}/${state.analysisWindow}`;
       $("session_trades").textContent = `${state.trades}/${state.maxTrades}`;
       $("metricTradeCount").textContent = String(state.trades);
     }
 
-    function clampInt(v, min, max, fallback) {
-      const n = parseInt(v, 10);
-      if (!Number.isFinite(n)) return fallback;
-      return Math.max(min, Math.min(max, n));
-    }
-
-    function clampNum(v, min, max, fallback) {
-      const n = parseFloat(v);
-      if (!Number.isFinite(n)) return fallback;
-      return Math.max(min, Math.min(max, n));
-    }
-
     function disableInputs(disabled) {
-      ["symbol","analysis_window","min_ticks","max_trades","base_stake","multiplier","max_steps"].forEach(id => {
+      ["token","symbol","analysis_window","min_ticks","max_trades","base_stake","multiplier","max_steps"].forEach(id => {
         $(id).disabled = disabled;
       });
-      ["mode_smart","mode_fixed","side_over","side_under"].forEach(id => {
+      ["mode_smart","mode_fixed","side_over","side_under","saveTokenBtn","clearTokenBtn"].forEach(id => {
         $(id).disabled = disabled;
         $(id).classList.toggle("opacity-60", disabled);
       });
@@ -770,9 +779,14 @@
     function start() {
       if (state.isRunning) return;
 
+      readTokenFromUI();
       readInputs();
 
-      // session reset
+      if (!state.token) {
+        log("❌ Paste token and click Save Token (or just paste token).", "ERROR");
+        return;
+      }
+
       state.trades = 0;
       state.profit = 0;
       state.tickCount = 0;
@@ -780,6 +794,7 @@
       state.inContract = false;
       state.liveContractId = null;
       state.openContractSubId = null;
+
       pending.proposalReqId = null;
       pending.buyReqId = null;
       pending.proposalId = null;
@@ -789,13 +804,8 @@
       updatePnL();
       updateStakeUI();
       updateRateAndCounts();
+      computeRecommendation();
 
-      // keep digits (incremental) but enforce window size
-      if (state.digits.length > state.analysisWindow) {
-        state.digits = state.digits.slice(state.digits.length - state.analysisWindow);
-      }
-
-      // default side
       setSessionSide(state.strategy === "fixed" ? state.fixedSide : "OVER");
 
       state.isRunning = true;
@@ -831,6 +841,7 @@
       state.inContract = false;
       state.liveContractId = null;
       state.openContractSubId = null;
+      state.authorized = false;
     }
 
     function toggle() {
@@ -875,11 +886,50 @@
       log(`🔒 Fixed side = ${side}`, "SYSTEM");
     }
 
-    // -----------------------------
+    // ============================================
+    // Token storage
+    // ============================================
+    function readTokenFromUI() {
+      state.token = ($("token").value || "").trim();
+      if (!state.token) {
+        const saved = (localStorage.getItem("deriv_token") || "").trim();
+        if (saved) {
+          state.token = saved;
+          $("token").value = saved;
+        }
+      }
+    }
+
+    function saveToken() {
+      const t = ($("token").value || "").trim();
+      if (!t) {
+        log("❌ Token empty. Paste token first.", "ERROR");
+        return;
+      }
+      localStorage.setItem("deriv_token", t);
+      state.token = t;
+      log("✅ Token saved locally.", "SYSTEM");
+    }
+
+    function clearToken() {
+      localStorage.removeItem("deriv_token");
+      $("token").value = "";
+      state.token = "";
+      log("🧹 Token cleared.", "SYSTEM");
+    }
+
+    // ============================================
     // Init
-    // -----------------------------
+    // ============================================
     document.addEventListener("DOMContentLoaded", () => {
       setBadge("disconnected");
+
+      const saved = (localStorage.getItem("deriv_token") || "").trim();
+      if (saved) $("token").value = saved;
+
+      $("saveTokenBtn").addEventListener("click", saveToken);
+      $("clearTokenBtn").addEventListener("click", clearToken);
+
       $("toggleButton").addEventListener("click", toggle);
 
       $("mode_smart").addEventListener("click", () => setStrategy("smart"));
@@ -887,23 +937,28 @@
       $("side_over").addEventListener("click", () => setFixedSide("OVER"));
       $("side_under").addEventListener("click", () => setFixedSide("UNDER"));
 
+      ["symbol","analysis_window","min_ticks","max_trades","base_stake","multiplier","max_steps"].forEach(id => {
+        $(id).addEventListener("input", () => {
+          if (!state.isRunning) {
+            readInputs();
+            computeRecommendation();
+          }
+        });
+      });
+
       // defaults
       setStrategy("smart");
       setFixedSide("OVER");
 
-      // keep UI in sync
-      ["symbol","analysis_window","min_ticks","max_trades","base_stake","multiplier","max_steps"].forEach(id => {
-        $(id).addEventListener("input", () => {
-          if (!state.isRunning) readInputs();
-        });
-      });
-
+      readTokenFromUI();
       readInputs();
       updateStakeUI();
       updatePnL();
       computeRecommendation();
-      updateTradeStatus("READY", "Ready", "Click START", "normal");
-      log("🧠 Median analysis engine loaded (incremental)", "ENGINE");
+
+      updateTradeStatus("READY", "Ready", "Paste token (optional save) then click START", "normal");
+      log("🧠 Median analysis engine loaded (incremental).", "ENGINE");
+      if (saved) log("🔑 Token loaded from localStorage.", "SYSTEM");
     });
   </script>
 </body>
