@@ -1991,18 +1991,12 @@ if (!window.cycleActive || window.cycleTradeCount >= window.cycleLimit) return;
             window.nextTradeAllowed = false;
             window.executionLock = true;
             try {
-                window.stats.tradesExecuted++;
-                window.tradeCount++;
-                if (window.cycleActive) {
-                    window.cycleTradeCount++;
-                    if (window.releaseWindow) window.releaseWindow.tradeCount = window.cycleTradeCount;
-                }
-                document.getElementById('metricTradeCount').textContent = window.tradeCount;
+                const nextTradeNo = window.tradeCount + 1;
                 updateSessionDisplay();
-                log(`🚀 Release Trade #${window.tradeCount}: ${tick.price.toFixed(window.tickFormat.decimals || 3)} (Digit ${tick.digit})`, 'TRADE');
-                updateTradeStatus('TRADING', `Trade #${window.tradeCount}: $${window.currentStake.toFixed(2)} on digit ${digitToTrade}`, 'Executing release trade.', 'trade');
+                log(`🚀 Release Trade #${nextTradeNo}: ${tick.price.toFixed(window.tickFormat.decimals || 3)} (Digit ${tick.digit})`, 'TRADE');
+                updateTradeStatus('TRADING', `Trade #${nextTradeNo}: $${window.currentStake.toFixed(2)} on digit ${digitToTrade}`, 'Executing release trade.', 'trade');
                 playAudioFeedback('EXECUTION');
-                executeTrade(tick);
+                executeTrade(tick, nextTradeNo);
             } catch (error) {
                 log(`❌ Release trade error: ${error}`, 'ERROR');
                 window.executionLock = false;
@@ -2087,18 +2081,12 @@ if (!window.cycleActive || window.cycleTradeCount >= window.cycleLimit) return;
             window.executionLock = true;
             window.nextTradeAllowed = false;
             try {
-                window.stats.tradesExecuted++;
-                window.tradeCount++;
-                if (window.cycleActive) {
-                    window.cycleTradeCount++;
-                    if (window.releaseWindow) window.releaseWindow.tradeCount = window.cycleTradeCount;
-                }
-                document.getElementById('metricTradeCount').textContent = window.tradeCount;
+                const nextTradeNo = window.tradeCount + 1;
                 updateSessionDisplay();
-                log(`⚡ Trade #${window.tradeCount}: ${tick.price.toFixed(window.tickFormat.decimals || 3)} (Digit ${tick.digit})`, 'TRADE');
-                updateTradeStatus('TRADING', `Trade #${window.tradeCount}: $${window.currentStake.toFixed(2)} on digit ${getExecutionDigit()}`, 'Executing trade...', 'trade');
+                log(`⚡ Trade #${nextTradeNo}: ${tick.price.toFixed(window.tickFormat.decimals || 3)} (Digit ${tick.digit})`, 'TRADE');
+                updateTradeStatus('TRADING', `Trade #${nextTradeNo}: $${window.currentStake.toFixed(2)} on digit ${getExecutionDigit()}`, 'Executing trade.', 'trade');
                 playAudioFeedback('EXECUTION');
-                executeTrade(tick);
+                executeTrade(tick, nextTradeNo);
             } catch (error) {
                 log(`❌ Error: ${error}`, 'ERROR');
                 window.executionLock = false;
@@ -2110,10 +2098,12 @@ if (!window.cycleActive || window.cycleTradeCount >= window.cycleLimit) return;
         // ============================================================================
         // EXECUTE TRADE
         // ============================================================================
-        function executeTrade(tick) {
+        function executeTrade(tick, tradeNumber) {
             const contractType = document.getElementById('contractType').value;
             const symbol = document.getElementById('symbol').value;
             const predictedDigit = getExecutionDigit();
+            const tn = Number.isInteger(tradeNumber) ? tradeNumber : (window.tradeCount + 1);
+
             
             // Band gate: never fire trades outside the pressure zone (0.80–0.88)
             try {
@@ -2150,7 +2140,7 @@ let stake = window.currentStake;
                 contractType: contractType,
                 predictedDigit: predictedDigit,
                 startTime: Date.now(),
-                tradeNumber: window.tradeCount,
+                tradeNumber: tn,
                 martingaleStep: window.martingaleStep
             });
             sendRequest(proposalRequest);
@@ -2165,7 +2155,6 @@ let stake = window.currentStake;
                 window.lastTradeResult = 'win';
                 window.stopAfterWin = true;
                 window.stats.wins++;
-                window.tradeCount++;
                 playAudioFeedback('WIN');
                 const payout = window.currentStake * 9;
                 trackTradePayout(payout);
@@ -2516,6 +2505,16 @@ let stake = window.currentStake;
         function executeBuy(proposal_id, ask_price, pending) {
             const buyRequest = { buy: proposal_id, price: ask_price, req_id: getNextReqId() };
             log(`✅ Buying: $${pending.stake.toFixed(2)} on digit ${pending.predictedDigit}`, 'TRADE');
+
+            const tradeNo = Number.isInteger(pending.tradeNumber) ? pending.tradeNumber : (window.tradeCount + 1);
+            window.stats.tradesExecuted++;
+            window.tradeCount = tradeNo;
+            if (window.cycleActive) {
+                window.cycleTradeCount++;
+                if (window.releaseWindow) window.releaseWindow.tradeCount = window.cycleTradeCount;
+            }
+            document.getElementById('metricTradeCount').textContent = window.tradeCount;
+            updateSessionDisplay();
             window.pendingProposals.set(buyRequest.req_id, { ...pending, proposal_id: proposal_id, buyStartTime: Date.now() });
             sendRequest(buyRequest);
         }
