@@ -695,7 +695,7 @@
             minSupport: 22,
 
             // EARLY PRESSURE (REALISTIC MODE)
-            minH5: 0.42,        // 🔥 KEY CHANGE (from 0.50 → 0.45)
+            minH5: 0.40,        // 🔥 KEY CHANGE (from 0.50 → 0.45)
             minP10: 0.66,       // slightly relaxed
 
             maxPersistenceStable: 97,      // allow more clean cold
@@ -714,9 +714,6 @@
             pressureZoneMaxP90Ratio: 0.95,
                         // Hard floor: never recommend if gap is far from P90 (prevents "gap 4, p90 20" type picks)
             pressureZoneMinFloorP90Ratio: 0.60,
-// Adaptive fallback: if no digit qualifies at the first tier, the engine progressively relaxes.
-            // It will NEVER go below pressureZoneMinFloorP90Ratio.
-            pressureZoneFallbackMinP90Ratios: [0.70, 0.66, 0.63, 0.60]
         };
 
 
@@ -729,7 +726,7 @@
         // Ranking defaults (tweakable)
         window.SURVIVAL_CFG = {
             minPm5: 0.60,
-            maxS20: 0.05,
+            maxS20: 0.08,
             maxETM: 12,
             requirePressure: true
         };
@@ -811,6 +808,22 @@
                     digits: [],
                     counts: Array(10).fill(0)
                 };
+        // Helpers for release-window invalidation (Patch 4)
+        window.digitIntelligenceEngine.locked = false;
+        window.digitIntelligenceEngine.forceReanalyze = function forceReanalyze() {
+            try {
+                this.currentRecommendation = null;
+                if (typeof this.analyzeAndRecommend === 'function') {
+                    this.analyzeAndRecommend();
+                }
+                if (typeof updateExecutionLogic === 'function') {
+                    updateExecutionLogic();
+                }
+            } catch (e) {
+                console.warn('forceReanalyze error:', e);
+            }
+        };
+
                 
                 updateEngineStatus('Warming up...', 'WARMUP', 0);
                 log('🧠 Engine reset - ready for warm-up', 'ENGINE');
@@ -896,11 +909,9 @@
                 this.updateRegime(digit);
                 this.onNewDigit(digit);
                 
-                // Update analysis every 50 ticks
-                if (this.tickIndex % 50 === 0) {
-                    this.analyzeAndRecommend();
-                }
-            },
+                // PATCH 3: Force immediate re-analysis (every tick)
+                this.analyzeAndRecommend();
+},
             
             // Update regime statistics
             updateRegime: function(digit) {
@@ -1055,126 +1066,94 @@
             // Select best digit using AI logic
             selectBestDigit: function() {
                 if (!this.warmupDone || !this.enabled) return null;
-                
+
                 const regimeStatus = this.computeRegimeStatus();
                 if (!regimeStatus.ok) {
                     log(`🧠 Regime unstable: E=${regimeStatus.entropy}, χ²=${regimeStatus.chi2}, D=${regimeStatus.dominance}`, 'ENGINE');
                     return null;
                 }
-                
-                let best = null;
 
                 const thresholds = window.AI_THRESHOLDS;
-
                 const maxPersistence =
                     regimeStatus.label === "STABLE"
                         ? thresholds.maxPersistenceStable
                         : thresholds.maxPersistenceUnstable;
 
-                const rawPressureTiers = (thresholds.pressureZoneEnabled &&
-                    Array.isArray(thresholds.pressureZoneFallbackMinP90Ratios) &&
-                    thresholds.pressureZoneFallbackMinP90Ratios.length)
-                    ? thresholds.pressureZoneFallbackMinP90Ratios
-                    : [thresholds.pressureZoneEnabled ? thresholds.pressureZoneMinP90Ratio : 0.0];
+                const MAX_EXTEND_RATIO = 1.9;
 
-                const pressureFloor = (thresholds.pressureZoneEnabled && typeof thresholds.pressureZoneMinFloorP90Ratio === "number")
-                    ? thresholds.pressureZoneMinFloorP90Ratio
-                    : 0.0;
 
-                // Ensure tiers are sorted high→low, unique, and never drop below the floor.
-                const pressureTiers = Array.from(new Set(rawPressureTiers))
-                    .map(v => (typeof v === "number" ? v : 0.0))
-                    .filter(v => v >= pressureFloor && v < 1)
-                    .sort((a, b) => b - a);
+                // --- survival metrics (tail-risk cap) ---
+                const MAX_S20 = 0.08;  // 8% tail cap
+                let _survivalByDigit = null;
 
-                if (thresholds.pressureZoneEnabled && pressureTiers.length === 0) {
-                    pressureTiers.push(Math.max(0, Math.min(0.999, pressureFloor)));
+                try {
+                    const minDigits = (typeof window.SURVIVAL_MIN_DIGITS === 'number') ? window.SURVIVAL_MIN_DIGITS : 80;
+                    const windowSize = window.SURVIVAL_WINDOW || 2000;
+
+                    if (window.SurvivalEngine && Array.isArray(window.lastDigits) && window.lastDigits.length >= minDigits) {
+                        const sStats = window.SurvivalEngine.analyze(window.lastDigits, { window: windowSize });
+                        _survivalByDigit = new Map(sStats.map(x => [x.digit, x]));
+                    }
+                } catch (e) {
+                    _survivalByDigit = null;
                 }
 
-                const runPass = (activeMinP90Ratio) => {
-                    let passBest = null;
 
-                    for (let d = 0; d < 10; d++) {
-                        const s = this.digitStats[d];
-                        const g = s.currentGap;
-                        const p90 = Math.max(s.p90Gap, 1);
-                        const p90Ratio = g / p90;
-                        const extendRatio = g / s.avgGap;
+                let best = null;
 
-                        // 🔥 HARD TAIL BLOCK: extreme stretch vs history
-                        if (extendRatio > 2.8) continue;
+                for (let d = 0; d < 10; d++) {
+                    const s = this.digitStats[d];
+                    const g = s.currentGap;
+                    const p90 = Math.max(s.p90Gap, 1);
+                    const p90Ratio = g / p90;
+                    const extendRatio = (s.avgGap && s.avgGap > 0) ? (g / s.avgGap) : Infinity;
 
-                        // 🔥 Biased regime + stretched digit = tail risk
-                        if (regimeStatus.entropy < 0.96 && extendRatio > 1.5) continue;
+                    // PATCH 2: ExtendRatio is a SINGLE hard rule
+                    if (extendRatio > MAX_EXTEND_RATIO) continue;
 
-                        // 🔥 Tail forming: suppressed digit + stretched gap
-                        if (s.persistenceScore > 90 && extendRatio > 1.8) continue;
+                    // PATCH 1: Synchronize pressure band with UI (single hard gate)
+                    const PRESSURE_MIN = 0.70;
+                    const PRESSURE_MAX = 0.95;
 
-                        const P5  = this.conditionalReturnProb(d, g, 5);
-                        const P10 = this.conditionalReturnProb(d, g, 10);
+                    if (p90Ratio < PRESSURE_MIN || p90Ratio > PRESSURE_MAX) continue;
 
-                        // Filter conditions
-                        if (s.gaps.length < thresholds.minSupport) continue;
 
-                        // STRONG EARLY FIRST (H5 primary gate)
-                        if (P5 < thresholds.minH5) continue;
+                    const P5  = this.conditionalReturnProb(d, g, 5);
+                    const P10 = this.conditionalReturnProb(d, g, 10);
 
-                        // MEDIUM EARLY SECOND
-                        if (P10 < thresholds.minP10) continue;
 
-                        // SAFETY
-                        if (thresholds.require_g_lt_p90 && g >= p90) continue;
 
-                        // PRESSURE ZONE (adaptive): prefer digits close to P90, but relax if too strict.
-                        if (thresholds.pressureZoneEnabled) {
-                            if (p90Ratio < activeMinP90Ratio) continue;
-                            if (p90Ratio >= thresholds.pressureZoneMaxP90Ratio) continue;
-                        }
+                    const s20 = _survivalByDigit ? Number((_survivalByDigit.get(d) || {}).s20) : 0;
+                    if (!Number.isFinite(s20) || s20 > MAX_S20) continue;
 
-                        // Cold-stickiness / persistence filters
-                        const effectiveMaxPersistence = (
-                            regimeStatus.label === "STABLE" &&
-                            P10 >= (thresholds.minP10 + 0.05) &&
-                            extendRatio <= 1.3
-                        ) ? thresholds.maxPersistenceStableRelax : maxPersistence;
+                    if (s.gaps.length < thresholds.minSupport) continue;
+                    if (P5 < thresholds.minH5) continue;
+                    if (P10 < thresholds.minP10) continue;
+                    if (thresholds.require_g_lt_p90 && g >= p90) continue;
 
-                        if (s.persistenceScore > effectiveMaxPersistence) continue;
-                        if (s.consecutiveExtendingGaps > thresholds.maxExtend) continue;
-                        if (s.isUnstable) continue;
+                    if (s.persistenceScore > maxPersistence) continue;
+                    if (s.consecutiveExtendingGaps > thresholds.maxExtend) continue;
+                    if (s.isUnstable) continue;
 
-                        // Calculate score (still strongly favors closest-to-P90)
-                        const denom = Math.max(1 - activeMinP90Ratio, 1e-6);
-                        const pressureScore = thresholds.pressureZoneEnabled
-                            ? Math.max(0, Math.min(1, (p90Ratio - activeMinP90Ratio) / denom))
-                            : Math.max(0, Math.min(1, g / p90));
+                    const pressureScore = Math.max(0, Math.min(1, (p90Ratio - 0.78) / (0.92 - 0.78)));
 
-                        const score =
-                            0.45 * P10 +
-                            0.25 * P5 +
-                            0.20 * pressureScore +
-                            0.10 * (1 - s.persistenceScore / 100);
+                    const score =
+                        0.70 * P5 +
+                        0.20 * P10 +
+                        0.10 * pressureScore;
 
-                        if (!passBest || score > passBest.score) {
-                            passBest = {
-                                digit: d,
-                                score: score,
-                                P10: P10,
-                                P5: P5,
-                                gap: g,
-                                persistenceScore: s.persistenceScore,
-                                isUnstable: s.isUnstable
-                            };
-                        }
-                    }
-
-                    return passBest;
-                };
-
-                for (const activeMinP90Ratio of pressureTiers) {
-                    best = runPass(activeMinP90Ratio);
-                    if (best) {
-                        best.pressureMinP90Ratio = activeMinP90Ratio;
-                        break;
+                    if (!best || score > best.score) {
+                        best = {
+                            digit: d,
+                            score: score,
+                            P10: P10,
+                            P5: P5,
+                            gap: g,
+                            persistenceScore: s.persistenceScore,
+                            isUnstable: s.isUnstable,
+                            p90Ratio: p90Ratio,
+                            extendRatio: extendRatio
+                        };
                     }
                 }
 
@@ -1271,60 +1250,26 @@
                             (2.0 * (s.pm5 || 0)) + (1.0 * (s.pm10 || 0)) - (2.5 * (s.s20 || 0)) - (0.05 * Math.min(Number.isFinite(s.etm) ? s.etm : 100, 100));
                         const survNorm = 1 / (1 + Math.exp(-raw));
 
-                        const base = Number.isFinite(candidate.score) ? candidate.score : 0.0;
-                        const historyFactor = Math.min(1, (window.lastDigits.length / windowSize));
-                        const wBase = (typeof window.SURVIVAL_BLEND === 'number') ? window.SURVIVAL_BLEND : 0.35;
-                        const w = Math.max(0.10, Math.min(0.55, wBase * historyFactor));
-
                         candidate.survival = { ...s, survivalScore: raw, survivalNorm: survNorm };
-                        candidate.source = 'HYBRID';
-                        candidate.score = Math.max(0, Math.min(1, ((1 - w) * base) + (w * survNorm)));
-                    } else {
-                        candidate.source = 'HYBRID';
+                        candidate.source = 'BASE_ONLY';
+} else {
+                        candidate.source = 'BASE_ONLY';
                         candidate.survival = null;
                     }
                     return candidate;
                 };
 
-                // If base engine has no pick, use survival's best digit (still HYBRID)
-                if (!best && hasSurvival && survivalTop) {
-                    best = {
-                        digit: survivalTop.digit,
-                        score: survivalTop.survivalNorm ?? (1 / (1 + Math.exp(-(survivalTop.survivalScore || 0)))),
-                        P10: survivalTop.pm10 ?? 0,
-                        P5: survivalTop.pm5 ?? 0,
-                        gap: survivalTop.gap ?? 0,
-                        persistenceScore: (this.digitStats[survivalTop.digit]?.persistenceScore ?? 0),
-                        isUnstable: (this.digitStats[survivalTop.digit]?.isUnstable ?? false),
-                        source: 'HYBRID',
-                        survival: survivalTop
-                    };
-                } else {
-                    best = attachHybrid(best);
+                best = attachHybrid(best);
+
+                if (!best) {
+                    log('🚫 No digit passed final engine gates', 'ENGINE');
+                    this.currentRecommendation = null;
+                    document.getElementById('ai-recommended-digit').textContent = '-';
+                    document.getElementById('ai-digit-score').textContent = 'Score: 0.0% | P10: 0.0% | NO-TRADE';
+                    return;
                 }
 
-                // Optional override: if survival strongly prefers another digit, allow it to replace weak base picks.
-                if (best && hasSurvival && survivalTop && survivalTop.digit !== best.digit) {
-                    const baseScore = Number.isFinite(best.score) ? best.score : 0;
-                    const survTopNorm = survivalTop.survivalNorm ?? (1 / (1 + Math.exp(-(survivalTop.survivalScore || 0))));
-                    if (survTopNorm >= Math.max(0.62, baseScore + 0.08)) {
-                        best = {
-                            digit: survivalTop.digit,
-                            score: survTopNorm,
-                            P10: survivalTop.pm10 ?? 0,
-                            P5: survivalTop.pm5 ?? 0,
-                            gap: survivalTop.gap ?? 0,
-                            persistenceScore: (this.digitStats[survivalTop.digit]?.persistenceScore ?? 0),
-                            isUnstable: (this.digitStats[survivalTop.digit]?.isUnstable ?? false),
-                            source: 'HYBRID',
-                            survival: survivalTop
-                        };
-                    } else {
-                        // Ensure survival metrics are attached even if not overriding.
-                        best.survival = best.survival || survivalByDigit.get(best.digit) || null;
-                        best.source = 'HYBRID';
-                    }
-                }
+// Survival metrics are for diagnostics only (not used for ranking).
 
                 if (best) {
                     this.currentRecommendation = best;
@@ -1818,25 +1763,18 @@
 
                 const passSupport = support >= thresholds.minSupport;
                 const passP90 = !(thresholds.require_g_lt_p90 && g >= p90);
-                const passPressure = !thresholds.pressureZoneEnabled || (
-                    p90Ratio >= thresholds.pressureZoneMinP90Ratio &&
-                    p90Ratio < thresholds.pressureZoneMaxP90Ratio
-                );
+                const passPressure = (p90Ratio >= 0.78 && p90Ratio <= 0.92);
                 const passPersistence = s.persistenceScore <= effectiveMaxPersistence;
                 const passExtend = s.consecutiveExtendingGaps <= thresholds.maxExtend;
                 const passUnstable = !s.isUnstable;
                 const passP5 = P5 >= thresholds.minH5;
                 const passP10 = P10 >= thresholds.minP10;
-const denom = Math.max(1 - thresholds.pressureZoneMinP90Ratio, 1e-6);
-                const pressureScore = thresholds.pressureZoneEnabled
-                    ? Math.max(0, Math.min(1, (p90Ratio - thresholds.pressureZoneMinP90Ratio) / denom))
-                    : Math.max(0, Math.min(1, g / p90));
+const pressureScore = Math.max(0, Math.min(1, (p90Ratio - 0.78) / (0.92 - 0.78)));
 
                 const score =
-                    0.45 * P10 +
-                    0.25 * P5 +
-                    0.20 * pressureScore +
-                    0.10 * (1 - s.persistenceScore / 100);
+                    0.70 * P5 +
+                    0.20 * P10 +
+                    0.10 * pressureScore;
 const passScore = score >= scoreCutoff;
 
                 const passAll =
@@ -1948,6 +1886,29 @@ const isRecommended = engine.currentRecommendation && engine.currentRecommendati
         // CORE BOT FUNCTIONS - UPDATED FOR 10 SECOND PNL DISPLAY & NETWORK RECOVERY
         // ============================================================================
         
+
+        // ============================================================================
+        // EXECUTION DIGIT RESOLVER (Patch 5)
+        // Single source of truth for what digit is actually being traded / checked.
+        // ============================================================================
+        function getExecutionDigit() {
+            try {
+                // AI mode: prefer locked session digit; fall back to current AI recommendation
+                if (typeof sessionState !== 'undefined' && sessionState && sessionState.mode === 'ai') {
+                    const locked = sessionState.sessionDigit;
+                    if (Number.isInteger(locked) && locked >= 0 && locked <= 9) return locked;
+
+                    const rec = window.digitIntelligenceEngine?.currentRecommendation?.digit;
+                    if (Number.isInteger(rec) && rec >= 0 && rec <= 9) return rec;
+                }
+
+                const v = parseInt(document.getElementById('predictedDigit')?.value, 10);
+                if (Number.isInteger(v) && v >= 0 && v <= 9) return v;
+            } catch (_) {}
+
+            return 5;
+        }
+
         // Global State
         window.ws = null;
         window.req_id = 0;
@@ -1969,6 +1930,55 @@ const isRecommended = engine.currentRecommendation && engine.currentRecommendati
         window.baseStake = 1.0;
         window.currentStake = 1.0;
         window.multiplier = 1.15;
+
+        
+        // Release Window: Digit freeze (Patch 1)
+        window.frozenDigit = null;
+        window.freezeTick = null;
+
+        // Early-pressure multiplier window (Patch 2)
+        const EARLY_WINDOW = 3; // ticks
+// ================= RELEASE WINDOW STRAIN MODE =================
+        window.releaseWindow = {
+            tickIndex: 0,
+            gap: Array(10).fill(0),
+            lastSeen: Array(10).fill(-Infinity),
+            lastDigits: [],
+            gapHist: Array.from({ length: 10 }, () => []),
+            pm2Hits: Array(10).fill(0),
+            pm3Hits: Array(10).fill(0),
+            entropy: 2.5,
+
+            inTrade: false,
+            activeDigit: null,
+            tradeStartTick: null,
+            tradeCount: 0,
+
+            RELEASE_BAND: {
+  0: [7, 8],
+  1: [6, 7],
+  2: [6, 7],
+  3: [5, 6],
+  4: [6, 7],
+  5: [7, 8],
+  6: [6, 7],
+  7: [6, 7],
+  8: [5, 6],
+  9: [6, 7]
+},
+            EXEC_WINDOW: 3
+        };
+        // Rolling pm windows (local, NOT global)
+        window.pm2Window = Array.from({ length: 10 }, () => []);
+        window.pm3Window = Array.from({ length: 10 }, () => []);
+        const PM_WINDOW = 20;
+
+        // Release windows are single-shot events (no late fires)
+        window.releaseTickFired = Array(10).fill(false);
+
+
+        window.releaseLatency = [];
+
         window.maxTrades = 20;
         window.maxCycleTrades = 10;
         window.cycleRotations = 0;
@@ -1997,6 +2007,8 @@ const isRecommended = engine.currentRecommendation && engine.currentRecommendati
         window.lastTick = null;
         window.nextTradeAllowed = true;
         window.stopAfterWin = false;
+            window.frozenDigit = null;
+            window.freezeTick = null;
         window.pendingProposals = new Map();
         window.executionLock = false;
         
@@ -2094,6 +2106,74 @@ const isRecommended = engine.currentRecommendation && engine.currentRecommendati
             const lastChar = s[s.length - 1];
             const d = Number.parseInt(lastChar, 10);
             return Number.isNaN(d) ? NaN : d;
+        }
+
+
+        function computeEntropyShort(arr) {
+            if (arr.length < 3) return 2.5;
+            const c = Array(10).fill(0);
+            arr.forEach(d => c[d]++);
+            let H = 0;
+            const n = arr.length;
+            for (let i = 0; i < 10; i++) {
+                const p = c[i] / n;
+                if (p > 0) H -= p * Math.log(p);
+            }
+            return H / Math.log(10);
+        }
+
+        function releaseWindowJustOpened(d) {
+            const RW = window.releaseWindow;
+
+            if (window.releaseTickFired[d]) return false;
+            const h = RW.gapHist[d];
+            if (h.length < 2) return false;
+
+            const prevGap = h[h.length - 2];
+            const g = RW.gap[d];
+
+            // Patch 3: entry only on exact gap transition into band[0]
+            const band = RW.RELEASE_BAND[d];
+            if (!(prevGap < band[0] && g === band[0])) return false;
+
+            const pm2 = window.pm2Window[d].reduce((a,b)=>a+b,0) / PM_WINDOW;
+            const pm3 = window.pm3Window[d].reduce((a,b)=>a+b,0) / PM_WINDOW;
+            if (pm2 < 0.45 && pm3 < 0.65) return false;
+
+            if (RW.entropy > 1.9) return false;
+
+            // Patch 4: local dominance only (rolling pm3 window)
+            const dScore = window.pm3Window[d].reduce((a,b)=>a+b,0);
+            for (let x = 0; x < 10; x++) {
+                if (x !== d) {
+                    const xScore = window.pm3Window[x].reduce((a,b)=>a+b,0);
+                    if (xScore > dScore) return false;
+                }
+            }
+
+            return true;
+        }
+
+        function executeReleaseTrade(d, tick) {
+            const RW = window.releaseWindow;
+
+            // Patch 1: always trade the frozen digit once in-trade
+            const digitToTrade = (window.frozenDigit !== null) ? window.frozenDigit : d;
+
+            const digitInput = document.getElementById('predictedDigit');
+            if (digitInput) digitInput.value = digitToTrade;
+
+            // Patch 2: early-pressure multiplier (no aborting late trades)
+            if (window.freezeTick !== null) {
+                const age = RW.tickIndex - window.freezeTick;
+                if (age <= EARLY_WINDOW) {
+                    window.currentStake = parseFloat((window.currentStake * 1.15).toFixed(2));
+                } else {
+                    window.currentStake = parseFloat((window.currentStake * 1.02).toFixed(2));
+                }
+            }
+
+            executeTrade(tick);
         }
 
         
@@ -2440,68 +2520,6 @@ const isRecommended = engine.currentRecommendation && engine.currentRecommendati
             if (reason) log(`🔓 Session digit lock cleared (${reason})`, 'SESSION');
         }
 
-        // HYBRID UTILITIES (tail-risk gate + cycle rotation)
-        function getSurvivalForDigit(digit) {
-            const d = Number(digit);
-            if (!Number.isFinite(d) || d < 0 || d > 9) return null;
-
-            if (window.latestSurvivalByDigit && window.latestSurvivalByDigit[d]) {
-                return window.latestSurvivalByDigit[d];
-            }
-
-            const rec = window.digitIntelligenceEngine?.currentRecommendation;
-            if (rec && rec.digit === d && rec.survival) return rec.survival;
-
-            return null;
-        }
-
-        function pickBestLowTailRiskDigit(maxS20 = 0.05) {
-            if (!window.latestSurvivalByDigit) return null;
-
-            let best = null;
-            for (let d = 0; d <= 9; d++) {
-                const s = window.latestSurvivalByDigit[d];
-                if (!s) continue;
-
-                const s20 = Number(s.s20);
-                if (!Number.isFinite(s20) || s20 > maxS20) continue;
-
-                const raw =
-                    (2.0 * (s.pm5 || 0)) +
-                    (1.0 * (s.pm10 || 0)) -
-                    (2.5 * (s.s20 || 0)) -
-                    (0.05 * Math.min(Number.isFinite(s.etm) ? s.etm : 100, 100));
-
-                const norm = 1 / (1 + Math.exp(-raw));
-                if (!best || norm > best.norm) best = { digit: d, norm, s };
-            }
-            return best;
-        }
-
-        function rotateHybridDigit(reason = '') {
-            clearSessionDigitLock(reason || 'Rotate');
-            window.cycleRotations = (window.cycleRotations || 0) + 1;
-
-            // Reset progression (cycle reset)
-            window.martingaleStep = 0;
-            window.currentStake = window.baseStake;
-
-            if (sessionState.mode !== 'ai') return;
-
-            // Prefer a low tail-risk digit (s20 <= 5%), otherwise use current AI rec.
-            const pick = pickBestLowTailRiskDigit(0.05);
-            const nextDigit =
-                (pick && Number.isFinite(pick.digit)) ? pick.digit :
-                (window.digitIntelligenceEngine?.currentRecommendation?.digit ?? null);
-
-            if (nextDigit === null) return;
-
-            lockSessionDigit(nextDigit, true, reason || 'Rotate');
-            log(`🔁 Re-picked HYBRID digit ${nextDigit}${reason ? ' (' + reason + ')' : ''}`, 'SESSION');
-        }
-
-
-
 // CONNECTION STATUS
         function updateConnectionStatus() {
             const isConnected = window.ws && window.ws.readyState === WebSocket.OPEN;
@@ -2594,6 +2612,8 @@ const isRecommended = engine.currentRecommendation && engine.currentRecommendati
         }
         
         function updateExecutionLogic() {
+            // PATCH 4: Freeze the digit after first trade (no re-selection mid-cycle)
+            if (window.releaseWindow && window.releaseWindow.inTrade) return;
             if (sessionState.mode === 'ai') {
                 const hasRec = !!window.digitIntelligenceEngine.currentRecommendation;
                 const warmed = !!window.digitIntelligenceEngine.warmupDone;
@@ -2828,6 +2848,10 @@ const isRecommended = engine.currentRecommendation && engine.currentRecommendati
         
         // TICK HANDLER - FIXED DIGIT EXTRACTION (SPECIAL FIX FOR DIGIT 0)
         function handleTick(tick) {
+            const t0 = performance.now();
+            const RW = window.releaseWindow;
+            RW.tickIndex++;
+
             if (!window.isBotRunning || !tick || !tick.quote) return;
             
             const price = parseFloat(tick.quote);
@@ -2844,6 +2868,38 @@ const isRecommended = engine.currentRecommendation && engine.currentRecommendati
             if (isNaN(digit) || digit < 0 || digit > 9) {
                 log(`⚠️ Invalid digit from tick: ${tick.quote}`, 'WARNING');
                 return;
+            }
+
+
+            // ---- Release Window: Update gaps ----
+            for (let i = 0; i < 10; i++) RW.gap[i]++;
+            RW.gap[digit] = 0;
+            RW.lastSeen[digit] = RW.tickIndex;
+
+
+
+            // ---- Release Window: Rolling PM2/PM3 (last 20 ticks) ----
+            for (let d = 0; d < 10; d++) {
+                // pm2
+                window.pm2Window[d].push(RW.gap[d] <= 2 ? 1 : 0);
+                if (window.pm2Window[d].length > PM_WINDOW) window.pm2Window[d].shift();
+
+                // pm3
+                window.pm3Window[d].push(RW.gap[d] <= 3 ? 1 : 0);
+                if (window.pm3Window[d].length > PM_WINDOW) window.pm3Window[d].shift();
+            }
+            // ---- Release Window: Short window ----
+            RW.lastDigits.push(digit);
+            if (RW.lastDigits.length > 7) RW.lastDigits.shift();
+            RW.entropy = computeEntropyShort(RW.lastDigits);
+
+            // ---- Release Window: PM2 / PM3 ----
+            for (let d = 0; d < 10; d++) {
+                RW.gapHist[d].push(RW.gap[d]);
+                if (RW.gapHist[d].length > 5) RW.gapHist[d].shift();
+
+                if (RW.gap[d] <= 2) RW.pm2Hits[d]++;
+                if (RW.gap[d] <= 3) RW.pm3Hits[d]++;
             }
             
             // Track digit 0 occurrences for debugging
@@ -2901,6 +2957,65 @@ const isRecommended = engine.currentRecommendation && engine.currentRecommendati
             
             // Update connection status UI
             updateConnectionStatus();
+
+            // ---- Release Window: ENTRY LOGIC (FROZEN DIGIT) ----
+            if (!RW.inTrade && window.isBotRunning && window.nextTradeAllowed && !window.executionLock && window.digitIntelligenceEngine.currentRecommendation) {
+                const d = window.digitIntelligenceEngine.currentRecommendation.digit;
+                if (releaseWindowJustOpened(d)) {
+                    RW.inTrade = true;
+
+                    // Patch 1: freeze digit + start tick (no re-evaluation)
+                    window.frozenDigit = d;
+                    window.freezeTick = RW.tickIndex;
+
+                    RW.activeDigit = d;
+                    RW.tradeStartTick = RW.tickIndex;
+                    RW.tradeCount = 0;
+
+                    window.currentStake = window.baseStake;
+
+                    window.releaseTickFired[d] = true;
+                    log(`⚡ RELEASE WINDOW OPEN → DIGIT ${d} (FROZEN)`, 'STRAIN');
+                    executeReleaseTrade(d, tickData);
+                }
+            }
+
+            // ---- Release Window: HARD STOP (MATCH / MAX TRADES) ----
+            if (RW.inTrade) {
+                if (digit === RW.activeDigit) {
+                    log(`✅ MATCH ${digit} — STOP`, 'WIN');
+
+                    window.releaseTickFired[RW.activeDigit] = false;
+                    RW.inTrade = false;
+                    window.frozenDigit = null;
+                    window.freezeTick = null;
+
+                    resetAllState();
+                    stopBot();
+
+                    window.releaseLatency.push(performance.now() - t0);
+                    if (window.releaseLatency.length > 200) window.releaseLatency.shift();
+                    return;
+                }
+
+                if (RW.tradeCount >= window.maxTrades) {
+                    log(`⛔ MAX TRADES — STOP`, 'STOP');
+
+                    window.releaseTickFired[RW.activeDigit] = false;
+                    RW.inTrade = false;
+                    window.frozenDigit = null;
+                    window.freezeTick = null;
+
+                    resetAllState();
+                    stopBot();
+
+                    return;
+                }
+            }
+            // ---- Release Window: LATENCY LOGGING ----
+            window.releaseLatency.push(performance.now() - t0);
+            if (window.releaseLatency.length > 200) window.releaseLatency.shift();
+
         }
         
         // API RESPONSE HANDLER - MODIFIED FOR ENGINE INTEGRATION
@@ -2980,27 +3095,22 @@ const isRecommended = engine.currentRecommendation && engine.currentRecommendati
                 return;
             }
 
+            // Patch 1: ignore AI updates while a release-window trade is active
+            if (window.releaseWindow && window.releaseWindow.inTrade && window.frozenDigit !== null) {
+                const digitInput = document.getElementById('predictedDigit');
+                if (digitInput) digitInput.value = window.frozenDigit;
+            }
 
-            // 🧱 HARD TAIL-RISK GATE (s20 <= 5%)
-            if (sessionState.mode === 'ai' && window.isBotRunning) {
-                const lockedDigit = (sessionState.sessionDigit !== null) ? sessionState.sessionDigit : parseInt(document.getElementById('predictedDigit').value);
-                const s = getSurvivalForDigit(lockedDigit);
-
-                if (!s || !Number.isFinite(Number(s.s20))) {
-                    log('🧱 Tail-risk gate: Survival data not ready — no trade', 'ENGINE');
-                    updateTradeStatus('NO TRADE', 'Survival warming up', 'Waiting for more ticks', 'loss');
-                    return;
-                }
-
-                const s20 = Number(s.s20);
-                if (s20 > 0.05) {
-                    log(`🧱 Tail-risk gate: s20 ${(s20 * 100).toFixed(1)}% > 5% — re-picking`, 'ENGINE');
-                    updateTradeStatus('NO TRADE', `Tail risk too high (s20 ${(s20 * 100).toFixed(1)}%)`, 'Re-picking safer digit', 'loss');
-                    rotateHybridDigit('Tail-risk gate');
-                    return;
+            // Patch 2: early-pressure multiplier (applied per trade attempt)
+            if (window.releaseWindow && window.releaseWindow.inTrade && window.freezeTick !== null) {
+                const age = window.releaseWindow.tickIndex - window.freezeTick;
+                if (age <= EARLY_WINDOW) {
+                    window.currentStake = parseFloat((window.currentStake * 1.15).toFixed(2));
+                } else {
+                    window.currentStake = parseFloat((window.currentStake * 1.02).toFixed(2));
                 }
             }
-            
+
             window.executionLock = true;
             window.nextTradeAllowed = false;
             
@@ -3014,7 +3124,7 @@ const isRecommended = engine.currentRecommendation && engine.currentRecommendati
                 
                 updateTradeStatus(
                     'TRADING',
-                    `Trade #${window.tradeCount}: $${window.currentStake.toFixed(2)} on digit ${parseInt(document.getElementById('predictedDigit').value)}`,
+                    `Trade #${window.tradeCount}: $${window.currentStake.toFixed(2)} on digit ${getExecutionDigit()}`,
                     'Executing trade...',
                     'trade'
                 );
@@ -3034,7 +3144,7 @@ const isRecommended = engine.currentRecommendation && engine.currentRecommendati
         function executeTrade(tick) {
             const contractType = document.getElementById('contractType').value;
             const symbol = document.getElementById('symbol').value;
-            const predictedDigit = parseInt(document.getElementById('predictedDigit').value);
+            const predictedDigit = getExecutionDigit();
             
             let stake = window.currentStake;
             trackTradeInvestment(stake);
@@ -3069,7 +3179,7 @@ const isRecommended = engine.currentRecommendation && engine.currentRecommendati
         function checkForImmediateWin(tick) {
             if (!window.isBotRunning || window.stopAfterWin) return false;
             
-            const predictedDigit = parseInt(document.getElementById('predictedDigit').value);
+            const predictedDigit = getExecutionDigit();
             const tickDigit = parseInt(tick.digit);
             
             if (tickDigit === predictedDigit) {
@@ -3138,19 +3248,17 @@ const isRecommended = engine.currentRecommendation && engine.currentRecommendati
                 window.currentStake = parseFloat(newStake.toFixed(2));
 
                 if (window.cycleLosses >= window.maxCycleTrades) {
-                    log(`🧯 LOSS CAP REACHED (${window.maxCycleTrades}) — switching HYBRID digit (keeping martingale)`, 'CRITICAL');
+                    log(`🧯 LOSS CAP REACHED (${window.maxCycleTrades}) — resetting cycle (no digit switch)`, 'CRITICAL');
                     updateTradeStatus(
-                        'SWITCH DIGIT 🔁',
+                        'LOSS CAP 🧯',
                         `Loss cap reached (${window.maxCycleTrades})`,
-                        'Switching HYBRID digit; keeping martingale progression...',
+                        'Resetting cycle counters; keeping digit lock...',
                         'loss'
                     );
 
                     window.cycleLosses = 0;
-
-                    if (window.isBotRunning && sessionState.mode === 'ai') {
-                        rotateHybridDigit(`Loss cap ${window.maxCycleTrades} (keep martingale)`);
-                    }
+                    window.martingaleStep = 0;
+                    window.currentStake = window.baseStake;
                 }
                 log(`❌ LOSS. Next stake: $${window.currentStake.toFixed(2)} (Step: ${window.martingaleStep})`, 'LOSS');
                 
@@ -3252,6 +3360,8 @@ window.isBotRunning = true;
             window.isBotRunning = false;
             window.nextTradeAllowed = false;
             window.stopAfterWin = false;
+            window.frozenDigit = null;
+            window.freezeTick = null;
             updateButtonState();
             
             log('⏹️ Bot stopped', 'SYSTEM');
@@ -3533,6 +3643,21 @@ window.isBotRunning = true;
             window.executionLock = false;
             window.nextTradeAllowed = true;
             updateSessionDisplay();
+
+            // Release Window trade accounting / max-trades safety
+            try {
+                const RW = window.releaseWindow;
+                if (RW && RW.inTrade) {
+                    RW.tradeCount++;
+                    if (RW.tradeCount >= window.maxTrades) {
+                        log(`⛔ MAX TRADES — STOP`, 'STOP');
+                        RW.inTrade = false;
+                        stopBot();
+                        return;
+                    }
+                }
+            } catch (_) {}
+
             
             if (!isSuccess) {
                 updateStake('loss');
@@ -3582,6 +3707,8 @@ window.isBotRunning = true;
             window.waitingForTradeResult = false;
             window.nextTradeAllowed = true;
             window.stopAfterWin = false;
+            window.frozenDigit = null;
+            window.freezeTick = null;
             
             // Reset digit zero tracker
             window.digitZeroTracker = {
