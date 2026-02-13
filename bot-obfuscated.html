@@ -1240,12 +1240,21 @@
                 let progression = [];
                 let finalStake = baseStake;
                 for (let i = 1; i <= maxTrades; i++) {
-                    if (i === 1) currentStake = baseStake;
-                    else currentStake *= multiplier;
-                    currentStake = Math.round(currentStake * 100) / 100;
+                    // Stake rule: Trade #1 uses base; Trade #2 uses base * multiplier^2 (e.g. 1 * 1.15^2 = 1.32)
+                    const stake = (i === 1)
+                        ? baseStake
+                        : (baseStake * Math.pow(multiplier, i));
+
+                    currentStake = Math.round(stake * 100) / 100;
+
                     totalRequired += currentStake;
                     finalStake = currentStake;
-                    progression.push({ trade: i, stake: currentStake.toFixed(2), cumulative: Math.round(totalRequired * 100) / 100 });
+
+                    progression.push({
+                        trade: i,
+                        stake: currentStake.toFixed(2),
+                        cumulative: Math.round(totalRequired * 100) / 100
+                    });
                 }
                 totalRequired = Math.round(totalRequired * 100) / 100;
                 const profitOnWin = (finalStake * 9) - totalRequired;
@@ -2170,8 +2179,9 @@
             } else if (winOrLoss === 'loss') {
                 window.martingaleStep = (window.martingaleStep || 0) + 1;
                 window.cycleLosses = (window.cycleLosses || 0) + 1;
-                const newStake = window.currentStake * window.multiplier;
-                window.currentStake = parseFloat(newStake.toFixed(2));
+                const exp = (window.martingaleStep || 0) + 1; // Trade #2 => exp=2
+                const newStake = window.baseStake * Math.pow(window.multiplier, exp);
+                window.currentStake = Math.round(newStake * 100) / 100;
                 log(`❌ LOSS. Next stake: $${window.currentStake.toFixed(2)} (Step: ${window.martingaleStep})`, 'LOSS');
                 updateTradeStatus('LOSS ❌', `Lost - Next: $${window.currentStake.toFixed(2)}`, 'Increasing stake', 'loss');
                 updatePnL();
