@@ -1971,7 +1971,22 @@
 
         function executeReleaseTrade(d, tick) {
             const digitToTrade = (window.frozenDigit !== null) ? window.frozenDigit : d;
-            if (!window.cycleActive || window.cycleTradeCount >= window.cycleLimit) return;
+            
+            // Band gate: do not execute release trades unless digit is inside pressure zone
+            try {
+                const activeStats = buildDigitStatsForCycle(digitToTrade);
+                if (!isDigitInsideBand(activeStats)) {
+                    log(`⏳ Waiting for band — p90Ratio=${(activeStats.p90Ratio || 0).toFixed(3)}`, 'ENGINE');
+                    window.executionLock = false;
+                    window.nextTradeAllowed = true;
+                    return;
+                }
+            } catch (_) {
+                window.executionLock = false;
+                window.nextTradeAllowed = true;
+                return;
+            }
+if (!window.cycleActive || window.cycleTradeCount >= window.cycleLimit) return;
             document.getElementById('predictedDigit').value = digitToTrade;
             window.nextTradeAllowed = false;
             window.executionLock = true;
@@ -2068,14 +2083,7 @@
             if (window.releaseWindow && window.releaseWindow.inTrade && window.frozenDigit !== null) {
                 document.getElementById('predictedDigit').value = window.frozenDigit;
             }
-            if (window.releaseWindow && window.releaseWindow.inTrade && window.freezeTick !== null) {
-                const age = window.releaseWindow.tickIndex - window.freezeTick;
-                if (age <= 3) {
-                    window.currentStake = parseFloat((window.currentStake * 1.15).toFixed(2));
-                } else {
-                    window.currentStake = parseFloat((window.currentStake * 1.02).toFixed(2));
-                }
-            }
+
             window.executionLock = true;
             window.nextTradeAllowed = false;
             try {
@@ -2106,7 +2114,23 @@
             const contractType = document.getElementById('contractType').value;
             const symbol = document.getElementById('symbol').value;
             const predictedDigit = getExecutionDigit();
-            let stake = window.currentStake;
+            
+            // Band gate: never fire trades outside the pressure zone (0.80–0.88)
+            try {
+                const activeStats = buildDigitStatsForCycle(predictedDigit);
+                if (!isDigitInsideBand(activeStats)) {
+                    log(`⏳ Waiting for band — p90Ratio=${(activeStats.p90Ratio || 0).toFixed(3)}`, 'ENGINE');
+                    window.executionLock = false;
+                    window.nextTradeAllowed = true;
+                    return;
+                }
+            } catch (_) {
+                // If stats are unavailable, fail closed (no trade)
+                window.executionLock = false;
+                window.nextTradeAllowed = true;
+                return;
+            }
+let stake = window.currentStake;
             trackTradeInvestment(stake);
             const proposalRequest = {
                 proposal: 1,
