@@ -3,178 +3,88 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Deriv Over/Under Bot (Balanced AI + Strike Mode + Real PnL + Token + Minimizable Calculator)</title>
+  <title>Deriv DIGITDIFF Bot (Real Trades + Token + Correct PnL)</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
     body { font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; background:#111827; }
-    #log-area::-webkit-scrollbar{ width:4px; }
-    #log-area::-webkit-scrollbar-thumb{ background:#4ade80; border-radius:2px; }
-    #log-area::-webkit-scrollbar-track{ background:#374151; }
-
-    .badge-ok { background: linear-gradient(90deg, #10b981, #059669) !important; }
-    .badge-bad { background: linear-gradient(90deg, #dc2626, #b91c1c) !important; }
-    .badge-warn { background: linear-gradient(90deg, #f59e0b, #d97706) !important; }
-
-    @keyframes win-pulse { 0%{box-shadow:0 0 5px #10B981} 50%{box-shadow:0 0 30px #10B981} 100%{box-shadow:0 0 5px #10B981} }
-    .win-glow{ animation:win-pulse 1s infinite; }
-
+    #log::-webkit-scrollbar{ width:4px; }
+    #log::-webkit-scrollbar-thumb{ background:#4ade80; border-radius:2px; }
+    #log::-webkit-scrollbar-track{ background:#374151; }
     .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
   </style>
 </head>
 
 <body class="min-h-screen p-4 sm:p-8 flex items-start justify-center">
-  <div class="w-full max-w-6xl bg-gray-800 text-gray-100 shadow-2xl rounded-xl p-5 md:p-6">
-    <div class="flex items-center justify-between mb-4">
-      <h1 class="text-2xl sm:text-3xl font-extrabold text-blue-400 border-b border-gray-700 pb-2 w-full">
-        🔮 Over/Under Bot (Balanced AI)
-        <span id="status-badge" class="ml-3 inline-flex items-center px-3 py-1 text-sm font-medium rounded-full badge-bad text-white shadow-md">
-          🔴 DISCONNECTED
+  <div class="w-full max-w-5xl bg-gray-800 text-gray-100 shadow-2xl rounded-xl p-5 md:p-6 space-y-5">
+    <div class="flex items-center justify-between">
+      <h1 class="text-2xl sm:text-3xl font-extrabold text-blue-400">
+        🎲 Deriv DIGITDIFF Bot
+        <span id="badge" class="ml-3 inline-flex items-center px-3 py-1 text-sm font-medium rounded-full bg-red-600 text-white shadow-md">
+          DISCONNECTED
         </span>
       </h1>
     </div>
 
-    <!-- TOKEN BAR -->
-    <div class="bg-gray-900 border border-gray-700 rounded-xl p-4 shadow-lg mb-6">
-      <div class="flex flex-col md:flex-row gap-3 md:items-end">
-        <div class="flex-1">
-          <label for="token" class="block text-xs font-semibold text-gray-300 mb-1">Deriv API Token</label>
-          <input id="token" type="password" placeholder="Paste your token here"
+    <div class="bg-gray-900 border border-gray-700 rounded-xl p-4">
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-3 items-end">
+        <div class="md:col-span-2">
+          <label class="block text-xs font-semibold text-gray-300 mb-1">Deriv API Token</label>
+          <input id="token" type="password" placeholder="Paste token..."
                  class="w-full rounded-md bg-gray-700 border border-gray-600 text-white px-3 py-2 text-sm" />
-          <div class="text-[11px] text-gray-400 mt-1">
-            Stored locally in your browser if you click “Save Token”.
-          </div>
+          <div class="text-[11px] text-gray-400 mt-1">Stored locally only if you click Save.</div>
         </div>
         <div class="flex gap-2">
-          <button id="saveTokenBtn" class="px-4 py-2 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 transition">Save Token</button>
-          <button id="clearTokenBtn" class="px-4 py-2 bg-gray-600 text-white font-bold rounded-lg hover:bg-gray-700 transition">Clear</button>
+          <button id="saveToken" class="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg font-bold">Save</button>
+          <button id="clearToken" class="w-full px-4 py-2 bg-gray-600 hover:bg-gray-700 rounded-lg font-bold">Clear</button>
         </div>
       </div>
     </div>
 
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-      <!-- LEFT -->
-      <div class="lg:col-span-1 space-y-6">
-        <div class="bg-gray-900 border border-gray-700 rounded-xl p-4 shadow-lg">
-          <h2 class="text-lg font-bold text-cyan-400 mb-4 pb-2 border-b border-gray-700">📊 MARKET</h2>
-
-          <div class="mb-4 p-3 bg-gray-800 rounded-lg border border-gray-600 text-xs">
-            <div class="grid grid-cols-2 gap-2">
-              <div><span class="text-gray-400">Status:</span> <span id="market_status" class="ml-2 font-bold text-red-400">Offline</span></div>
-              <div><span class="text-gray-400">Symbol:</span> <span id="current_symbol" class="ml-2 font-bold text-cyan-400">V. 100 Index</span></div>
-              <div><span class="text-gray-400">Ticks:</span> <span id="ticks_received" class="ml-2 font-bold text-green-400">0</span></div>
-              <div><span class="text-gray-400">Rate:</span> <span id="current_tick_rate" class="ml-2 font-bold text-blue-400">0/s</span></div>
-            </div>
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+      <div class="bg-gray-900 border border-gray-700 rounded-xl p-4 space-y-3">
+        <div class="grid grid-cols-2 gap-2 text-xs">
+          <div class="p-2 bg-gray-800 rounded border border-gray-700">
+            <div class="text-gray-400">Symbol</div>
+            <div id="symLabel" class="font-bold text-cyan-300">R_100</div>
           </div>
-
-          <div class="mb-4 p-3 bg-gray-800 rounded-lg border border-blue-500/50">
-            <h3 class="text-sm font-bold text-blue-400 mb-3 flex items-center">
-              🧠 BALANCED AI ENGINE
-              <span id="analysis-progress" class="ml-auto text-xs bg-gray-700 px-2 py-1 rounded">0/100</span>
-            </h3>
-
-            <div class="mb-3 p-2 bg-gray-900 rounded border border-gray-700">
-              <div class="text-xs font-semibold text-gray-300 mb-1">Trading Gate:</div>
-              <div id="window-status" class="text-sm font-bold text-yellow-400">Collecting data...</div>
-              <div class="text-[11px] text-gray-400 mt-1">Trades can start after Min Ticks and low volatility.</div>
-            </div>
-
-            <div class="mb-3 p-3 bg-gray-900 rounded border border-green-500/30 text-center">
-              <div class="text-xs font-semibold text-green-400 mb-1">Median (rolling window)</div>
-              <div id="median-value" class="text-4xl font-bold text-white">-</div>
-              <div id="median-interpretation" class="text-xs text-gray-400 mt-1">Waiting for data</div>
-            </div>
-
-            <div class="grid grid-cols-2 gap-2 mb-3">
-              <div class="p-3 bg-gray-900 rounded border border-gray-700 text-center">
-                <div class="text-xs font-semibold text-gray-300 mb-1">Volatility</div>
-                <div id="volatility-value" class="text-xl font-bold text-white mono">-</div>
-                <div id="volatility-note" class="text-[11px] text-gray-400 mt-1">Needs ≥ 10 ticks</div>
-              </div>
-              <div class="p-3 bg-gray-900 rounded border border-gray-700 text-center">
-                <div class="text-xs font-semibold text-gray-300 mb-1">Cluster</div>
-                <div id="cluster-value" class="text-xl font-bold text-white mono">-</div>
-                <div class="text-[11px] text-gray-400 mt-1">Last 20 ticks</div>
-              </div>
-            </div>
-
-            <div class="p-3 bg-gray-900 rounded border border-purple-500/30 text-center">
-              <div class="text-xs font-semibold text-purple-400 mb-1">RECOMMENDATION</div>
-              <div id="recommended-side" class="text-2xl font-bold text-white">---</div>
-              <div id="confidence-score" class="text-xs text-gray-400 mt-1">Confidence: --</div>
-              <div id="mode-badge" class="mt-2 text-xs font-bold text-gray-300">Mode: -</div>
-            </div>
+          <div class="p-2 bg-gray-800 rounded border border-gray-700">
+            <div class="text-gray-400">Balance</div>
+            <div id="bal" class="font-bold text-green-400">$---</div>
           </div>
-
-          <div class="p-3 bg-gray-800 rounded border border-blue-500/30">
-            <h3 class="text-sm font-bold text-blue-300 mb-2">Session</h3>
-            <div class="flex items-center justify-between">
-              <div>
-                <div class="text-xs text-gray-300">Side:</div>
-                <div id="session_side" class="text-xl font-bold text-blue-400">-</div>
-              </div>
-              <div>
-                <div class="text-xs text-gray-300">Trades:</div>
-                <div id="session_trades" class="text-sm font-bold text-yellow-400">0/0</div>
-              </div>
-            </div>
-            <div class="mt-3 text-xs text-gray-400">
-              Strike mode uses <span class="text-yellow-300 font-bold">flat stake</span>. Stability mode uses <span class="text-blue-300 font-bold">martingale</span>.
-            </div>
+          <div class="p-2 bg-gray-800 rounded border border-gray-700">
+            <div class="text-gray-400">Trades</div>
+            <div id="trades" class="font-bold text-yellow-300">0/0</div>
+          </div>
+          <div class="p-2 bg-gray-800 rounded border border-gray-700">
+            <div class="text-gray-400">Session P/L</div>
+            <div id="pnl" class="font-bold text-white">$0.00</div>
           </div>
         </div>
 
-        <!-- Minimizable Calculator -->
-        <div class="bg-gray-900 border border-gray-700 rounded-xl p-4 shadow-lg">
-          <div class="flex items-center justify-between mb-3">
-            <h2 class="text-lg font-bold text-orange-300">🧮 Martingale Calculator</h2>
-            <button id="calcToggleBtn" class="text-xs px-2 py-1 rounded bg-gray-700 hover:bg-gray-600">
-              <span id="calcToggleIcon">−</span>
-            </button>
-          </div>
+        <div class="p-3 bg-gray-800 rounded border border-gray-700">
+          <div class="text-xs text-gray-400">Last Tick</div>
+          <div id="tick" class="text-lg font-bold text-white mono">---</div>
+          <div id="digit" class="text-xs text-green-300">Digit: ?</div>
+        </div>
 
-          <div id="calcBody">
-            <div class="grid grid-cols-2 gap-3">
-              <div>
-                <label class="block text-xs font-semibold text-gray-300 mb-1">Base Stake ($)</label>
-                <input id="calc_base" type="number" min="0.35" step="0.01" value="1.00"
-                       class="w-full rounded-md bg-gray-700 border border-gray-600 text-white px-2 py-1.5 text-sm">
-              </div>
-              <div>
-                <label class="block text-xs font-semibold text-gray-300 mb-1">Multiplier</label>
-                <input id="calc_mult" type="number" min="1.0" step="0.1" value="1.5"
-                       class="w-full rounded-md bg-gray-700 border border-gray-600 text-white px-2 py-1.5 text-sm">
-              </div>
-              <div class="col-span-2">
-                <label class="block text-xs font-semibold text-gray-300 mb-1">Steps</label>
-                <input id="calc_steps" type="number" min="1" max="20" step="1" value="3"
-                       class="w-full rounded-md bg-gray-700 border border-gray-600 text-white px-2 py-1.5 text-sm">
-              </div>
-            </div>
+        <div class="p-3 bg-gray-800 rounded border border-gray-700">
+          <div class="text-xs text-gray-400">AI Barrier (least frequent digit)</div>
+          <div id="barrier" class="text-2xl font-bold text-orange-300 mono">-</div>
+          <div class="text-[11px] text-gray-400 mt-1">Uses rolling digit frequency window.</div>
+        </div>
 
-            <button id="calcBtn" class="mt-3 w-full px-4 py-2 bg-orange-600 hover:bg-orange-700 rounded-lg font-bold text-white">
-              Calculate
-            </button>
-
-            <div class="mt-3 grid grid-cols-2 gap-2 text-xs">
-              <div class="p-2 bg-gray-800 rounded border border-gray-700">
-                <div class="text-gray-400">Total Required</div>
-                <div id="calc_total" class="text-white font-bold">$0.00</div>
-              </div>
-              <div class="p-2 bg-gray-800 rounded border border-gray-700">
-                <div class="text-gray-400">Max Stake</div>
-                <div id="calc_max" class="text-white font-bold">$0.00</div>
-              </div>
-            </div>
-          </div>
+        <div class="p-3 bg-gray-800 rounded border border-gray-700">
+          <div class="text-xs text-gray-400">Status</div>
+          <div id="status" class="text-sm font-bold text-gray-200">Ready</div>
+          <div id="status2" class="text-xs text-gray-400">Paste token → Start</div>
         </div>
       </div>
 
-      <!-- RIGHT -->
-      <div class="lg:col-span-2">
-        <div class="grid grid-cols-2 gap-3 mb-6">
+      <div class="lg:col-span-2 bg-gray-900 border border-gray-700 rounded-xl p-4 space-y-3">
+        <div class="grid grid-cols-2 md:grid-cols-3 gap-3">
           <div>
-            <label for="symbol" class="block text-xs font-semibold text-gray-300 mb-1">Symbol</label>
-            <select id="symbol" class="w-full rounded-md bg-gray-700 border border-gray-600 text-white px-2 py-1.5 text-sm">
+            <label class="block text-xs font-semibold text-gray-300 mb-1">Symbol</label>
+            <select id="symbol" class="w-full rounded-md bg-gray-700 border border-gray-600 text-white px-2 py-2 text-sm">
               <option value="R_10">V. 10 Index</option>
               <option value="R_25">V. 25 Index</option>
               <option value="R_50">V. 50 Index</option>
@@ -184,242 +94,105 @@
           </div>
 
           <div>
-            <label for="analysis_window" class="block text-xs font-semibold text-gray-300 mb-1">Rolling Window</label>
-            <select id="analysis_window" class="w-full rounded-md bg-gray-700 border border-gray-600 text-white px-2 py-1.5 text-sm">
-              <option value="20">20</option>
-              <option value="50">50</option>
-              <option value="100" selected>100</option>
-              <option value="200">200</option>
-            </select>
+            <label class="block text-xs font-semibold text-gray-300 mb-1">Rolling Window</label>
+            <input id="window" type="number" min="10" max="500" value="100"
+                   class="w-full rounded-md bg-gray-700 border border-gray-600 text-white px-2 py-2 text-sm" />
           </div>
 
           <div>
-            <label for="min_ticks" class="block text-xs font-semibold text-gray-300 mb-1">Min Ticks Before Trading</label>
-            <input id="min_ticks" type="number" min="1" max="500" value="10"
-                   class="w-full rounded-md bg-gray-700 border border-gray-600 text-white px-2 py-1.5 text-sm">
+            <label class="block text-xs font-semibold text-gray-300 mb-1">Min Ticks</label>
+            <input id="minTicks" type="number" min="1" max="500" value="20"
+                   class="w-full rounded-md bg-gray-700 border border-gray-600 text-white px-2 py-2 text-sm" />
           </div>
 
           <div>
-            <label for="vol_threshold" class="block text-xs font-semibold text-gray-300 mb-1">Volatility Threshold</label>
-            <input id="vol_threshold" type="number" min="0" step="0.1" value="4.5"
-                   class="w-full rounded-md bg-gray-700 border border-gray-600 text-white px-2 py-1.5 text-sm">
+            <label class="block text-xs font-semibold text-gray-300 mb-1">Base Stake ($)</label>
+            <input id="baseStake" type="number" min="0.35" step="0.01" value="1.00"
+                   class="w-full rounded-md bg-gray-700 border border-gray-600 text-white px-2 py-2 text-sm" />
           </div>
 
           <div>
-            <label for="max_trades" class="block text-xs font-semibold text-gray-300 mb-1">Max Trades (session)</label>
-            <input id="max_trades" type="number" min="1" max="500" value="10"
-                   class="w-full rounded-md bg-gray-700 border border-gray-600 text-white px-2 py-1.5 text-sm">
+            <label class="block text-xs font-semibold text-gray-300 mb-1">Multiplier</label>
+            <input id="mult" type="number" min="1.0" step="0.1" value="1.5"
+                   class="w-full rounded-md bg-gray-700 border border-gray-600 text-white px-2 py-2 text-sm" />
           </div>
 
           <div>
-            <label for="base_stake" class="block text-xs font-semibold text-gray-300 mb-1">Base Stake ($)</label>
-            <input id="base_stake" type="number" min="0.35" step="0.01" value="1.00"
-                   class="w-full rounded-md bg-gray-700 border border-gray-600 text-white px-2 py-1.5 text-sm">
+            <label class="block text-xs font-semibold text-gray-300 mb-1">Max Steps</label>
+            <input id="steps" type="number" min="0" max="20" value="3"
+                   class="w-full rounded-md bg-gray-700 border border-gray-600 text-white px-2 py-2 text-sm" />
           </div>
 
           <div>
-            <label for="multiplier" class="block text-xs font-semibold text-gray-300 mb-1">Multiplier</label>
-            <input id="multiplier" type="number" min="1.0" step="0.1" value="1.5"
-                   class="w-full rounded-md bg-gray-700 border border-gray-600 text-white px-2 py-1.5 text-sm">
+            <label class="block text-xs font-semibold text-gray-300 mb-1">Max Trades</label>
+            <input id="maxTrades" type="number" min="1" max="500" value="10"
+                   class="w-full rounded-md bg-gray-700 border border-gray-600 text-white px-2 py-2 text-sm" />
           </div>
 
           <div>
-            <label for="max_steps" class="block text-xs font-semibold text-gray-300 mb-1">Max Steps</label>
-            <input id="max_steps" type="number" min="0" max="20" step="1" value="3"
-                   class="w-full rounded-md bg-gray-700 border border-gray-600 text-white px-2 py-1.5 text-sm">
-          </div>
-
-          <div>
-            <label for="stop_mode" class="block text-xs font-semibold text-gray-300 mb-1">Stop Mode</label>
-            <select id="stop_mode" class="w-full rounded-md bg-gray-700 border border-gray-600 text-white px-2 py-1.5 text-sm">
+            <label class="block text-xs font-semibold text-gray-300 mb-1">Stop Mode</label>
+            <select id="stopMode" class="w-full rounded-md bg-gray-700 border border-gray-600 text-white px-2 py-2 text-sm">
               <option value="firstWin" selected>Stop on first WIN</option>
-              <option value="breakEven">Recover to break-even (PnL ≥ 0)</option>
+              <option value="breakEven">Stop at break-even (PnL ≥ 0)</option>
               <option value="targetProfit">Stop at target profit</option>
             </select>
           </div>
 
           <div>
-            <label for="target_profit" class="block text-xs font-semibold text-gray-300 mb-1">Target Profit ($)</label>
-            <input id="target_profit" type="number" min="0" step="0.01" value="1.00"
-                   class="w-full rounded-md bg-gray-700 border border-gray-600 text-white px-2 py-1.5 text-sm">
-          </div>
-
-          <div class="col-span-2">
-            <label class="block text-xs font-semibold text-gray-300 mb-1">Mode</label>
-            <div class="grid grid-cols-2 gap-2">
-              <button id="mode_smart" class="px-4 py-2 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 transition">🧠 SMART</button>
-              <button id="mode_fixed" class="px-4 py-2 bg-gray-600 text-white font-bold rounded-lg hover:bg-gray-700 transition">🔒 FIXED</button>
-            </div>
-          </div>
-
-          <div class="col-span-2" id="fixed_side_container" style="display:none;">
-            <label class="block text-xs font-semibold text-gray-300 mb-1">Fixed Side</label>
-            <div class="grid grid-cols-2 gap-2">
-              <button id="side_over" class="px-4 py-2 bg-blue-600 text-white font-bold rounded-lg">OVER2</button>
-              <button id="side_under" class="px-4 py-2 bg-gray-600 text-white font-bold rounded-lg">UNDER7</button>
-            </div>
+            <label class="block text-xs font-semibold text-gray-300 mb-1">Target Profit ($)</label>
+            <input id="targetProfit" type="number" min="0" step="0.01" value="1.00"
+                   class="w-full rounded-md bg-gray-700 border border-gray-600 text-white px-2 py-2 text-sm" />
           </div>
         </div>
 
-        <div class="grid grid-cols-4 gap-2 mb-4">
-          <div class="bg-gray-700 rounded-lg p-2 col-span-2">
-            <p class="text-[10px] text-green-500">Current Tick</p>
-            <p id="metricLiveTick" class="text-lg font-bold text-white">---</p>
-            <p id="metricLastDigit" class="text-xs text-green-300">Digit: ?</p>
-          </div>
-          <div class="bg-gray-700 rounded-lg p-2">
-            <p class="text-[10px] text-green-500">Balance</p>
-            <p id="metricBalance" class="text-lg font-bold text-green-400">$---</p>
-          </div>
-          <div class="bg-gray-700 rounded-lg p-2">
-            <p class="text-[10px] text-green-500">Trades</p>
-            <p id="metricTradeCount" class="text-lg font-bold text-white">0</p>
-          </div>
-          <div class="bg-gray-700 rounded-lg p-2 col-span-2">
-            <p class="text-[10px] text-lime-400">Session P/L (REAL)</p>
-            <p id="metricTotalProfit" class="text-lg font-bold text-white">$0.00</p>
-          </div>
-          <div class="bg-gray-700 rounded-lg p-2 col-span-2">
-            <p class="text-[10px] text-green-500">Next Stake</p>
-            <p id="metricCurrentStake" class="text-lg font-bold text-white">$0.00</p>
-          </div>
-        </div>
-
-        <div id="trade-status" class="bg-gray-900 rounded-lg p-3 border border-yellow-500/50 mb-4">
-          <div class="flex justify-between items-center mb-1">
-            <p class="text-xs font-semibold text-yellow-500">TRADE STATUS</p>
-            <p id="status-badge-small" class="text-xs text-gray-400">READY</p>
-          </div>
-          <p id="status-message" class="text-sm font-bold text-gray-300">Waiting for start...</p>
-          <p id="next-action" class="text-xs text-yellow-400 mt-1">Paste token then click START</p>
-        </div>
-
-        <div class="flex justify-center my-5">
-          <button id="toggleButton"
-                  class="w-full md:w-1/2 px-6 py-3 bg-green-600 text-white font-bold text-lg rounded-lg shadow-xl hover:bg-green-700 transition">
-            🚀 START BOT
+        <div class="flex justify-center pt-2">
+          <button id="toggle"
+                  class="w-full md:w-2/3 px-6 py-3 bg-green-600 hover:bg-green-700 rounded-lg font-extrabold text-lg">
+            START
           </button>
         </div>
 
         <div>
-          <h2 class="text-lg font-bold text-gray-300 mb-2 border-b border-gray-700 pb-1">Structured Logs</h2>
-          <div id="log-area" class="h-80 bg-gray-900 text-lime-400 p-2.5 rounded-lg overflow-y-scroll text-xs whitespace-pre-wrap"></div>
+          <h2 class="text-sm font-bold text-gray-300 mb-2 border-b border-gray-700 pb-1">Logs</h2>
+          <div id="log" class="h-72 bg-gray-950 border border-gray-800 rounded-lg p-3 text-xs text-lime-300 overflow-y-scroll whitespace-pre-wrap"></div>
         </div>
       </div>
     </div>
   </div>
 
   <script>
-    // ============================================
-    // Structured logger
-    // ============================================
-    const LOG = {
-      sessionId: 0,
-      tradeNo: 0,
-      buffer: [],
-      maxLines: 900,
+    // --------------------------------------------
+    // Plan (pseudocode)
+    // 1) UI: token save/clear + controls (symbol/window/minTicks/stake/martingale/maxTrades/stopMode)
+    // 2) Connect WS → authorize(token)
+    // 3) Subscribe: ticks(symbol) + balance
+    // 4) Maintain rolling last-digit window + frequency counts
+    // 5) Barrier AI: pick least frequent digit (tie => random) once minTicks reached
+    // 6) Trading loop (one contract at a time):
+    //    - proposal: DIGITDIFF barrier=aiDigit amount=stake duration=1t
+    //    - buy: proposal.id
+    //    - subscribe proposal_open_contract(contract_id) until is_sold
+    //    - realizedProfit = sell_price - buy_price (fallback to oc.profit)
+    //    - update session PnL, martingale on loss, reset on win
+    //    - enforce stop rules and maxTrades
+    // --------------------------------------------
 
-      time() {
-        return new Date().toLocaleTimeString("en-US", { hour12: false, hour: "2-digit", minute: "2-digit", second: "2-digit" });
-      },
-      esc(s) {
-        return String(s).replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
-      },
-      cls(level) {
-        if (level === "ERROR") return "text-red-400";
-        if (level === "SYSTEM") return "text-white";
-        if (level === "TRADE") return "text-yellow-300";
-        if (level === "WIN") return "text-green-400 font-bold";
-        if (level === "LOSS") return "text-red-400";
-        if (level === "ENGINE") return "text-cyan-300";
-        return "text-lime-400";
-      },
-      line(level, tag, msg) {
-        const ts = this.time();
-        const prefix = `[${ts}] [S${String(this.sessionId).padStart(2, "0")}]`;
-        const t = tag ? ` [${tag}]` : "";
-        return `${prefix}${t} <span class="${this.cls(level)}">${this.esc(msg)}</span>`;
-      },
-      write(level, tag, msg) {
-        this.buffer.push(this.line(level, tag, msg));
-        if (this.buffer.length > this.maxLines) this.buffer = this.buffer.slice(-this.maxLines);
-        const area = document.getElementById("log-area");
-        area.innerHTML = this.buffer.join("\n");
-        area.scrollTop = area.scrollHeight;
-      },
-      sessionStart(settings) {
-        this.sessionId += 1;
-        this.tradeNo = 0;
-        this.write("SYSTEM", "SESSION", `========== START #${this.sessionId} ==========`);
+    const $ = (id) => document.getElementById(id);
+    const logBox = $("log");
 
-        const s = [
-          `Symbol=${settings.symbol}`,
-          `Window=${settings.window}`,
-          `MinTicks=${settings.minTicks}`,
-          `VolTh=${settings.volThreshold}`,
-          `MaxTrades=${settings.maxTrades}`,
-          `Base=$${settings.baseStake}`,
-          `Mult=${settings.multiplier}x`,
-          `Steps=${settings.maxSteps}`,
-          `Mode=${settings.mode}`,
-          `Stop=${settings.stopMode}${settings.stopMode === "targetProfit" ? `(+${settings.targetProfit})` : ""}`,
-        ].join(" | ");
-
-        this.write("SYSTEM", "SETTINGS", s);
-      },
-      sessionStop(reason, pnl, trades) {
-        this.write("SYSTEM", "SESSION", `========== STOP (${reason}) | Trades=${trades} | PnL=$${pnl.toFixed(2)} ==========`);  
-      },
-      tradeStart({ side, stake, median, volatility, extreme }) {
-        this.tradeNo += 1;
-        const m = (median == null) ? "?" : Number(median).toFixed(1);
-        const v = (volatility == null) ? "?" : Number(volatility).toFixed(2);
-        const e = extreme ?? "-";
-        this.write("TRADE", `T${this.tradeNo}`, `START | Side=${side} | Stake=$${stake.toFixed(2)} | Med=${m} | Vol=${v} | Cluster=${e}`);
-      },
-      contractBought({ contractId, side, buyPrice }) {
-        this.write("TRADE", `T${this.tradeNo}`, `BUY | Contract=${contractId} | Side=${side} | BuyPrice=$${buyPrice.toFixed(2)}`);
-      },
-      tradeResult({ isWin, buyPrice, sellPrice, realizedProfit, sessionPnl, nextStake, balance }) {
-        const lvl = isWin ? "WIN" : "LOSS";
-        const r = isWin ? "WIN" : "LOSS";
-        const bal = (balance == null) ? "?" : `$${Number(balance).toFixed(2)}`;
-        this.write(
-          lvl,
-          `T${this.tradeNo}`,
-          `RESULT | ${r} | buy=$${buyPrice.toFixed(2)} sell=$${sellPrice.toFixed(2)} profit=$${realizedProfit.toFixed(2)} | SessionPnL=$${sessionPnl.toFixed(2)} | NextStake=$${nextStake.toFixed(2)} | Balance=${bal}`
-        );
-      },
-      skip(reason, volatility) {
-        const v = (volatility == null) ? "?" : Number(volatility).toFixed(2);
-        this.write("ENGINE", "SKIP", `${reason} | Vol=${v}`);
-      }
-    };
-
-    // ============================================
-    // State
-    // ============================================
     const state = {
       ws: null,
       reqId: 0,
-
-      isRunning: false,
-      isConnecting: false,
+      running: false,
       authorized: false,
 
       token: "",
-
       symbol: "R_100",
-      analysisWindow: 100,
-      minTicks: 10,
-      volatilityThreshold: 4.5,
-
-      strategy: "smart", // smart|fixed
-      fixedSide: "OVER2", // FIXED uses stability labels
-      currentSide: null,
+      window: 100,
+      minTicks: 20,
 
       baseStake: 1.0,
-      multiplier: 1.5,
+      mult: 1.5,
       maxSteps: 3,
       step: 0,
       stake: 1.0,
@@ -427,281 +200,151 @@
       maxTrades: 10,
       trades: 0,
 
-      stopMode: "firstWin", // firstWin|breakEven|targetProfit
-      targetProfit: 1.00,
-
-      tickCount: 0,
-      tickTimes: [],
+      stopMode: "firstWin",
+      targetProfit: 1.0,
 
       digits: [],
-
-      // CRITICAL: strike trades use flat stake
-      strikeMode: false,
+      freq: Array(10).fill(0),
 
       inContract: false,
       liveContractId: null,
-      openContractSubReqId: null,
 
       lastBalance: null,
-      profit: 0,
+      pnl: 0,
 
-      contracts: new Map(), // contract_id -> { buyPrice, stake, side }
+      contracts: new Map(), // contract_id -> { buyPrice, barrier, stake }
     };
 
     const pending = {
       proposalReqId: null,
       buyReqId: null,
-      proposalId: null,
-      side: null,
+      barrier: null,
       stake: null,
-      median: null,
-      volatility: null,
-      extreme: null,
     };
 
-    // ============================================
-    // DOM helpers
-    // ============================================
-    const $ = (id) => document.getElementById(id);
-
-    function setBadge(status) {
-      const b = $("status-badge");
-      const s = $("market_status");
-      if (status === "connected") {
-        b.textContent = "🟢 CONNECTED";
-        b.className = "ml-3 inline-flex items-center px-3 py-1 text-sm font-medium rounded-full badge-ok text-white shadow-md";
-        s.textContent = "Live";
-        s.className = "ml-2 font-bold text-green-400";
-      } else if (status === "connecting") {
-        b.textContent = "🟡 CONNECTING";
-        b.className = "ml-3 inline-flex items-center px-3 py-1 text-sm font-medium rounded-full badge-warn text-white shadow-md";
-        s.textContent = "Connecting...";
-        s.className = "ml-2 font-bold text-yellow-400";
-      } else {
-        b.textContent = "🔴 DISCONNECTED";
-        b.className = "ml-3 inline-flex items-center px-3 py-1 text-sm font-medium rounded-full badge-bad text-white shadow-md";
-        s.textContent = "Offline";
-        s.className = "ml-2 font-bold text-red-400";
-      }
+    function ts() {
+      return new Date().toLocaleTimeString("en-US", { hour12: false, hour: "2-digit", minute: "2-digit", second: "2-digit" });
     }
 
-    function updateRateAndCounts() {
-      const now = Date.now();
-      state.tickTimes = state.tickTimes.filter(t => now - t < 5000);
-      $("current_tick_rate").textContent = (state.tickTimes.length / 5).toFixed(1) + "/s";
-      $("ticks_received").textContent = String(state.tickCount);
-      $("metricTradeCount").textContent = String(state.trades);
-      $("session_trades").textContent = `${state.trades}/${state.maxTrades}`;
-      $("current_symbol").textContent = $("symbol").options[$("symbol").selectedIndex].text;
+    function log(msg) {
+      logBox.textContent += `[${ts()}] ${msg}\n`;
+      logBox.scrollTop = logBox.scrollHeight;
     }
 
-    function updateTradeStatus(status, message, action, kind = "normal") {
-      const box = $("trade-status");
-      const badge = $("status-badge-small");
-      const msg = $("status-message");
-      const act = $("next-action");
-
-      box.classList.remove("win-glow");
-      msg.textContent = message;
-      act.textContent = action;
-
-      if (kind === "trade") {
-        badge.textContent = "TRADING ⚡";
-        badge.className = "text-xs font-bold text-yellow-400";
-        msg.className = "text-sm font-bold text-yellow-400";
-      } else if (kind === "win") {
-        badge.textContent = "WIN 🎯";
-        badge.className = "text-xs font-bold text-green-400";
-        msg.className = "text-sm font-bold text-green-400";
-        box.classList.add("win-glow");
-      } else if (kind === "loss") {
-        badge.textContent = "LOSS ❌";
-        badge.className = "text-xs font-bold text-red-400";
-        msg.className = "text-sm font-bold text-red-400";
-      } else {
-        badge.textContent = status;
-        badge.className = "text-xs font-bold text-gray-400";
-        msg.className = "text-sm font-bold text-gray-300";
-      }
+    function setBadge(text, color) {
+      const b = $("badge");
+      b.textContent = text;
+      b.className = `ml-3 inline-flex items-center px-3 py-1 text-sm font-medium rounded-full ${color} text-white shadow-md`;
     }
 
-    function updatePnL() {
-      $("metricTotalProfit").textContent = `$${state.profit.toFixed(2)}`;
-      $("metricTotalProfit").className = state.profit >= 0 ? "text-lg font-bold text-green-400" : "text-lg font-bold text-red-400";
+    function uiStatus(main, sub) {
+      $("status").textContent = main;
+      $("status2").textContent = sub || "";
     }
 
-    function updateStakeUI() {
-      $("metricCurrentStake").textContent = `$${state.stake.toFixed(2)}`;
+    function clampInt(v, min, max, fallback) {
+      const n = parseInt(v, 10);
+      if (!Number.isFinite(n)) return fallback;
+      return Math.max(min, Math.min(max, n));
+    }
+    function clampNum(v, min, max, fallback) {
+      const n = parseFloat(v);
+      if (!Number.isFinite(n)) return fallback;
+      return Math.max(min, Math.min(max, n));
+    }
+    function round2(n) { return Math.round(n * 100) / 100; }
+
+    function readInputs() {
+      state.symbol = $("symbol").value;
+      state.window = clampInt($("window").value, 10, 500, 100);
+      state.minTicks = clampInt($("minTicks").value, 1, 500, 20);
+
+      state.baseStake = clampNum($("baseStake").value, 0.35, 100000, 1.0);
+      state.mult = clampNum($("mult").value, 1.0, 10.0, 1.5);
+      state.maxSteps = clampInt($("steps").value, 0, 20, 3);
+
+      state.maxTrades = clampInt($("maxTrades").value, 1, 500, 10);
+
+      state.stopMode = $("stopMode").value;
+      state.targetProfit = clampNum($("targetProfit").value, 0, 100000, 1.0);
+
+      state.stake = state.baseStake;
+
+      $("symLabel").textContent = state.symbol;
+      $("trades").textContent = `${state.trades}/${state.maxTrades}`;
+      $("pnl").textContent = `$${state.pnl.toFixed(2)}`;
+      $("pnl").className = state.pnl >= 0 ? "font-bold text-green-400" : "font-bold text-red-400";
     }
 
-    function setSessionSide(side) {
-      state.currentSide = side;
-      $("session_side").textContent = side;
-      $("session_side").className = side.startsWith("OVER") ? "text-xl font-bold text-blue-400" : "text-xl font-bold text-purple-400";
+    function disableInputs(disabled) {
+      ["token","symbol","window","minTicks","baseStake","mult","steps","maxTrades","stopMode","targetProfit","saveToken","clearToken"].forEach(id => {
+        $(id).disabled = disabled;
+        $(id).classList.toggle("opacity-60", disabled);
+      });
     }
 
-    // ============================================
-    // STEP 1 — Volatility Score
-    // ============================================
-    function calculateVolatility() {
-      if (state.digits.length < 10) return 0;
-
-      let sum = 0;
-      for (let i = 1; i < state.digits.length; i++) {
-        sum += Math.abs(state.digits[i] - state.digits[i - 1]);
-      }
-      return sum / state.digits.length;
-    }
-
-    // ============================================
-    // STEP 2 — Extreme Cluster Detection
-    // ============================================
-    function detectExtremeCluster() {
-      if (state.digits.length < 20) return null;
-
-      const recent = state.digits.slice(-20);
-      const high = recent.filter(d => d >= 8).length;
-      const low = recent.filter(d => d <= 1).length;
-
-      if (high >= 6) return "OVER7";
-      if (low >= 6) return "UNDER2";
-
-      return null;
-    }
-
-    // ============================================
-    // Median / Recommendation
-    // ============================================
-    function pushDigit(d) {
-      state.digits.push(d);
-      if (state.digits.length > state.analysisWindow) state.digits.shift();
-    }
-
-    function calcMedian(arr) {
-      if (!arr.length) return null;
-      const s = [...arr].sort((a, b) => a - b);
-      const mid = Math.floor(s.length / 2);
-      return (s.length % 2 === 0) ? (s[mid - 1] + s[mid]) / 2 : s[mid];
-    }
-
-    function computeRecommendation() {
-      const used = state.digits.length;
-      $("analysis-progress").textContent = `${used}/${state.analysisWindow}`;
-
-      const vol = calculateVolatility();
-      const extreme = detectExtremeCluster();
-
-      $("volatility-value").textContent = (used >= 10) ? vol.toFixed(2) : "-";
-      $("cluster-value").textContent = extreme ?? "-";
-
-      if (used < state.minTicks) {
-        $("window-status").textContent = `Collecting data... (${used}/${state.minTicks})`;
-        $("window-status").className = "text-sm font-bold text-yellow-400";
-      } else {
-        $("window-status").textContent = `Ready`;
-        $("window-status").className = "text-sm font-bold text-green-400";
-      }
-
-      const med = calcMedian(state.digits);
-      if (med === null) {
-        $("median-value").textContent = "-";
-        $("median-interpretation").textContent = "Waiting for data";
-        $("recommended-side").textContent = "---";
-        $("confidence-score").textContent = "Confidence: --";
-        $("mode-badge").textContent = "Mode: -";
-        return { median: null, side: null, confidence: 0, volatility: vol, extreme };
-      }
-
-      $("median-value").textContent = med.toFixed(1);
-      if (med > 4.5) {
-        $("median-value").className = "text-4xl font-bold text-orange-400";
-        $("median-interpretation").textContent = "↗️ Trending HIGH";
-      } else {
-        $("median-value").className = "text-4xl font-bold text-blue-400";
-        $("median-interpretation").textContent = "↙️ Trending LOW";
-      }
-
-      const side = med > 4.5 ? "OVER" : "UNDER";
-      const confidence = Math.min(100, Math.round((Math.abs(med - 4.5) / 4.5) * 100));
-
-      // UI only shows stability output labels (OVER2/UNDER7) by default; decideSide can override to strike.
-      $("recommended-side").textContent = side === "OVER" ? "OVER2" : "UNDER7";
-      $("recommended-side").className = side === "OVER" ? "text-2xl font-bold text-blue-400" : "text-2xl font-bold text-purple-400";
-      $("confidence-score").textContent = `Confidence: ${confidence}%`;
-
-      return { median: med, side, confidence, volatility: vol, extreme };
-    }
-
-    // ============================================
-    // STEP 3 — Balanced AI decideSide()
-    // - returns: "OVER2" | "UNDER7" | "OVER7" | "UNDER2" | null
-    // ============================================
-    function decideSide() {
-      if (state.strategy === "fixed") {
-        state.strikeMode = false;
-        return state.fixedSide;
-      }
-
-      const rec = computeRecommendation();
-      const volatility = rec.volatility;
-      const extreme = rec.extreme;
-
-      // Low data => no trade
-      if (state.digits.length < state.minTicks) {
-        state.strikeMode = false;
-        return null;
-      }
-
-      // Optional volatility filter => no trade when chaotic
-      if (volatility > state.volatilityThreshold) {
-        state.strikeMode = false;
-        return null;
-      }
-
-      // Strike Mode
-      if (extreme === "OVER7") {
-        state.strikeMode = true;
-        return "OVER7";
-      }
-      if (extreme === "UNDER2") {
-        state.strikeMode = true;
-        return "UNDER2";
-      }
-
-      // Stability Mode
-      state.strikeMode = false;
-      if (rec.side === "OVER") return "OVER2";
-      return "UNDER7";
-    }
-
-    // ============================================
-    // WS helpers
-    // ============================================
-    function nextReqId() {
-      state.reqId += 1;
-      return state.reqId;
-    }
-
+    function nextReqId() { state.reqId += 1; return state.reqId; }
     function send(msg) {
       if (!state.ws || state.ws.readyState !== WebSocket.OPEN) return;
       state.ws.send(JSON.stringify(msg));
     }
 
+    function lastDigit(quote) {
+      const s = String(quote);
+      const d = parseInt(s[s.length - 1], 10);
+      return Number.isFinite(d) ? d : null;
+    }
+
+    function resetWindow() {
+      state.digits = [];
+      state.freq = Array(10).fill(0);
+      $("barrier").textContent = "-";
+    }
+
+    function pushDigit(d) {
+      state.digits.push(d);
+      state.freq[d] += 1;
+
+      while (state.digits.length > state.window) {
+        const old = state.digits.shift();
+        state.freq[old] -= 1;
+      }
+    }
+
+    function pickLeastFrequentDigit() {
+      if (state.digits.length < state.minTicks) return null;
+
+      let min = Infinity;
+      for (let i = 0; i < 10; i++) min = Math.min(min, state.freq[i]);
+
+      const candidates = [];
+      for (let i = 0; i < 10; i++) if (state.freq[i] === min) candidates.push(i);
+
+      const chosen = candidates[Math.floor(Math.random() * candidates.length)];
+      return chosen;
+    }
+
+    function updateTopUI(digitValue, quote) {
+      $("tick").textContent = Number(quote).toFixed(3);
+      $("digit").textContent = `Digit: ${digitValue}`;
+      $("trades").textContent = `${state.trades}/${state.maxTrades}`;
+      $("pnl").textContent = `$${state.pnl.toFixed(2)}`;
+      $("pnl").className = state.pnl >= 0 ? "font-bold text-green-400" : "font-bold text-red-400";
+      if (state.lastBalance != null) $("bal").textContent = `$${state.lastBalance.toFixed(2)}`;
+    }
+
     function connect() {
       if (state.ws) { try { state.ws.close(); } catch {} }
-
-      state.isConnecting = true;
-      setBadge("connecting");
+      setBadge("CONNECTING", "bg-yellow-600");
+      uiStatus("Connecting…", "Authorizing…");
 
       state.ws = new WebSocket("wss://ws.binaryws.com/websockets/v3?app_id=120389");
 
       state.ws.onopen = () => {
-        state.isConnecting = false;
-        setBadge("connected");
-        LOG.write("SYSTEM", "WS", "WebSocket connected");
-
+        setBadge("CONNECTED", "bg-green-600");
+        log("WS connected");
         if (!state.token) {
-          LOG.write("ERROR", "TOKEN", "Token missing.");
+          log("ERROR: missing token");
           stop("Missing token");
           return;
         }
@@ -713,30 +356,28 @@
         try { data = JSON.parse(ev.data); } catch { return; }
 
         if (data.error) {
-          LOG.write("ERROR", "API", data.error.message);
+          log(`API ERROR: ${data.error.message}`);
           state.inContract = false;
           state.liveContractId = null;
-          state.openContractSubReqId = null;
           return;
         }
 
         switch (data.msg_type) {
           case "authorize":
             state.authorized = true;
-            LOG.write("SYSTEM", "AUTH", `Authorized as ${data.authorize.loginid}`);
+            log(`Authorized as ${data.authorize.loginid}`);
+            uiStatus("Live", "Subscribed to ticks + balance");
             send({ ticks: state.symbol, subscribe: 1, req_id: nextReqId() });
             send({ balance: 1, subscribe: 1, req_id: nextReqId() });
             break;
 
-          case "tick":
-            onTick(data.tick);
+          case "balance":
+            state.lastBalance = Number(data.balance.balance);
+            $("bal").textContent = `$${state.lastBalance.toFixed(2)}`;
             break;
 
-          case "balance":
-            if (data.balance && typeof data.balance.balance !== "undefined") {
-              state.lastBalance = Number(data.balance.balance);
-              $("metricBalance").textContent = `$${state.lastBalance.toFixed(2)}`;
-            }
+          case "tick":
+            onTick(data.tick);
             break;
 
           case "proposal":
@@ -756,71 +397,45 @@
         }
       };
 
-      state.ws.onclose = () => {
-        setBadge("disconnected");
-        LOG.write("SYSTEM", "WS", "WebSocket disconnected");
+      state.ws.onerror = () => {
+        log("WS error");
+        setBadge("DISCONNECTED", "bg-red-600");
       };
 
-      state.ws.onerror = () => {
-        setBadge("disconnected");
-        LOG.write("ERROR", "WS", "WebSocket error");
+      state.ws.onclose = () => {
+        log("WS disconnected");
+        setBadge("DISCONNECTED", "bg-red-600");
       };
     }
 
-    // ============================================
-    // STEP 4 — Proposal Logic (OVER2/UNDER7 + Strike OVER7/UNDER2)
-    // and Correct PnL (sell - buy)
-    // ============================================
-    function makeProposal(side, stake, median, volatility, extreme) {
-      let contractType, barrier;
-
-      if (side === "OVER2") {
-        contractType = "DIGITOVER";
-        barrier = "2";
-      } else if (side === "UNDER7") {
-        contractType = "DIGITUNDER";
-        barrier = "7";
-      } else if (side === "OVER7") {
-        contractType = "DIGITOVER";
-        barrier = "7";
-      } else if (side === "UNDER2") {
-        contractType = "DIGITUNDER";
-        barrier = "2";
-      } else {
-        return;
-      }
-
+    function makeProposalDigitDiff(barrierDigit, stake) {
       const reqId = nextReqId();
       pending.proposalReqId = reqId;
-      pending.side = side;
+      pending.barrier = barrierDigit;
       pending.stake = stake;
-      pending.median = median;
-      pending.volatility = volatility;
-      pending.extreme = extreme;
 
       send({
         proposal: 1,
         amount: stake.toFixed(2),
         basis: "stake",
-        contract_type: contractType,
+        contract_type: "DIGITDIFF",
         currency: "USD",
         duration: 1,
         duration_unit: "t",
         symbol: state.symbol,
-        barrier,
-        req_id: reqId,
+        barrier: String(barrierDigit),
+        req_id: reqId
       });
     }
 
     function onProposal(proposal, reqId) {
       if (reqId !== pending.proposalReqId) return;
       if (!proposal || !proposal.id) {
-        LOG.write("ERROR", `T${LOG.tradeNo}`, "Proposal failed (no id)");
+        log("Proposal failed (no id)");
         state.inContract = false;
         return;
       }
 
-      pending.proposalId = proposal.id;
       const buyReqId = nextReqId();
       pending.buyReqId = buyReqId;
 
@@ -830,7 +445,7 @@
     function onBuy(buy, reqId) {
       if (reqId !== pending.buyReqId) return;
       if (!buy || !buy.contract_id) {
-        LOG.write("ERROR", `T${LOG.tradeNo}`, "Buy failed (no contract_id)");
+        log("Buy failed (no contract_id)");
         state.inContract = false;
         return;
       }
@@ -838,15 +453,36 @@
       state.liveContractId = buy.contract_id;
 
       const buyPrice = Number(buy.buy_price ?? pending.stake ?? 0);
-      state.contracts.set(String(state.liveContractId), { buyPrice, stake: pending.stake, side: pending.side });
+      state.contracts.set(String(state.liveContractId), {
+        buyPrice,
+        barrier: pending.barrier,
+        stake: pending.stake
+      });
 
-      const subReq = nextReqId();
-      state.openContractSubReqId = subReq;
+      send({
+        proposal_open_contract: 1,
+        contract_id: state.liveContractId,
+        subscribe: 1,
+        req_id: nextReqId()
+      });
 
-      send({ proposal_open_contract: 1, contract_id: state.liveContractId, subscribe: 1, req_id: subReq });
+      uiStatus("In contract", `Bought ${state.liveContractId} (DIFFERS ${pending.barrier})`);
+      log(`BUY contract=${state.liveContractId} barrier=${pending.barrier} buy=$${buyPrice.toFixed(2)}`);
+    }
 
-      LOG.contractBought({ contractId: state.liveContractId, side: pending.side, buyPrice });
-      updateTradeStatus("LIVE", `Contract live (${pending.side})`, "Waiting settlement...", "trade");
+    function applyAfterLoss() {
+      state.step += 1;
+      if (state.step > state.maxSteps) {
+        state.step = 0;
+        state.stake = state.baseStake;
+        return;
+      }
+      state.stake = round2(state.baseStake * Math.pow(state.mult, state.step));
+    }
+
+    function resetAfterWin() {
+      state.step = 0;
+      state.stake = state.baseStake;
     }
 
     function onOpenContract(oc) {
@@ -854,437 +490,168 @@
       if (String(oc.contract_id) !== String(state.liveContractId)) return;
       if (!oc.is_sold) return;
 
-      const contractId = String(oc.contract_id);
-      const cached = state.contracts.get(contractId);
+      const cid = String(oc.contract_id);
+      const cached = state.contracts.get(cid);
 
       const buyPriceFromOC = Number(oc.buy_price ?? 0);
       const sellPrice = Number(oc.sell_price ?? 0);
       const buyPrice = buyPriceFromOC > 0 ? buyPriceFromOC : Number(cached?.buyPrice ?? 0);
 
-      let realizedProfit = 0;
-      if (buyPrice > 0 && sellPrice > 0) realizedProfit = sellPrice - buyPrice;
-      else if (typeof oc.profit !== "undefined") realizedProfit = Number(oc.profit) || 0;
-      else realizedProfit = -Number(cached?.stake ?? 0);
+      let realized = 0;
+      if (buyPrice > 0 && sellPrice > 0) realized = sellPrice - buyPrice;
+      else if (typeof oc.profit !== "undefined") realized = Number(oc.profit) || 0;
+      else realized = -Number(cached?.stake ?? 0);
 
-      const isWin = realizedProfit > 0;
+      const isWin = realized > 0;
 
       state.trades += 1;
-      state.profit += realizedProfit;
+      state.pnl += realized;
 
       send({ balance: 1, req_id: nextReqId() });
 
-      updatePnL();
-      updateRateAndCounts();
+      $("trades").textContent = `${state.trades}/${state.maxTrades}`;
+      $("pnl").textContent = `$${state.pnl.toFixed(2)}`;
+      $("pnl").className = state.pnl >= 0 ? "font-bold text-green-400" : "font-bold text-red-400";
+
+      log(`SETTLE contract=${cid} buy=$${buyPrice.toFixed(2)} sell=$${sellPrice.toFixed(2)} pnl=$${realized.toFixed(2)} (session=$${state.pnl.toFixed(2)})`);
 
       if (isWin) {
         resetAfterWin();
-        updateTradeStatus("WIN", `WIN +$${realizedProfit.toFixed(2)}`, "Checking stop rules...", "win");
+        uiStatus("WIN", `Profit $${realized.toFixed(2)} | session $${state.pnl.toFixed(2)}`);
       } else {
         applyAfterLoss();
-        updateTradeStatus("LOSS", `LOSS $${realizedProfit.toFixed(2)}`, `Next stake: $${state.stake.toFixed(2)}`, "loss");
+        uiStatus("LOSS", `Profit $${realized.toFixed(2)} | next stake $${state.stake.toFixed(2)}`);
       }
 
-      LOG.tradeResult({
-        isWin,
-        buyPrice,
-        sellPrice,
-        realizedProfit,
-        sessionPnl: state.profit,
-        nextStake: state.stake,
-        balance: state.lastBalance,
-      });
-
-      state.contracts.delete(contractId);
+      state.contracts.delete(cid);
       state.inContract = false;
       state.liveContractId = null;
-      state.openContractSubReqId = null;
 
+      // Stop rules
       if (state.trades >= state.maxTrades) return stop(`Max trades reached (${state.maxTrades})`);
 
       if (state.stopMode === "firstWin" && isWin) return stop("Stopped on first WIN");
-      if (state.stopMode === "breakEven" && state.profit >= 0) return stop("Recovered to break-even (PnL ≥ 0)");
-      if (state.stopMode === "targetProfit" && state.profit >= state.targetProfit) {
+      if (state.stopMode === "breakEven" && state.pnl >= 0) return stop("Stopped at break-even (PnL ≥ 0)");
+      if (state.stopMode === "targetProfit" && state.pnl >= state.targetProfit) {
         return stop(`Target profit reached (+$${state.targetProfit.toFixed(2)})`);
       }
     }
 
-    function resetAfterWin() {
-      state.step = 0;
-      state.stake = state.baseStake;
-      updateStakeUI();
-    }
-
-    // ✅ Modify Martingale Behavior (Strike uses flat stake)
-    function applyAfterLoss() {
-      state.step += 1;
-
-      if (state.step > state.maxSteps) {
-        state.step = 0;
-        state.stake = state.baseStake;
-        updateStakeUI();
-        return;
-      }
-
-      if (state.strikeMode) {
-        state.stake = state.baseStake;
-      } else {
-        state.stake = round2(state.baseStake * Math.pow(state.multiplier, state.step));
-      }
-      updateStakeUI();
-    }
-
-    function round2(n) { return Math.round(n * 100) / 100; }
-
-    // ============================================
-    // Tick handler + trade trigger
-    // ============================================
-    function lastDigitOfQuote(q) {
-      const s = String(q);
-      const d = parseInt(s[s.length - 1], 10);
-      return Number.isFinite(d) ? d : null;
-    }
-
     function onTick(tick) {
-      if (!state.isRunning) return;
+      if (!state.running) return;
 
-      const digit = lastDigitOfQuote(tick.quote);
-      if (digit === null) return;
+      const d = lastDigit(tick.quote);
+      if (d == null) return;
 
-      state.tickCount += 1;
-      state.tickTimes.push(Date.now());
+      pushDigit(d);
+      updateTopUI(d, tick.quote);
 
-      $("metricLiveTick").textContent = Number(tick.quote).toFixed(3);
-      $("metricLastDigit").textContent = `Digit: ${digit}`;
+      const barrierDigit = pickLeastFrequentDigit();
+      $("barrier").textContent = barrierDigit == null ? "-" : String(barrierDigit);
 
-      pushDigit(digit);
-
-      const rec = computeRecommendation();
-      updateRateAndCounts();
-
-      // UI mode badge
-      const extreme = rec.extreme;
-      $("mode-badge").textContent = state.strikeMode ? "Mode: STRIKE" : "Mode: STABILITY";
-
-      // Low data => no trade
       if (state.digits.length < state.minTicks) {
-        updateTradeStatus("COLLECTING", `Collecting ticks (${state.digits.length}/${state.minTicks})`, "Waiting...", "normal");
+        uiStatus("Collecting ticks…", `${state.digits.length}/${state.minTicks}`);
         return;
       }
-
-      if (state.trades >= state.maxTrades) {
-        stop(`Max trades reached (${state.maxTrades})`);
-        return;
-      }
-
+      if (state.trades >= state.maxTrades) return stop(`Max trades reached (${state.maxTrades})`);
       if (state.inContract) return;
 
-      const side = decideSide();
-      const volatility = calculateVolatility();
-      const cluster = detectExtremeCluster();
-
-      // High volatility or no decision => skip
-      if (!side) {
-        $("mode-badge").textContent = "Mode: SKIP";
-        updateTradeStatus("SKIP", "No trade (chaotic or low data)", "Waiting next tick...", "normal");
-        LOG.skip("No trade decision", volatility);
-        return;
-      }
-
-      setSessionSide(side);
-      $("mode-badge").textContent = state.strikeMode ? "Mode: STRIKE" : "Mode: STABILITY";
+      if (barrierDigit == null) return;
 
       state.inContract = true;
+      uiStatus("Placing trade…", `DIGITDIFF barrier=${barrierDigit} stake=$${state.stake.toFixed(2)}`);
+      log(`TRADE #${state.trades + 1} DIGITDIFF barrier=${barrierDigit} stake=$${state.stake.toFixed(2)}`);
 
-      LOG.tradeStart({
-        side,
-        stake: state.stake,
-        median: rec.median,
-        volatility,
-        extreme: cluster,
-      });
-
-      updateTradeStatus("PROPOSING", `Trade #${state.trades + 1}: ${side}`, `Stake: $${state.stake.toFixed(2)}`, "trade");
-      makeProposal(side, state.stake, rec.median, volatility, cluster);
-    }
-
-    // ============================================
-    // Controls
-    // ============================================
-    function clampInt(v, min, max, fallback) {
-      const n = parseInt(v, 10);
-      if (!Number.isFinite(n)) return fallback;
-      return Math.max(min, Math.min(max, n));
-    }
-
-    function clampNum(v, min, max, fallback) {
-      const n = parseFloat(v);
-      if (!Number.isFinite(n)) return fallback;
-      return Math.max(min, Math.min(max, n));
-    }
-
-    function readTokenFromUI() {
-      state.token = ($("token").value || "").trim();
-      if (!state.token) {
-        const saved = (localStorage.getItem("deriv_token") || "").trim();
-        if (saved) {
-          state.token = saved;
-          $("token").value = saved;
-        }
-      }
-    }
-
-    function readInputs() {
-      state.symbol = $("symbol").value;
-      state.analysisWindow = clampInt($("analysis_window").value, 5, 500, 100);
-      state.minTicks = clampInt($("min_ticks").value, 1, 500, 10);
-      state.volatilityThreshold = clampNum($("vol_threshold").value, 0, 100, 4.5);
-
-      state.maxTrades = clampInt($("max_trades").value, 1, 500, 10);
-      state.baseStake = clampNum($("base_stake").value, 0.35, 100000, 1.0);
-      state.multiplier = clampNum($("multiplier").value, 1.0, 10.0, 1.5);
-      state.maxSteps = clampInt($("max_steps").value, 0, 20, 3);
-
-      state.stopMode = $("stop_mode").value;
-      state.targetProfit = clampNum($("target_profit").value, 0, 100000, 1.00);
-
-      state.stake = state.baseStake;
-      updateStakeUI();
-
-      if (state.digits.length > state.analysisWindow) {
-        state.digits = state.digits.slice(state.digits.length - state.analysisWindow);
-      }
-
-      $("current_symbol").textContent = $("symbol").options[$("symbol").selectedIndex].text;
-      $("analysis-progress").textContent = `${state.digits.length}/${state.analysisWindow}`;
-      $("session_trades").textContent = `${state.trades}/${state.maxTrades}`;
-      $("metricTradeCount").textContent = String(state.trades);
-
-      // sync calculator defaults with strategy fields
-      $("calc_base").value = state.baseStake.toFixed(2);
-      $("calc_mult").value = String(state.multiplier);
-      $("calc_steps").value = String(state.maxSteps);
-    }
-
-    function disableInputs(disabled) {
-      ["token","symbol","analysis_window","min_ticks","vol_threshold","max_trades","base_stake","multiplier","max_steps","stop_mode","target_profit"].forEach(id => {
-        $(id).disabled = disabled;
-      });
-      ["mode_smart","mode_fixed","side_over","side_under","saveTokenBtn","clearTokenBtn","calcBtn","calcToggleBtn"].forEach(id => {
-        $(id).disabled = disabled;
-        $(id).classList.toggle("opacity-60", disabled);
-      });
+      makeProposalDigitDiff(barrierDigit, state.stake);
     }
 
     function start() {
-      if (state.isRunning) return;
+      if (state.running) return;
 
-      readTokenFromUI();
       readInputs();
 
+      state.token = ($("token").value || "").trim() || (localStorage.getItem("deriv_token") || "").trim();
       if (!state.token) {
-        LOG.write("ERROR", "TOKEN", "Paste token and click Save Token (or paste then Start).");
+        uiStatus("Missing token", "Paste token first");
+        log("ERROR: token required");
         return;
       }
 
+      // Reset session
       state.trades = 0;
-      state.profit = 0;
+      state.pnl = 0;
       state.step = 0;
       state.stake = state.baseStake;
-      state.tickCount = 0;
-      state.tickTimes = [];
       state.inContract = false;
       state.liveContractId = null;
-      state.openContractSubReqId = null;
       state.contracts.clear();
-      state.strikeMode = false;
+      resetWindow();
 
-      updatePnL();
-      updateStakeUI();
-      updateRateAndCounts();
-      computeRecommendation();
+      $("trades").textContent = `${state.trades}/${state.maxTrades}`;
+      $("pnl").textContent = `$${state.pnl.toFixed(2)}`;
+      $("pnl").className = "font-bold text-white";
 
-      setSessionSide(state.strategy === "fixed" ? state.fixedSide : "OVER2");
-
-      state.isRunning = true;
       disableInputs(true);
 
-      $("toggleButton").textContent = "⏹️ STOP BOT";
-      $("toggleButton").classList.remove("bg-green-600","hover:bg-green-700");
-      $("toggleButton").classList.add("bg-red-600","hover:bg-red-700");
+      $("toggle").textContent = "STOP";
+      $("toggle").classList.remove("bg-green-600","hover:bg-green-700");
+      $("toggle").classList.add("bg-red-600","hover:bg-red-700");
 
-      LOG.sessionStart({
-        symbol: state.symbol,
-        window: state.analysisWindow,
-        minTicks: state.minTicks,
-        volThreshold: state.volatilityThreshold.toFixed(1),
-        maxTrades: state.maxTrades,
-        baseStake: state.baseStake.toFixed(2),
-        multiplier: state.multiplier,
-        maxSteps: state.maxSteps,
-        mode: state.strategy,
-        stopMode: state.stopMode,
-        targetProfit: state.targetProfit.toFixed(2),
-      });
-
-      updateTradeStatus("STARTING", "Connecting...", "Authorizing...", "normal");
+      state.running = true;
+      log(`START symbol=${state.symbol} window=${state.window} minTicks=${state.minTicks} maxTrades=${state.maxTrades} base=$${state.baseStake.toFixed(2)}`);
       connect();
     }
 
-    function stop(reason = "Stopped") {
-      if (!state.isRunning) return;
+    function stop(reason) {
+      if (!state.running) return;
 
-      state.isRunning = false;
+      state.running = false;
       disableInputs(false);
 
-      $("toggleButton").textContent = "🚀 START BOT";
-      $("toggleButton").classList.remove("bg-red-600","hover:bg-red-700");
-      $("toggleButton").classList.add("bg-green-600","hover:bg-green-700");
+      $("toggle").textContent = "START";
+      $("toggle").classList.remove("bg-red-600","hover:bg-red-700");
+      $("toggle").classList.add("bg-green-600","hover:bg-green-700");
 
-      updateTradeStatus("STOPPED", reason, `Session PnL: $${state.profit.toFixed(2)}`, state.profit > 0 ? "win" : "normal");
-      LOG.sessionStop(reason, state.profit, state.trades);
+      uiStatus("Stopped", reason);
+      log(`STOP: ${reason} | trades=${state.trades} pnl=$${state.pnl.toFixed(2)}`);
 
       try { if (state.ws) state.ws.close(); } catch {}
       state.ws = null;
-      setBadge("disconnected");
 
-      state.inContract = false;
-      state.liveContractId = null;
-      state.openContractSubReqId = null;
-      state.authorized = false;
-      state.strikeMode = false;
+      setBadge("DISCONNECTED", "bg-red-600");
     }
 
-    function toggle() {
-      if (state.isRunning) stop("Manual stop");
-      else start();
-    }
-
-    function setStrategy(mode) {
-      state.strategy = mode;
-
-      if (mode === "smart") {
-        $("mode_smart").classList.add("bg-blue-600");
-        $("mode_fixed").classList.remove("bg-blue-600");
-        $("mode_fixed").classList.add("bg-gray-600");
-        $("fixed_side_container").style.display = "none";
-        LOG.write("SYSTEM", "MODE", "Strategy: SMART");
-      } else {
-        $("mode_fixed").classList.add("bg-blue-600");
-        $("mode_smart").classList.remove("bg-blue-600");
-        $("mode_smart").classList.add("bg-gray-600");
-        $("fixed_side_container").style.display = "block";
-        LOG.write("SYSTEM", "MODE", "Strategy: FIXED");
-      }
-    }
-
-    function setFixedSide(side) {
-      state.fixedSide = side;
-      setSessionSide(side);
-
-      if (side === "OVER2") {
-        $("side_over").classList.add("bg-blue-600");
-        $("side_over").classList.remove("bg-gray-600");
-        $("side_under").classList.add("bg-gray-600");
-        $("side_under").classList.remove("bg-purple-600");
-      } else {
-        $("side_under").classList.add("bg-purple-600");
-        $("side_under").classList.remove("bg-gray-600");
-        $("side_over").classList.add("bg-gray-600");
-        $("side_over").classList.remove("bg-blue-600");
-      }
-
-      LOG.write("SYSTEM", "MODE", `Fixed side = ${side}`);
-    }
-
-    // Token storage
-    function saveToken() {
+    // Token buttons
+    $("saveToken").addEventListener("click", () => {
       const t = ($("token").value || "").trim();
-      if (!t) {
-        LOG.write("ERROR", "TOKEN", "Token empty.");
-        return;
-      }
+      if (!t) return log("Token empty (not saved)");
       localStorage.setItem("deriv_token", t);
       state.token = t;
-      LOG.write("SYSTEM", "TOKEN", "Token saved locally.");
-    }
+      log("Token saved locally");
+    });
 
-    function clearToken() {
+    $("clearToken").addEventListener("click", () => {
       localStorage.removeItem("deriv_token");
       $("token").value = "";
       state.token = "";
-      LOG.write("SYSTEM", "TOKEN", "Token cleared.");
-    }
+      log("Token cleared");
+    });
 
-    // Minimizable calculator
-    function toggleCalculator() {
-      const body = $("calcBody");
-      const icon = $("calcToggleIcon");
-      const isHidden = body.classList.toggle("hidden");
-      icon.textContent = isHidden ? "+" : "−";
-    }
+    // Toggle
+    $("toggle").addEventListener("click", () => {
+      if (state.running) stop("Manual stop");
+      else start();
+    });
 
-    function calculateMartingale() {
-      const base = clampNum($("calc_base").value, 0.01, 100000, 1.0);
-      const mult = clampNum($("calc_mult").value, 1.0, 100, 1.5);
-      const steps = clampInt($("calc_steps").value, 1, 50, 3);
-
-      let total = 0;
-      let maxStake = 0;
-      let stake = base;
-
-      for (let i = 0; i < steps; i++) {
-        total += stake;
-        if (stake > maxStake) maxStake = stake;
-        stake = stake * mult;
-      }
-
-      $("calc_total").textContent = `$${total.toFixed(2)}`;
-      $("calc_max").textContent = `$${maxStake.toFixed(2)}`;
-      LOG.write("SYSTEM", "CALC", `Total=$${total.toFixed(2)} Max=$${maxStake.toFixed(2)} Steps=${steps}`);
-    }
-
-    // Init
-    document.addEventListener("DOMContentLoaded", () => {
-      setBadge("disconnected");
-
+    // Boot
+    (function init() {
       const saved = (localStorage.getItem("deriv_token") || "").trim();
       if (saved) $("token").value = saved;
-
-      $("saveTokenBtn").addEventListener("click", saveToken);
-      $("clearTokenBtn").addEventListener("click", clearToken);
-      $("toggleButton").addEventListener("click", toggle);
-
-      $("mode_smart").addEventListener("click", () => setStrategy("smart"));
-      $("mode_fixed").addEventListener("click", () => setStrategy("fixed"));
-      $("side_over").addEventListener("click", () => setFixedSide("OVER2"));
-      $("side_under").addEventListener("click", () => setFixedSide("UNDER7"));
-
-      $("calcToggleBtn").addEventListener("click", toggleCalculator);
-      $("calcBtn").addEventListener("click", calculateMartingale);
-
-      ["symbol","analysis_window","min_ticks","vol_threshold","max_trades","base_stake","multiplier","max_steps","stop_mode","target_profit"].forEach(id => {
-        $(id).addEventListener("input", () => {
-          if (!state.isRunning) {
-            readInputs();
-            computeRecommendation();
-          }
-        });
-      });
-
-      setStrategy("smart");
-      setFixedSide("OVER2");
-
-      readTokenFromUI();
       readInputs();
-      updateStakeUI();
-      updatePnL();
-      computeRecommendation();
-      updateTradeStatus("READY", "Ready", "Paste token then click START", "normal");
-
-      LOG.write("SYSTEM", "BOOT", "Bot initialized");
-      LOG.write("ENGINE", "AI", "Volatility + Cluster + Strike/Stable enabled");
-      if (saved) LOG.write("SYSTEM", "TOKEN", "Token loaded from localStorage");
-    });
+      setBadge("DISCONNECTED", "bg-red-600");
+      uiStatus("Ready", "Paste token → Start");
+      log("Bot initialized (DIGITDIFF)");
+    })();
   </script>
 </body>
 </html>
