@@ -1974,8 +1974,11 @@ const isRecommended = engine.currentRecommendation && engine.currentRecommendati
         window.martingaleStep = 0;
         window.cycleActive = false;
         window.cycleTradeCount = 0;
-        window.MAX_CYCLE_TRADES = 6;
-
+            cycleLimit = determineCycleLimit(buildDigitStatsForCycle(d));
+            window.cycleLimit = cycleLimit;
+            console.log("🧠 Dynamic cycle limit:", cycleLimit);
+        let cycleLimit = 6;
+        window.cycleLimit = cycleLimit;
         window.cycleLosses = 0;
         window.accountBalance = 0.0;
         window.startingBalance = 0.0;
@@ -2115,6 +2118,58 @@ const isRecommended = engine.currentRecommendation && engine.currentRecommendati
         }
 
         
+
+
+function isDigitInsideBand(stats) {
+    const ratio = stats.p90Ratio;
+    return ratio >= 0.80 && ratio <= 0.88;
+}
+
+function determineCycleLimit(stats) {
+    const pressure = stats.p90Ratio; // 0.78 – 0.92
+    const velocity = stats.currentGap - stats.prevGap; // gap delta
+    const pm2 = stats.pm2_recent || 0;
+    const pm3 = stats.pm3_recent || 0;
+
+    let strength = 0;
+
+    // Ideal pressure zone
+    if (pressure >= 0.80 && pressure <= 0.88) strength++;
+
+    // Slowing or stable gap = good release
+    if (velocity <= 0) strength++;
+
+    // Strong short window activity
+    if (pm2 >= 0.35) strength++;
+    if (pm3 >= 0.45) strength++;
+
+    // Strong release → fewer trades
+    if (strength >= 4) return 2;
+    if (strength === 3) return 3;
+    if (strength === 2) return 4;
+
+    // Weak but valid → allow deeper cycle
+    return 6;
+}
+
+function buildDigitStatsForCycle(d) {
+    const s = window.digitIntelligenceEngine?.digitStats?.[d] || {};
+    const p90Gap = Number(s.p90Gap) || 0;
+    const currentGap = Number(s.currentGap) || 0;
+    const prevGap = Number(s.prevGap) || currentGap;
+
+    const p90Ratio = p90Gap > 0 ? (currentGap / p90Gap) : 0;
+
+    const pm2_recent = (window.pm2Window?.[d]?.length)
+        ? window.pm2Window[d].reduce((a, b) => a + b, 0) / window.pm2Window[d].length
+        : 0;
+
+    const pm3_recent = (window.pm3Window?.[d]?.length)
+        ? window.pm3Window[d].reduce((a, b) => a + b, 0) / window.pm3Window[d].length
+        : 0;
+
+    return { p90Ratio, currentGap, prevGap, pm2_recent, pm3_recent };
+}
         function getDynamicReleaseBand(d) {
             // Dynamic P90-based band (replaces static per-digit bands)
             try {
@@ -2144,12 +2199,17 @@ function releaseWindowJustOpened(d) {
 }
 
         function executeReleaseTrade(d, tick) {
+            const activeDigitStats = buildDigitStatsForCycle(digitToTrade);
+            if (!isDigitInsideBand(activeDigitStats)) {
+                return; // wait until band condition true
+            }
+
             const RW = window.releaseWindow;
 
             // Always trade the frozen digit once in-trade
             const digitToTrade = (window.frozenDigit !== null) ? window.frozenDigit : d;
 
-            if (!window.cycleActive || window.cycleTradeCount >= window.MAX_CYCLE_TRADES) {
+            if (!window.cycleActive || window.cycleTradeCount >= window.cycleLimit) {
                 return;
             }
 
@@ -2188,16 +2248,6 @@ function releaseWindowJustOpened(d) {
                 );
 
                 playAudioFeedback('EXECUTION');
-
-                // Early-pressure multiplier (no aborting late trades)
-                if (window.freezeTick !== null) {
-                    const age = RW.tickIndex - window.freezeTick;
-                    if (age <= EARLY_WINDOW) {
-                        window.currentStake = parseFloat((window.currentStake * 1.15).toFixed(2));
-                    } else {
-                        window.currentStake = parseFloat((window.currentStake * 1.02).toFixed(2));
-                    }
-                }
 
                 // Execute using the SAME trade function as AI/instant
                 executeTrade(tick);
@@ -3007,7 +3057,7 @@ if (sessionState.mode === 'ai' && window.digitIntelligenceEngine.currentRecommen
 
             window.cycleActive = true;
             window.cycleTradeCount = 0;
-            log("🚀 Starting 6-trade cycle on digit " + d + " (martingale step " + (window.martingaleStep || 0) + ")", "ENGINE");
+            log("🚀 Starting " + cycleLimit + "-trade cycle on digit " + d + " (martingale step " + (window.martingaleStep || 0) + ")", "ENGINE");
 
             // Update UI immediately
             const digitInput = document.getElementById('predictedDigit');
@@ -3041,13 +3091,13 @@ if (sessionState.mode === 'ai' && window.digitIntelligenceEngine.currentRecommen
                     return;
                 }
 
-                if (window.cycleActive && window.cycleTradeCount >= window.MAX_CYCLE_TRADES) {
+                if (window.cycleActive && window.cycleTradeCount >= window.cycleLimit) {
                     window.releaseTickFired[RW.activeDigit] = false;
                     RW.inTrade = false;
                     window.frozenDigit = null;
                     window.freezeTick = null;
                     window.cycleActive = false;
-                    log('⏸ 6 trades completed — waiting for next band entry (keeping martingale)', 'SYSTEM');
+                    log("⏸ Cycle limit reached — waiting for next band", "SYSTEM");
                     return;
                 }
             }
@@ -3120,7 +3170,8 @@ if (sessionState.mode === 'ai' && window.digitIntelligenceEngine.currentRecommen
             // Band-cycle gate (AI mode): do not trade unless a 6-trade cycle is active
             if (sessionState.mode === 'ai') {
                 if (!window.cycleActive) return;
-                if (window.cycleTradeCount >= window.MAX_CYCLE_TRADES) {
+                if (window.cycleTradeCount >= window.cycleLimit) {
+                    console.log("⏸ Cycle limit reached — waiting for next band");
                     window.cycleActive = false;
                     return;
                 }
@@ -3181,6 +3232,13 @@ if (sessionState.mode === 'ai' && window.digitIntelligenceEngine.currentRecommen
                     'trade'
                 );
                 
+                if (sessionState.mode === 'ai') {
+                    const activeDigitStats = buildDigitStatsForCycle(getExecutionDigit());
+                    if (!isDigitInsideBand(activeDigitStats)) {
+                        return; // wait until band condition true
+                    }
+                }
+
                 playAudioFeedback('EXECUTION');
                 executeTrade(tick);
                 
@@ -3699,11 +3757,12 @@ window.isBotRunning = true;
                 const RW = window.releaseWindow;
                 if (RW && RW.inTrade && window.cycleActive) {
                     // cycleTradeCount is incremented at trade-send time (executeReleaseTrade / processTickImmediately).
-                    if (window.cycleTradeCount >= window.MAX_CYCLE_TRADES) {
+                    if (window.cycleTradeCount >= window.cycleLimit) {
+                        log("⏸ Cycle limit reached — waiting for next band", "SYSTEM");
                         window.cycleActive = false;
                         RW.inTrade = false;
                         window.freezeTick = null;
-                        log('⏸ 6 trades completed — waiting for next band entry (keeping martingale)', 'SYSTEM');
+                        return;
                     }
                 }
             } catch (_) {}
