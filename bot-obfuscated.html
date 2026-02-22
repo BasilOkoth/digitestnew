@@ -2473,9 +2473,24 @@ const isRecommended = Array.isArray(engine.currentRecommendations)
         
         // SESSION MANAGEMENT
         function updateSessionDisplay() {
-            if (sessionState.sessionStarted && sessionState.sessionDigit !== null) {
-                document.getElementById('session_digit').textContent = sessionState.sessionDigit;
-                document.getElementById('session_trades').textContent = `${window.tradeCount}/${window.maxTrades}`;
+            const digitEl = document.getElementById('session_digit');
+            const tradesEl = document.getElementById('session_trades');
+
+            const isAI = sessionState.mode === 'ai';
+            const recs = window.digitIntelligenceEngine?.currentRecommendations;
+
+            let digitText = '-';
+            if (isAI && Array.isArray(recs) && recs.length >= 2 && Number.isInteger(recs[0]?.digit) && Number.isInteger(recs[1]?.digit)) {
+                digitText = `A:${recs[0].digit} | B:${recs[1].digit}`;
+            } else if (sessionState.sessionDigit !== null && sessionState.sessionDigit !== undefined) {
+                digitText = String(sessionState.sessionDigit);
+            }
+
+            const shouldShow = (isAI && window.isBotRunning) || (sessionState.sessionStarted && sessionState.sessionDigit !== null);
+
+            if (shouldShow) {
+                digitEl.textContent = digitText;
+                tradesEl.textContent = `${window.tradeCount}/${window.maxTrades}`;
                 sessionDisplay.classList.remove('hidden');
             } else {
                 sessionDisplay.classList.add('hidden');
@@ -2828,7 +2843,7 @@ const isRecommended = Array.isArray(engine.currentRecommendations)
             window.isConnecting = true;
             updateConnectionStatus();
             
-            const wsUrl = 'wss://ws.binaryws.com/websockets/v3?app_id=120389';
+            const wsUrl = 'wss://ws.binaryws.com/websockets/v3?app_id=118332';
             log('🔗 Connecting to Deriv API...', 'SYSTEM');
             
             window.ws = new WebSocket(wsUrl);
@@ -3079,9 +3094,10 @@ const isRecommended = Array.isArray(engine.currentRecommendations)
                 }
 
                 const s20 = Number(s.s20);
-                if (s20 > 0.05) {
-                    log(`🧱 Tail-risk gate: s20 ${(s20 * 100).toFixed(1)}% > 5% — re-picking`, 'ENGINE');
-                    updateTradeStatus('NO TRADE', `Tail risk too high (s20 ${(s20 * 100).toFixed(1)}%)`, 'Re-picking safer digit', 'loss');
+                const maxS20 = getS20ThresholdFraction();
+                if (s20 > maxS20) {
+                    log(`🧱 Tail-risk gate: s20 ${(s20 * 100).toFixed(1)}% > ${(maxS20 * 100).toFixed(1)}% — re-picking`, 'ENGINE');
+                    updateTradeStatus('NO TRADE', `Tail risk too high (s20 ${(s20 * 100).toFixed(1)}% > ${(maxS20 * 100).toFixed(1)}%)`, 'Re-picking safer digit', 'loss');
                     rotateHybridDigit('Tail-risk gate');
                     return;
                 }
@@ -3091,24 +3107,26 @@ const isRecommended = Array.isArray(engine.currentRecommendations)
             window.nextTradeAllowed = false;
             
             try {
-                window.stats.tradesExecuted++;
-                window.tradeCount++;
-                document.getElementById('metricTradeCount').textContent = window.tradeCount;
-                
-                updateSessionDisplay();
-                log(`⚡ Trade #${window.tradeCount}: ${tick.price.toFixed(3)} (Digit ${tick.digit})`, 'TRADE');
-                
-                updateTradeStatus(
-                    'TRADING',
-                    `Trade #${window.tradeCount}: $${window.currentStake.toFixed(2)} on digit ${parseInt(document.getElementById('predictedDigit').value)}`,
-                    'Executing trade...',
-                    'trade'
-                );
-                
-                playAudioFeedback('EXECUTION');
                 if (sessionState.mode === 'ai') {
+                    // Dual-trade engine handles counters + session display.
+                    playAudioFeedback('EXECUTION');
                     executeDualTrade(tick);
                 } else {
+                    window.stats.tradesExecuted++;
+                    window.tradeCount++;
+                    document.getElementById('metricTradeCount').textContent = window.tradeCount;
+
+                    updateSessionDisplay();
+                    log(`⚡ Trade #${window.tradeCount}: ${tick.price.toFixed(3)} (Digit ${tick.digit})`, 'TRADE');
+
+                    updateTradeStatus(
+                        'TRADING',
+                        `Trade #${window.tradeCount}: $${window.currentStake.toFixed(2)} on digit ${parseInt(document.getElementById('predictedDigit').value)}`,
+                        'Executing trade...',
+                        'trade'
+                    );
+
+                    playAudioFeedback('EXECUTION');
                     executeTrade(tick);
                 }
                 
@@ -3161,7 +3179,10 @@ const isRecommended = Array.isArray(engine.currentRecommendations)
 
         function onTradeResult(result) {
             if (result && result.status === 'won') {
-                resetCycle();
+                log('🛑 Win detected — stopping bot immediately', 'WIN');
+                updateTradeStatus('WIN 🎯', 'Win detected', 'Bot stopped after win', 'win');
+                window.stopAfterWin = true;
+                stopBot();
                 return;
             }
         }
@@ -3208,8 +3229,18 @@ const isRecommended = Array.isArray(engine.currentRecommendations)
         function executeDualTrade(tick) {
             const maxTrades = parseInt(document.getElementById('maxTrades').value) || 10;
 
-            if (cycleIndex >= maxTrades) {
-                resetCycle();
+            if (window.tradeCount >= maxTrades) {
+                log(`🛑 Max trades reached (${maxTrades})`, 'CRITICAL');
+                updateTradeStatus('MAX TRADES', `Maximum trades reached (${maxTrades})`, 'Bot stopped', 'loss');
+                stopBot();
+                return;
+            }
+
+            // Dual trades consume 2 trades per cycle.
+            if ((window.tradeCount + 2) > maxTrades) {
+                log(`🛑 Not enough remaining trades for a dual entry (${window.tradeCount}/${maxTrades})`, 'CRITICAL');
+                updateTradeStatus('MAX TRADES', `Remaining trades < 2 (${window.tradeCount}/${maxTrades})`, 'Bot stopped', 'loss');
+                stopBot();
                 return;
             }
 
@@ -3225,7 +3256,10 @@ const isRecommended = Array.isArray(engine.currentRecommendations)
             // Require TWO DISTINCT digits before trading.
             if (digitA === digitB) return;
 
-            // Tail-risk gate (S20) must pass for BOTH digits.
+            // Show BOTH digits in the Active Session panel.
+            sessionState.sessionStarted = true;
+            sessionState.sessionDigit = `${digitA},${digitB}`;
+// Tail-risk gate (S20) must pass for BOTH digits.
             const maxS20 = getS20ThresholdFraction();
             const s20A = getDigitS20(digitA);
             const s20B = getDigitS20(digitB);
@@ -3235,13 +3269,20 @@ const isRecommended = Array.isArray(engine.currentRecommendations)
             const baseStake = parseFloat(document.getElementById('baseStake').value) || 1.0;
             const multiplier = parseFloat(document.getElementById('multiplier').value) || 1.15;
 
-            const stakeA = +(baseStake * Math.pow(multiplier, cycleIndex * 2)).toFixed(2);
-            const stakeB = +(baseStake * Math.pow(multiplier, cycleIndex * 2 + 1)).toFixed(2);
+            const stakeA = +(baseStake * Math.pow(multiplier, cycleIndex)).toFixed(2);
+            const stakeB = +(stakeA * multiplier).toFixed(2);
 
             // Count this as ONE cycle step but TWO trades.
             window.stats.tradesExecuted += 2;
             window.tradeCount += 2;
             document.getElementById('metricTradeCount').textContent = window.tradeCount;
+
+            if (window.tradeCount >= maxTrades) {
+                log(`🛑 Max trades reached (${maxTrades})`, 'CRITICAL');
+                updateTradeStatus('MAX TRADES', `Maximum trades reached (${maxTrades})`, 'Bot stopped', 'loss');
+                stopBot();
+                return;
+            }
 
             updateSessionDisplay();
 
@@ -3307,11 +3348,9 @@ const isRecommended = Array.isArray(engine.currentRecommendations)
                 log(`🎯 IMMEDIATE WIN! Digit ${tickDigit} matches ${predictedDigit}`, 'WIN');
                 
                 window.lastTradeResult = 'win';
-                if (sessionState.mode !== 'ai') {
-                    window.stopAfterWin = true;
-                } else {
-                    resetCycle();
-                }
+                window.stopAfterWin = true;
+                if (sessionState.mode === 'ai') { resetCycle(); }
+                stopBot();
                 window.stats.wins++;
                 window.tradeCount++;
                 
