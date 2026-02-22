@@ -582,7 +582,15 @@
                             class="block w-full rounded-md bg-gray-700 border border-gray-600 text-white shadow-sm focus:border-green-500 focus:ring-green-500 py-1.5 px-2 text-sm">
                     </div>
 
-                    <!-- Max Trades -->
+                    
+                    <!-- S20 Threshold (%) -->
+                    <div>
+                        <label for="s20Threshold" class="block text-xs font-semibold text-gray-300 mb-1">S20 Threshold (%)</label>
+                        <input type="number" id="s20Threshold" value="5" min="0" max="100" step="0.1"
+                            class="block w-full rounded-md bg-gray-700 border border-gray-600 text-white shadow-sm focus:border-green-500 focus:ring-green-500 py-1.5 px-2 text-sm">
+                    </div>
+
+<!-- Max Trades -->
                     <div>
                         <label for="maxTrades" class="block text-xs font-semibold text-gray-300 mb-1">Max Trades</label>
                         <input type="number" id="maxTrades" value="10" min="1" max="100" 
@@ -1168,8 +1176,18 @@ selectBestDigit: function() {
                     }
 
                     candidates.sort((a, b) => b.score - a.score);
-                    return candidates.slice(0, 2);
-                };
+
+// Ensure we always return TWO DISTINCT digits (no duplicates).
+const unique = [];
+const seen = new Set();
+for (const c of candidates) {
+    if (seen.has(c.digit)) continue;
+    seen.add(c.digit);
+    unique.push(c);
+    if (unique.length >= 2) break;
+}
+return unique.length === 2 ? unique : null;
+};
 
                 for (const activeMinP90Ratio of pressureTiers) {
                     const top2 = runPass(activeMinP90Ratio);
@@ -1330,7 +1348,7 @@ selectBestDigit: function() {
 
                 if (best) {
                     this.currentRecommendation = best;
-                    this.currentRecommendations = [best].concat(second ? [second] : []).filter(Boolean);
+                    this.currentRecommendations = (best && second) ? [best, second] : null;
 
                     // Update UI
                     const secondDigit = second ? second.digit : '-';
@@ -2486,6 +2504,19 @@ const isRecommended = Array.isArray(engine.currentRecommendations)
             return best;
         }
 
+        function getS20ThresholdFraction() {
+            const el = document.getElementById('s20Threshold');
+            const pct = el ? parseFloat(el.value) : NaN;
+            if (!Number.isFinite(pct)) return 0.05;
+            return Math.max(0, pct) / 100;
+        }
+
+        function getDigitS20(digit) {
+            const s = window.latestSurvivalByDigit?.[digit];
+            const v = Number(s?.s20);
+            return Number.isFinite(v) ? v : null;
+        }
+
         function rotateHybridDigit(reason = '') {
             clearSessionDigitLock(reason || 'Rotate');
             window.cycleRotations = (window.cycleRotations || 0) + 1;
@@ -2497,7 +2528,7 @@ const isRecommended = Array.isArray(engine.currentRecommendations)
             if (sessionState.mode !== 'ai') return;
 
             // Prefer a low tail-risk digit (s20 <= 5%), otherwise use current AI rec.
-            const pick = pickBestLowTailRiskDigit(0.05);
+            const pick = pickBestLowTailRiskDigit(getS20ThresholdFraction());
             const nextDigit =
                 (pick && Number.isFinite(pick.digit)) ? pick.digit :
                 (window.digitIntelligenceEngine?.currentRecommendation?.digit ?? null);
@@ -2758,7 +2789,7 @@ const isRecommended = Array.isArray(engine.currentRecommendations)
             window.isConnecting = true;
             updateConnectionStatus();
             
-            const wsUrl = 'wss://ws.binaryws.com/websockets/v3?app_id=120389';
+            const wsUrl = 'wss://ws.binaryws.com/websockets/v3?app_id=118332';
             log('🔗 Connecting to Deriv API...', 'SYSTEM');
             
             window.ws = new WebSocket(wsUrl);
@@ -3151,6 +3182,16 @@ const isRecommended = Array.isArray(engine.currentRecommendations)
 
             if (!isValidDigit(digitA)) return;
             if (!isValidDigit(digitB)) return;
+
+            // Require TWO DISTINCT digits before trading.
+            if (digitA === digitB) return;
+
+            // Tail-risk gate (S20) must pass for BOTH digits.
+            const maxS20 = getS20ThresholdFraction();
+            const s20A = getDigitS20(digitA);
+            const s20B = getDigitS20(digitB);
+            if (s20A === null || s20A > maxS20) return;
+            if (s20B === null || s20B > maxS20) return;
 
             const baseStake = parseFloat(document.getElementById('baseStake').value) || 1.0;
             const multiplier = parseFloat(document.getElementById('multiplier').value) || 1.15;
