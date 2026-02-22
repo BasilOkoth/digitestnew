@@ -2843,7 +2843,7 @@ const isRecommended = Array.isArray(engine.currentRecommendations)
             window.isConnecting = true;
             updateConnectionStatus();
             
-            const wsUrl = 'wss://ws.binaryws.com/websockets/v3?app_id=120389';
+            const wsUrl = 'wss://ws.binaryws.com/websockets/v3?app_id=118332';
             log('🔗 Connecting to Deriv API...', 'SYSTEM');
             
             window.ws = new WebSocket(wsUrl);
@@ -3108,9 +3108,8 @@ const isRecommended = Array.isArray(engine.currentRecommendations)
             
             try {
                 if (sessionState.mode === 'ai') {
-                    // Dual-trade engine handles counters + session display.
-                    playAudioFeedback('EXECUTION');
-                    executeDualTrade(tick);
+                    // AI entry: dual if 2 distinct digits exist, otherwise single.
+                    executeAiEntry(tick);
                 } else {
                     window.stats.tradesExecuted++;
                     window.tradeCount++;
@@ -3226,7 +3225,59 @@ const isRecommended = Array.isArray(engine.currentRecommendations)
             sendRequest(proposalRequest);
         }
 
-        function executeDualTrade(tick) {
+        
+        function executeAiEntry(tick) {
+            const engine = window.digitIntelligenceEngine;
+            const recs = engine?.currentRecommendations || [];
+            const best = recs[0]?.digit ?? engine?.currentRecommendation?.digit;
+
+            // Prefer dual only when we truly have 2 distinct digits.
+            if (recs.length >= 2) {
+                const d1 = recs[0]?.digit;
+                const d2 = recs[1]?.digit;
+                if (isValidDigit(d1) && isValidDigit(d2) && d1 !== d2) {
+                    // executeDualTrade does its own S20 checks for both digits.
+                    executeDualTrade(tick);
+                    return;
+                }
+            }
+
+            // Fallback to single-digit AI trade.
+            if (!isValidDigit(best)) return;
+
+            // Keep UI in sync
+            document.getElementById('predictedDigit').value = best;
+
+            sessionState.sessionStarted = true;
+            sessionState.sessionDigit = best;
+            updateSessionDisplay();
+
+            // Max-trades guard (single trade)
+            const maxTrades = parseInt(document.getElementById('maxTrades').value) || 10;
+            if (window.tradeCount >= maxTrades) {
+                log(`🛑 Max trades reached (${maxTrades})`, 'CRITICAL');
+                updateTradeStatus('MAX TRADES', `Maximum trades reached (${maxTrades})`, 'Bot stopped', 'loss');
+                stopBot();
+                return;
+            }
+
+            window.stats.tradesExecuted++;
+            window.tradeCount++;
+            document.getElementById('metricTradeCount').textContent = window.tradeCount;
+
+            log(`⚡ Trade #${window.tradeCount}: $${window.currentStake.toFixed(2)} on digit ${best}`, 'TRADE');
+            updateTradeStatus(
+                'TRADING',
+                `Trade #${window.tradeCount}: $${window.currentStake.toFixed(2)} on digit ${best}`,
+                'Executing trade...',
+                'trade'
+            );
+
+            playAudioFeedback('EXECUTION');
+            executeTrade(tick);
+        }
+
+function executeDualTrade(tick) {
             const maxTrades = parseInt(document.getElementById('maxTrades').value) || 10;
 
             if (window.tradeCount >= maxTrades) {
