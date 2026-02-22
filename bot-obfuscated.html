@@ -413,13 +413,8 @@
                         
                         <!-- Selected Digit -->
                         <div class="mb-3 p-2 bg-gray-900 rounded border border-green-500/30">
-                            <div class="text-xs font-semibold text-green-400 mb-1">AI Recommended Digits:</div>
-                            <div class="text-sm font-bold text-center text-green-400">
-                                Digit A: <span id="ai-recommended-digit-a">-</span>
-                            </div>
-                            <div class="text-sm font-bold text-center text-green-400">
-                                Digit B: <span id="ai-recommended-digit-b">-</span>
-                            </div>
+                            <div class="text-xs font-semibold text-green-400 mb-1">AI Recommended Digit:</div>
+                            <div id="ai-recommended-digit" class="text-center text-green-400">-</div>
                             <div id="ai-digit-score" class="text-xs text-gray-400 text-center">Score: -</div>
                         </div>
                         
@@ -779,6 +774,7 @@
             
             // Current recommendation
             currentRecommendation: null,
+            currentRecommendations: null,
             
             // Initialize engine
             init: function() {
@@ -791,6 +787,7 @@
                 this.warmupDone = false;
                 this.warmupTicks = 0;
                 this.tickIndex = 0;
+                this.currentRecommendation = null;
                 this.currentRecommendations = null;
                 
                 this.digitStats = Array(10).fill().map(() => ({
@@ -1058,16 +1055,15 @@
             },
             
             // Select best digit using AI logic
-            selectBestDigit: function() {
+            
+selectBestDigit: function() {
                 if (!this.warmupDone || !this.enabled) return null;
-                
+
                 const regimeStatus = this.computeRegimeStatus();
                 if (!regimeStatus.ok) {
                     log(`🧠 Regime unstable: E=${regimeStatus.entropy}, χ²=${regimeStatus.chi2}, D=${regimeStatus.dominance}`, 'ENGINE');
                     return null;
                 }
-                
-                let best = null;
 
                 const thresholds = window.AI_THRESHOLDS;
 
@@ -1177,59 +1173,213 @@
 
                 for (const activeMinP90Ratio of pressureTiers) {
                     const top2 = runPass(activeMinP90Ratio);
-                    if (top2 && top2.length) {
-                        best = top2;
-                        break;
-                    }
+                    if (top2 && top2.length) return top2;
                 }
 
-                return best;
+                return null;
             },
-            
+
             // Analyze and recommend digit
             analyzeAndRecommend: function() {
                 const regimeStatus = this.computeRegimeStatus();
 
                 if (!regimeStatus.ok) {
+                    // Keep UI consistent when regime is unstable
+                    this.currentRecommendation = null;
                     this.currentRecommendations = null;
-                    const elA = document.getElementById('ai-recommended-digit-a'); if (elA) elA.textContent = '-';
-                    const elB = document.getElementById('ai-recommended-digit-b'); if (elB) elB.textContent = '-';
-                    const scoreEl = document.getElementById('ai-digit-score');
-                    if (scoreEl) scoreEl.textContent = 'Score: 0.0% | P10: 0.0% | NO-TRADE';
-                    updateEngineStatus('Regime unstable — NO TRADE', 'WARMUP', 0);
+                    document.getElementById('ai-recommended-digit').textContent = '-';
+                    document.getElementById('ai-digit-score').textContent = 'Score: 0.0% | P10: 0.0% | NO-TRADE';
                     return;
                 }
 
-                const top2 = this.selectBestDigit(); // array [{digit, score, ...}, {digit, score, ...}]
-                if (!Array.isArray(top2) || top2.length < 2) {
-                    this.currentRecommendations = null;
-                    const elA = document.getElementById('ai-recommended-digit-a'); if (elA) elA.textContent = '-';
-                    const elB = document.getElementById('ai-recommended-digit-b'); if (elB) elB.textContent = '-';
-                    const scoreEl = document.getElementById('ai-digit-score');
-                    if (scoreEl) scoreEl.textContent = 'Score: 0.0% | P10: 0.0% | ANALYZING';
-                    updateEngineStatus('Analyzing…', 'ANALYZING', 50);
-                    return;
+                const top2 = this.selectBestDigit();
+
+                let best = (top2 && top2.length) ? top2[0] : null;
+                const second = (top2 && top2.length > 1) ? top2[1] : null;
+
+                // -----------------------------
+                // Survival-curve overlay (always-on hybrid when data exists)
+                // -----------------------------
+                const minDigits = (typeof window.SURVIVAL_MIN_DIGITS === 'number') ? window.SURVIVAL_MIN_DIGITS : 80;
+                const windowSize = window.SURVIVAL_WINDOW || 2000;
+
+                let survivalStats = null;
+                let survivalByDigit = null;
+                let survivalTop3 = [];
+                let survivalTop = null;
+
+                try {
+                    if (window.SurvivalEngine && Array.isArray(window.lastDigits) && window.lastDigits.length >= minDigits) {
+                        survivalStats = window.SurvivalEngine.analyze(window.lastDigits, { window: windowSize });
+                        survivalByDigit = new Map(survivalStats.map(s => [s.digit, s]));
+
+                        // Try strict rank first (user cfg). If empty, fall back to global ranking (no "ignore" case).
+                        let ranked = [];
+                        try {
+                            ranked = window.SurvivalEngine.rank(survivalStats, window.SURVIVAL_CFG || {});
+                        } catch (_) {
+                            ranked = [];
+                        }
+
+                        const scoreRaw = (x) =>
+                            (2.0 * (x.pm5 || 0)) +
+                            (1.0 * (x.pm10 || 0)) -
+                            (2.5 * (x.s20 || 0)) -
+                            (0.05 * Math.min(Number.isFinite(x.etm) ? x.etm : 100, 100));
+
+                        const asScored = (arr) => arr.map(x => {
+                            const raw = Number.isFinite(x.survivalScore) ? x.survivalScore : scoreRaw(x);
+                            const norm = 1 / (1 + Math.exp(-raw));
+                            return { ...x, survivalScore: raw, survivalNorm: norm };
+                        });
+
+                        let globalRanked = asScored(ranked);
+                        if (!globalRanked.length) {
+                            globalRanked = asScored(survivalStats).sort((a, b) => (b.survivalNorm - a.survivalNorm));
+                        }
+
+                        survivalTop3 = globalRanked.slice(0, 3);
+                        survivalTop = survivalTop3[0] || null;
+                    }
+                } catch (e) {
+                    console.warn('SurvivalEngine error:', e);
+                    survivalStats = null;
+                    survivalByDigit = null;
+                    survivalTop3 = [];
+                    survivalTop = null;
                 }
 
-                this.currentRecommendations = top2;
+                const hasSurvival = !!(survivalByDigit && survivalByDigit.size);
 
-                const a = top2[0];
-                const b = top2[1];
+                // Expose latest survival stats for trading gates
+                try {
+                    window.latestSurvivalStats = Array.isArray(survivalStats) ? survivalStats : null;
+                    window.latestSurvivalByDigit = Array.isArray(survivalStats)
+                        ? Object.fromEntries(survivalStats.map(s => [s.digit, s]))
+                        : null;
+                    window.latestSurvivalUpdatedAt = Date.now();
+                } catch (_) {
+                    window.latestSurvivalStats = null;
+                    window.latestSurvivalByDigit = null;
+                }
 
-                const elA = document.getElementById('ai-recommended-digit-a');
-                const elB = document.getElementById('ai-recommended-digit-b');
-                if (elA) elA.textContent = a.digit;
-                if (elB) elB.textContent = b.digit;
+                const attachHybrid = (candidate) => {
+                    if (!candidate || !hasSurvival) return candidate;
 
-                const scorePct = (a.score * 100).toFixed(1);
-                const p10Pct = (a.P10 * 100).toFixed(1);
-                const sourceLabel = a.source ? ` | ${a.source}` : '';
+                    const s = survivalByDigit.get(candidate.digit) || null;
+                    if (s) {
+                        const raw =
+                            Number.isFinite(s.survivalScore) ? s.survivalScore :
+                            (2.0 * (s.pm5 || 0)) + (1.0 * (s.pm10 || 0)) - (2.5 * (s.s20 || 0)) - (0.05 * Math.min(Number.isFinite(s.etm) ? s.etm : 100, 100));
+                        const survNorm = 1 / (1 + Math.exp(-raw));
 
-                const scoreEl = document.getElementById('ai-digit-score');
-                if (scoreEl) scoreEl.textContent = `Score: ${scorePct}% | P10: ${p10Pct}%${sourceLabel}`;
+                        const base = Number.isFinite(candidate.score) ? candidate.score : 0.0;
+                        const historyFactor = Math.min(1, (window.lastDigits.length / windowSize));
+                        const wBase = (typeof window.SURVIVAL_BLEND === 'number') ? window.SURVIVAL_BLEND : 0.35;
+                        const w = Math.max(0.10, Math.min(0.55, wBase * historyFactor));
 
-                updateEngineStatus('AI READY — Dual digits active', 'READY', 100);
-                log(`🎯 AI recommends digits ${a.digit} & ${b.digit} (A Score: ${scorePct}%, P10: ${p10Pct}%)`, 'AI');
+                        candidate.survival = { ...s, survivalScore: raw, survivalNorm: survNorm };
+                        candidate.source = 'HYBRID';
+                        candidate.score = Math.max(0, Math.min(1, ((1 - w) * base) + (w * survNorm)));
+                    } else {
+                        candidate.source = 'HYBRID';
+                        candidate.survival = null;
+                    }
+                    return candidate;
+                };
+
+                // If base engine has no pick, use survival's best digit (still HYBRID)
+                if (!best && hasSurvival && survivalTop) {
+                    best = {
+                        digit: survivalTop.digit,
+                        score: survivalTop.survivalNorm ?? (1 / (1 + Math.exp(-(survivalTop.survivalScore || 0)))),
+                        P10: survivalTop.pm10 ?? 0,
+                        P5: survivalTop.pm5 ?? 0,
+                        gap: survivalTop.gap ?? 0,
+                        persistenceScore: (this.digitStats[survivalTop.digit]?.persistenceScore ?? 0),
+                        isUnstable: (this.digitStats[survivalTop.digit]?.isUnstable ?? false),
+                        source: 'HYBRID',
+                        survival: survivalTop
+                    };
+                } else {
+                    best = attachHybrid(best);
+                }
+
+                // Optional override: if survival strongly prefers another digit, allow it to replace weak base picks.
+                if (best && hasSurvival && survivalTop && survivalTop.digit !== best.digit) {
+                    const baseScore = Number.isFinite(best.score) ? best.score : 0;
+                    const survTopNorm = survivalTop.survivalNorm ?? (1 / (1 + Math.exp(-(survivalTop.survivalScore || 0))));
+                    if (survTopNorm >= Math.max(0.62, baseScore + 0.08)) {
+                        best = {
+                            digit: survivalTop.digit,
+                            score: survTopNorm,
+                            P10: survivalTop.pm10 ?? 0,
+                            P5: survivalTop.pm5 ?? 0,
+                            gap: survivalTop.gap ?? 0,
+                            persistenceScore: (this.digitStats[survivalTop.digit]?.persistenceScore ?? 0),
+                            isUnstable: (this.digitStats[survivalTop.digit]?.isUnstable ?? false),
+                            source: 'HYBRID',
+                            survival: survivalTop
+                        };
+                    } else {
+                        // Ensure survival metrics are attached even if not overriding.
+                        best.survival = best.survival || survivalByDigit.get(best.digit) || null;
+                        best.source = 'HYBRID';
+                    }
+                }
+
+                if (best) {
+                    this.currentRecommendation = best;
+                    this.currentRecommendations = [best].concat(second ? [second] : []).filter(Boolean);
+
+                    // Update UI
+                    const secondDigit = second ? second.digit : '-';
+                    document.getElementById('ai-recommended-digit').innerHTML = `<div class="text-lg font-bold text-center text-green-400">Digit A: ${best.digit}</div><div class="text-lg font-bold text-center text-green-400">Digit B: ${secondDigit}</div>`;
+
+                    const sourceLabel = best.source ? ` | ${best.source}` : '';
+
+                    let survivalLabel = '';
+                    if (hasSurvival) {
+                        const s = best.survival || (survivalByDigit ? survivalByDigit.get(best.digit) : null);
+                        if (s) {
+                            survivalLabel =
+                                ` | pm5:${Math.round((s.pm5 || 0) * 100)}% pm10:${Math.round((s.pm10 || 0) * 100)}% s20:${Math.round((s.s20 || 0) * 100)}% etm:${Number.isFinite(s.etm) ? s.etm.toFixed(1) : '∞'}`;
+                        } else {
+                            survivalLabel = ` | Survival: N/A`;
+                        }
+                    } else {
+                        const n = Array.isArray(window.lastDigits) ? window.lastDigits.length : 0;
+                        survivalLabel = ` | Survival: warming up (${n}/${minDigits})`;
+                    }
+
+                    document.getElementById('ai-digit-score').textContent =
+                        `Score: ${(best.score * 100).toFixed(1)}% | P10: ${(best.P10 * 100).toFixed(1)}%${sourceLabel}${survivalLabel}`;
+
+                    // Color code based on score
+                    const scoreElem = document.getElementById('ai-digit-score');
+                    scoreElem.classList.remove('engine-digit-score-high', 'engine-digit-score-medium', 'engine-digit-score-low');
+                    if (best.score >= 0.85) scoreElem.classList.add('engine-digit-score-high');
+                    else if (best.score >= 0.75) scoreElem.classList.add('engine-digit-score-medium');
+                    else scoreElem.classList.add('engine-digit-score-low');
+
+                    // Update survival panel (top3)
+                    try {
+                        const panel = document.getElementById('survival-top3');
+                        if (panel) {
+                            if (!hasSurvival) {
+                                panel.textContent = 'Survival picks: warming up…';
+                            } else if (!survivalTop3.length) {
+                                panel.textContent = 'Survival picks: N/A';
+                            } else {
+                                panel.textContent = 'Top picks: ' + survivalTop3.map(x =>
+                                    `${x.digit} (pm5:${Math.round((x.pm5 || 0) * 100)}%, pm10:${Math.round((x.pm10 || 0) * 100)}%, s20:${Math.round((x.s20 || 0) * 100)}%, etm:${Number.isFinite(x.etm) ? x.etm.toFixed(1) : '∞'})`
+                                ).join(' | ');
+                            }
+                        }
+                    } catch (_) {}
+
+                    log(`🎯 AI recommends digit ${best.digit} (Score: ${(best.score * 100).toFixed(1)}%, P10: ${(best.P10 * 100).toFixed(1)}%)`, 'AI');
+                }
             },
             
             // Get digit statistics for display
@@ -1245,7 +1395,7 @@
                         p90Gap: s.p90Gap,
                         persistenceScore: s.persistenceScore,
                         isUnstable: s.isUnstable,
-                        isRecommended: Array.isArray(this.currentRecommendations) && this.currentRecommendations.some(x => x && x.digit === d)
+                        isRecommended: Array.isArray(this.currentRecommendations) ? this.currentRecommendations.some(r => r && r.digit === d) : (this.currentRecommendation && this.currentRecommendation.digit === d)
                     });
                 }
                 return stats;
@@ -1695,7 +1845,9 @@ const passScore = score >= scoreCutoff;
 
                 const passAll =
                     passSupport && passP90 && passPressure && passPersistence && passExtend && passUnstable && passP5 && passP10;
-const isRecommended = engine.currentRecommendation && engine.currentRecommendation.digit === d;
+const isRecommended = Array.isArray(engine.currentRecommendations)
+                    ? engine.currentRecommendations.some(r => r && r.digit === d)
+                    : (engine.currentRecommendation && engine.currentRecommendation.digit === d);
 
                 const barWidth = Math.min(100, (g / 50) * 100);
                 const barColor = !passAll ? 'bg-red-500' :
@@ -1748,13 +1900,15 @@ const isRecommended = engine.currentRecommendation && engine.currentRecommendati
         }
         
         function useAIRecommendedDigit() {
-            if (!window.digitIntelligenceEngine.currentRecommendations || !window.digitIntelligenceEngine.currentRecommendations[0]) {
+            if (!(window.digitIntelligenceEngine.currentRecommendations && window.digitIntelligenceEngine.currentRecommendations[0]) && !window.digitIntelligenceEngine.currentRecommendation) {
                 log('❌ No AI recommendation available yet', 'ENGINE');
                 alert('AI engine is still analyzing. Please wait for a recommendation.');
                 return;
             }
             
-            const recommendedDigit = window.digitIntelligenceEngine.currentRecommendations[0].digit;
+            const recommendedDigit = (window.digitIntelligenceEngine.currentRecommendations && window.digitIntelligenceEngine.currentRecommendations[0])
+                        ? window.digitIntelligenceEngine.currentRecommendations[0].digit
+                        : window.digitIntelligenceEngine.currentRecommendation.digit;
             document.getElementById('predictedDigit').value = recommendedDigit;
             
             if (sessionState.sessionStarted) {
@@ -2425,8 +2579,10 @@ const isRecommended = engine.currentRecommendation && engine.currentRecommendati
                 log('🔄 Switched to AI AUTO mode', 'SYSTEM');
 
                 // In AI mode we PREVIEW digits while stopped, and LOCK only when the bot is running.
-                if (window.digitIntelligenceEngine.warmupDone && window.digitIntelligenceEngine.currentRecommendations && window.digitIntelligenceEngine.currentRecommendations[0]) {
-                    const recommendedDigit = window.digitIntelligenceEngine.currentRecommendations[0].digit;
+                if (window.digitIntelligenceEngine.warmupDone && (window.digitIntelligenceEngine.currentRecommendations || window.digitIntelligenceEngine.currentRecommendation)) {
+                    const recommendedDigit = (window.digitIntelligenceEngine.currentRecommendations && window.digitIntelligenceEngine.currentRecommendations[0])
+                        ? window.digitIntelligenceEngine.currentRecommendations[0].digit
+                        : window.digitIntelligenceEngine.currentRecommendation.digit;
                     document.getElementById('predictedDigit').value = recommendedDigit;
 
                     if (window.isBotRunning) {
@@ -2449,7 +2605,7 @@ const isRecommended = engine.currentRecommendation && engine.currentRecommendati
         
         function updateExecutionLogic() {
             if (sessionState.mode === 'ai') {
-                const hasRec = !!window.digitIntelligenceEngine.currentRecommendations && window.digitIntelligenceEngine.currentRecommendations[0];
+                const hasRec = !!window.digitIntelligenceEngine.currentRecommendation;
                 const warmed = !!window.digitIntelligenceEngine.warmupDone;
 
                 if (!warmed || !hasRec) {
@@ -2465,7 +2621,9 @@ const isRecommended = engine.currentRecommendation && engine.currentRecommendati
                     return;
                 }
 
-                const recommendedDigit = window.digitIntelligenceEngine.currentRecommendations[0].digit;
+                const recommendedDigit = (window.digitIntelligenceEngine.currentRecommendations && window.digitIntelligenceEngine.currentRecommendations[0])
+                ? window.digitIntelligenceEngine.currentRecommendations[0].digit
+                : window.digitIntelligenceEngine.currentRecommendation.digit;
 
                 if (!window.isBotRunning) {
                     // Preview only while stopped
@@ -2600,7 +2758,7 @@ const isRecommended = engine.currentRecommendation && engine.currentRecommendati
             window.isConnecting = true;
             updateConnectionStatus();
             
-            const wsUrl = 'wss://ws.binaryws.com/websockets/v3?app_id=120389';
+            const wsUrl = 'wss://ws.binaryws.com/websockets/v3?app_id=118332';
             log('🔗 Connecting to Deriv API...', 'SYSTEM');
             
             window.ws = new WebSocket(wsUrl);
@@ -2812,16 +2970,17 @@ const isRecommended = engine.currentRecommendation && engine.currentRecommendati
             if (window.stopAfterWin) return;
             
             // In AI mode, wait for engine recommendation
-            if (sessionState.mode === 'ai' && (!window.digitIntelligenceEngine.warmupDone || !window.digitIntelligenceEngine.currentRecommendations || !window.digitIntelligenceEngine.currentRecommendations.length)) {
+            if (sessionState.mode === 'ai' && (!window.digitIntelligenceEngine.warmupDone || !(window.digitIntelligenceEngine.currentRecommendations && window.digitIntelligenceEngine.currentRecommendations.length))) {
                 log('🤖 Waiting for AI recommendation...', 'ENGINE');
                 return;
             }
             
             // AI AUTO: lock the CURRENT prediction for trading when the bot is running (once per START)
             if (sessionState.mode === 'ai' && window.isBotRunning && (!sessionState.sessionStarted || sessionState.sessionDigit === null)) {
-                const recs = window.digitIntelligenceEngine.currentRecommendations;
-                const d = (recs && recs.length) ? recs[0].digit : null;
-                if (d !== null) lockSessionDigit(d, true, 'AUTO start lock');
+                const d = (window.digitIntelligenceEngine.currentRecommendations && window.digitIntelligenceEngine.currentRecommendations[0])
+                    ? window.digitIntelligenceEngine.currentRecommendations[0].digit
+                    : window.digitIntelligenceEngine.currentRecommendation.digit;
+                lockSessionDigit(d, true, 'AUTO start lock');
             }
 
             if (checkForImmediateWin(tick)) {
@@ -2838,7 +2997,9 @@ const isRecommended = engine.currentRecommendation && engine.currentRecommendati
 
             // 🧱 HARD TAIL-RISK GATE (s20 <= 5%)
             if (sessionState.mode === 'ai' && window.isBotRunning) {
-                const lockedDigit = (sessionState.sessionDigit !== null) ? sessionState.sessionDigit : parseInt(document.getElementById('predictedDigit').value);
+                const lockedDigit = (window.digitIntelligenceEngine.currentRecommendations && window.digitIntelligenceEngine.currentRecommendations[0])
+                    ? window.digitIntelligenceEngine.currentRecommendations[0].digit
+                    : ((sessionState.sessionDigit !== null) ? sessionState.sessionDigit : parseInt(document.getElementById('predictedDigit').value));
                 const s = getSurvivalForDigit(lockedDigit);
 
                 if (!s || !Number.isFinite(Number(s.s20))) {
@@ -2875,7 +3036,11 @@ const isRecommended = engine.currentRecommendation && engine.currentRecommendati
                 );
                 
                 playAudioFeedback('EXECUTION');
-                if (sessionState.mode === 'ai') { executeDualTrade(tick); } else { executeTrade(tick); }
+                if (sessionState.mode === 'ai') {
+                    executeDualTrade(tick);
+                } else {
+                    executeTrade(tick);
+                }
                 
             } catch (error) {
                 log(`❌ Error: ${error}`, 'ERROR');
@@ -2885,42 +3050,43 @@ const isRecommended = engine.currentRecommendation && engine.currentRecommendati
             }
         }
         
-
-        // ---------------------------------------------
-        // DUAL TRADE ENGINE (TOP-2 digits)
-        // ---------------------------------------------
+        
+        // ============================================================================
+        // DUAL-TRADE EXECUTION ENGINE (TOP-2 DIGITS)
+        // - Stakes alternate per cycleIndex: A uses (step*2), B uses (step*2+1)
+        // - Stop-on-first-win resets the cycleIndex
+        // - Safety filter prevents execution if either digit is outside release band
+        // ============================================================================
         let cycleIndex = 0;
-
-        function getReleaseBandDigits() {
-            const candidates = [
-                window.releaseBandDigits,
-                window.digitReleaseBand,
-                window.digitBand,
-                window.releaseBand
-            ];
-            for (const c of candidates) {
-                if (Array.isArray(c)) return c.map(Number).filter(n => Number.isInteger(n));
-                if (c && typeof c === 'object') {
-                    const arr = Object.values(c);
-                    if (arr.some(v => Array.isArray(v))) {
-                        // ignore nested
-                    }
-                }
-            }
-            return null;
-        }
-
-        function isValidDigit(d) {
-            if (!Number.isInteger(d) || d < 0 || d > 9) return false;
-
-            const band = getReleaseBandDigits();
-            if (!band || !band.length) return true;
-
-            return band.includes(d);
-        }
 
         function resetCycle() {
             cycleIndex = 0;
+        }
+
+        function isValidDigit(digit) {
+            const d = Number(digit);
+            if (!Number.isFinite(d) || d < 0 || d > 9) return false;
+
+            const engine = window.digitIntelligenceEngine;
+            if (!engine || !engine.warmupDone) return false;
+
+            const thresholds = window.AI_THRESHOLDS || {};
+            const s = engine.digitStats?.[d];
+            if (!s) return false;
+
+            const g = Number(s.currentGap);
+            const p90 = Math.max(Number(s.p90Gap) || 0, 1);
+            const p90Ratio = g / p90;
+
+            const minRatio = (typeof thresholds.pressureZoneMinFloorP90Ratio === "number") ? thresholds.pressureZoneMinFloorP90Ratio : 0.0;
+            const maxRatio = (typeof thresholds.pressureZoneMaxP90Ratio === "number") ? thresholds.pressureZoneMaxP90Ratio : 1.0;
+
+            if (thresholds.require_g_lt_p90 && g >= p90) return false;
+            if (thresholds.pressureZoneEnabled) {
+                if (p90Ratio < minRatio) return false;
+                if (p90Ratio >= maxRatio) return false;
+            }
+            return true;
         }
 
         function onTradeResult(result) {
@@ -2934,55 +3100,88 @@ const isRecommended = engine.currentRecommendation && engine.currentRecommendati
             const contractType = document.getElementById('contractType').value;
             const symbol = document.getElementById('symbol').value;
 
+            const d = Number(digit);
+            if (!Number.isFinite(d) || d < 0 || d > 9) return;
+
+            const amount = Number(stake);
+            if (!Number.isFinite(amount) || amount <= 0) return;
+
+            trackTradeInvestment(amount);
+
             const proposalRequest = {
                 proposal: 1,
-                amount: (+stake).toFixed(2),
+                amount: amount.toFixed(2),
                 basis: "stake",
                 contract_type: contractType,
                 currency: "USD",
                 duration: 1,
                 duration_unit: "t",
                 symbol: symbol,
-                barrier: String(digit),
+                barrier: String(Math.floor(d)),
                 req_id: getNextReqId()
             };
 
             window.pendingProposals.set(proposalRequest.req_id, {
-                tick: tick || null,
-                stake: +stake,
+                tick: tick,
+                stake: amount,
                 contractType: contractType,
-                predictedDigit: digit,
-                createdAt: Date.now()
+                predictedDigit: Math.floor(d),
+                startTime: Date.now(),
+                tradeNumber: window.tradeCount,
+                martingaleStep: window.martingaleStep,
+                dual: true
             });
 
             sendRequest(proposalRequest);
         }
 
         function executeDualTrade(tick) {
-            if (window.tradeCount >= window.maxTrades) {
+            const maxTrades = parseInt(document.getElementById('maxTrades').value) || 10;
+
+            if (cycleIndex >= maxTrades) {
                 resetCycle();
                 return;
             }
 
-            const digits = window.digitIntelligenceEngine.currentRecommendations;
-            if (!digits || digits.length < 2) return;
+            const recs = window.digitIntelligenceEngine?.currentRecommendations;
+            if (!recs || recs.length < 2) return;
 
-            // ⚠️ SAFETY FILTER: never fire if any digit is outside release band
-            if (!isValidDigit(digits[0].digit)) return;
-            if (!isValidDigit(digits[1].digit)) return;
+            const digitA = recs[0]?.digit;
+            const digitB = recs[1]?.digit;
 
-            const baseStake = parseFloat(document.getElementById('baseStake').value);
-            const multiplier = parseFloat(document.getElementById('multiplier').value);
+            if (!isValidDigit(digitA)) return;
+            if (!isValidDigit(digitB)) return;
+
+            const baseStake = parseFloat(document.getElementById('baseStake').value) || 1.0;
+            const multiplier = parseFloat(document.getElementById('multiplier').value) || 1.15;
 
             const stakeA = +(baseStake * Math.pow(multiplier, cycleIndex * 2)).toFixed(2);
             const stakeB = +(baseStake * Math.pow(multiplier, cycleIndex * 2 + 1)).toFixed(2);
 
-            placeDigitMatchTrade(digits[0].digit, stakeA, tick);
-            placeDigitMatchTrade(digits[1].digit, stakeB, tick);
+            // Count this as ONE cycle step but TWO trades.
+            window.stats.tradesExecuted += 2;
+            window.tradeCount += 2;
+            document.getElementById('metricTradeCount').textContent = window.tradeCount;
+
+            updateSessionDisplay();
+
+            log(`⚡ Dual Trade cycle ${cycleIndex + 1}: A(${digitA}) $${stakeA.toFixed(2)} | B(${digitB}) $${stakeB.toFixed(2)}`, 'TRADE');
+            updateTradeStatus(
+                'TRADING',
+                `Dual: A $${stakeA.toFixed(2)} @${digitA} | B $${stakeB.toFixed(2)} @${digitB}`,
+                'Executing dual trades.',
+                'trade'
+            );
+
+            playAudioFeedback('EXECUTION');
+
+            placeDigitMatchTrade(digitA, stakeA, tick);
+            placeDigitMatchTrade(digitB, stakeB, tick);
 
             cycleIndex++;
         }
-        // EXECUTE TRADE - CRITICAL FUNCTION
+
+// EXECUTE TRADE - CRITICAL FUNCTION
         function executeTrade(tick) {
             const contractType = document.getElementById('contractType').value;
             const symbol = document.getElementById('symbol').value;
@@ -3028,9 +3227,12 @@ const isRecommended = engine.currentRecommendation && engine.currentRecommendati
                 log(`🎯 IMMEDIATE WIN! Digit ${tickDigit} matches ${predictedDigit}`, 'WIN');
                 
                 window.lastTradeResult = 'win';
-                if (sessionState.mode !== 'ai') window.stopAfterWin = true;
-                onTradeResult({ status: 'won' });
-window.stats.wins++;
+                if (sessionState.mode !== 'ai') {
+                    window.stopAfterWin = true;
+                } else {
+                    resetCycle();
+                }
+                window.stats.wins++;
                 window.tradeCount++;
                 
                 playAudioFeedback('WIN');
@@ -3473,7 +3675,13 @@ window.isBotRunning = true;
                 // Check if this was a win or loss
                 const wasWin = buyData.longcode && buyData.longcode.includes("win");
                 
-                updateStake(wasWin ? 'win' : 'loss');
+                try { onTradeResult({ status: wasWin ? 'won' : 'lost', buyData }); } catch (_) {}
+
+                // Legacy single-trade stake progression (keep for INSTANT mode)
+                if (sessionState.mode !== 'ai') {
+                    updateStake(wasWin ? 'win' : 'loss');
+                }
+
                 onTradeComplete(true);
             } else {
                 log(`❌ Trade failed`, 'ERROR');
