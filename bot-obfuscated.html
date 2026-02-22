@@ -1213,7 +1213,7 @@ return unique.length === 2 ? unique : null;
                 const top2 = this.selectBestDigit();
 
                 let best = (top2 && top2.length) ? top2[0] : null;
-                const second = (top2 && top2.length > 1) ? top2[1] : null;
+                let second = (top2 && top2.length > 1) ? top2[1] : null;
 
                 // -----------------------------
                 // Survival-curve overlay (always-on hybrid when data exists)
@@ -1347,6 +1347,45 @@ return unique.length === 2 ? unique : null;
                 }
 
                 if (best) {
+                    // Build a blended pool so Digit B can still appear even when "best" was overridden by survival/hybrid.
+                    const pool = [];
+
+                    const pushCand = (c) => {
+                        if (!c || !Number.isInteger(c.digit)) return;
+                        pool.push(c);
+                    };
+
+                    if (top2 && top2.length) top2.forEach(pushCand);
+
+                    if (hasSurvival && Array.isArray(survivalTop3) && survivalTop3.length) {
+                        for (const s of survivalTop3) {
+                            pushCand({
+                                digit: s.digit,
+                                score: (typeof s.survivalNorm === 'number') ? s.survivalNorm : 0,
+                                source: 'SURVIVAL',
+                                survival: s
+                            });
+                        }
+                    }
+
+                    // Ensure current "best" is included in the pool.
+                    pushCand(best);
+
+                    const blended = pool.map(attachHybrid).filter(Boolean);
+                    blended.sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
+
+                    const picked = [];
+                    const seen = new Set();
+                    for (const c of blended) {
+                        if (seen.has(c.digit)) continue;
+                        seen.add(c.digit);
+                        picked.push(c);
+                        if (picked.length >= 2) break;
+                    }
+
+                    best = picked[0] || best;
+                    second = picked.length > 1 ? picked[1] : null;
+
                     this.currentRecommendation = best;
                     this.currentRecommendations = (best && second) ? [best, second] : null;
 
@@ -2789,7 +2828,7 @@ const isRecommended = Array.isArray(engine.currentRecommendations)
             window.isConnecting = true;
             updateConnectionStatus();
             
-            const wsUrl = 'wss://ws.binaryws.com/websockets/v3?app_id=120389';
+            const wsUrl = 'wss://ws.binaryws.com/websockets/v3?app_id=118332';
             log('🔗 Connecting to Deriv API...', 'SYSTEM');
             
             window.ws = new WebSocket(wsUrl);
