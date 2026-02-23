@@ -3066,14 +3066,6 @@ const isRecommended = Array.isArray(engine.currentRecommendations)
                     return;
                 }
             }
-            
-            // AI AUTO: lock the CURRENT prediction for trading when the bot is running (once per START)
-            if (sessionState.mode === 'ai' && window.isBotRunning && (!sessionState.sessionStarted || sessionState.sessionDigit === null)) {
-                const d = (window.digitIntelligenceEngine.currentRecommendations && window.digitIntelligenceEngine.currentRecommendations[0])
-                    ? window.digitIntelligenceEngine.currentRecommendations[0].digit
-                    : window.digitIntelligenceEngine.currentRecommendation.digit;
-                lockSessionDigit(d, true, 'AUTO start lock');
-            }
 
             if (checkForImmediateWin(tick)) {
                 return;
@@ -3085,31 +3077,42 @@ const isRecommended = Array.isArray(engine.currentRecommendations)
                 stopBot();
                 return;
             }
-
-
-            // 🧱 HARD TAIL-RISK GATE (s20 <= 5%)
+            // 🧱 TAIL-RISK GATE (AI dual-only): both digits must have s20 <= UI threshold
             if (sessionState.mode === 'ai' && window.isBotRunning) {
-                const lockedDigit = (window.digitIntelligenceEngine.currentRecommendations && window.digitIntelligenceEngine.currentRecommendations[0])
-                    ? window.digitIntelligenceEngine.currentRecommendations[0].digit
-                    : ((sessionState.sessionDigit !== null) ? sessionState.sessionDigit : parseInt(document.getElementById('predictedDigit').value));
-                const s = getSurvivalForDigit(lockedDigit);
+                const recs = window.digitIntelligenceEngine?.currentRecommendations || [];
+                const d1 = recs[0]?.digit;
+                const d2 = recs[1]?.digit;
 
-                if (!s || !Number.isFinite(Number(s.s20))) {
-                    log('🧱 Tail-risk gate: Survival data not ready — no trade', 'ENGINE');
+                const hasDual = isValidDigit(d1) && isValidDigit(d2) && d1 !== d2;
+                if (!hasDual) {
+                    // Recommendation gate is handled above, but keep this as a safety net.
+                    updateTradeStatus('NO TRADE', 'Waiting for 2 distinct digits', 'AI dual-only', 'loss');
+                    return;
+                }
+
+                const maxS20 = getS20ThresholdFraction();
+                const s20A = getDigitS20(d1);
+                const s20B = getDigitS20(d2);
+
+                // Allow PnL/UI to update, but don't trade until survival stats are ready.
+                if (s20A === null || s20B === null) {
+                    log('🧱 Tail-risk gate: Survival warming up — no trade', 'ENGINE');
                     updateTradeStatus('NO TRADE', 'Survival warming up', 'Waiting for more ticks', 'loss');
                     return;
                 }
 
-                const s20 = Number(s.s20);
-                const maxS20 = getS20ThresholdFraction();
-                if (s20 > maxS20) {
-                    log(`🧱 Tail-risk gate: s20 ${(s20 * 100).toFixed(1)}% > ${(maxS20 * 100).toFixed(1)}% — re-picking`, 'ENGINE');
-                    updateTradeStatus('NO TRADE', `Tail risk too high (s20 ${(s20 * 100).toFixed(1)}% > ${(maxS20 * 100).toFixed(1)}%)`, 'Re-picking safer digit', 'loss');
-                    rotateHybridDigit('Tail-risk gate');
+                if (s20A > maxS20 || s20B > maxS20) {
+                    log(`🧱 Tail-risk gate: A ${(s20A * 100).toFixed(1)}%, B ${(s20B * 100).toFixed(1)}% > ${(maxS20 * 100).toFixed(1)}% — no trade`, 'ENGINE');
+                    updateTradeStatus(
+                        'NO TRADE',
+                        `Tail risk too high (A ${(s20A * 100).toFixed(1)}%, B ${(s20B * 100).toFixed(1)}% > ${(maxS20 * 100).toFixed(1)}%)`,
+                        'Waiting for safer dual digits',
+                        'loss'
+                    );
                     return;
                 }
             }
-            
+
             window.executionLock = true;
             window.nextTradeAllowed = false;
             
