@@ -3056,12 +3056,11 @@ const isRecommended = Array.isArray(engine.currentRecommendations)
             
             // In AI mode, wait for 2 DISTINCT engine recommendations (AI is dual-only)
             if (sessionState.mode === 'ai') {
-                const recs = window.digitIntelligenceEngine?.currentRecommendations || [];
-                const d1 = recs[0]?.digit;
-                const d2 = recs[1]?.digit;
-                const hasDual = isValidDigit(d1) && isValidDigit(d2) && d1 !== d2;
+                const [d1, d2] = getAiDualDigits();
+                const hasDual = isValidDigit(d1) && isValidDigit(d2) && Number(d1) !== Number(d2);
+
                 if (!hasDual) {
-                    log('🤖 Waiting for 2 distinct AI recommendations (dual-only)...', 'ENGINE');
+                    log(`🤖 Waiting for 2 distinct AI recommendations (dual-only)... (A=${d1 ?? '-'} B=${d2 ?? '-'})`, 'ENGINE');
                     updateSessionDisplay();
                     return;
                 }
@@ -3188,6 +3187,28 @@ const isRecommended = Array.isArray(engine.currentRecommendations)
                 if (p90Ratio < minRatio) return false;
                 if (p90Ratio >= maxRatio) return false;
             }
+
+        /**
+         * Returns two distinct AI-recommended digits for dual-only trading.
+         * Source of truth is the engine's currentRecommendations; falls back to the UI display
+         * to avoid desync where the UI shows two digits but the engine array is null.
+         */
+        function getAiDualDigits() {
+            const engine = window.digitIntelligenceEngine;
+            const recs = (engine && Array.isArray(engine.currentRecommendations)) ? engine.currentRecommendations : null;
+
+            if (recs && recs.length >= 2) {
+                return [recs[0]?.digit, recs[1]?.digit];
+            }
+
+            const el = document.getElementById('ai-recommended-digit');
+            const txt = (el && (el.innerText || el.textContent)) ? (el.innerText || el.textContent) : '';
+            const a = /Digit\s*A:\s*([0-9])/.exec(txt)?.[1];
+            const b = /Digit\s*B:\s*([0-9])/.exec(txt)?.[1];
+
+            return [a, b];
+        }
+
             return true;
         }
 
