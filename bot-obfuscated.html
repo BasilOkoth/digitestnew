@@ -3059,7 +3059,7 @@ const isRecommended = Array.isArray(engine.currentRecommendations)
                 const recs = window.digitIntelligenceEngine?.currentRecommendations || [];
                 const d1 = recs[0]?.digit;
                 const d2 = recs[1]?.digit;
-                const hasDual = window.digitIntelligenceEngine?.warmupDone && isValidDigit(d1) && isValidDigit(d2) && d1 !== d2;
+                const hasDual = isValidDigit(d1) && isValidDigit(d2) && d1 !== d2;
                 if (!hasDual) {
                     log('🤖 Waiting for 2 distinct AI recommendations (dual-only)...', 'ENGINE');
                     updateSessionDisplay();
@@ -3250,7 +3250,7 @@ function placeDigitMatchTrade(digit, stake, tick) {
             const d2 = recs[1]?.digit;
 
             // AI is dual-only: NEVER fall back to single-digit.
-            if (!engine?.warmupDone || !isValidDigit(d1) || !isValidDigit(d2) || d1 === d2) {
+            if (!isValidDigit(d1) || !isValidDigit(d2) || d1 === d2) {
                 updateSessionDisplay();
                 return false;
             }
