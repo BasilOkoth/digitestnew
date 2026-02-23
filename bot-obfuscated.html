@@ -2843,7 +2843,7 @@ const isRecommended = Array.isArray(engine.currentRecommendations)
             window.isConnecting = true;
             updateConnectionStatus();
             
-            const wsUrl = 'wss://ws.binaryws.com/websockets/v3?app_id=120389';
+            const wsUrl = 'wss://ws.binaryws.com/websockets/v3?app_id=118332';
             log('🔗 Connecting to Deriv API...', 'SYSTEM');
             
             window.ws = new WebSocket(wsUrl);
@@ -3109,7 +3109,12 @@ const isRecommended = Array.isArray(engine.currentRecommendations)
             try {
                 if (sessionState.mode === 'ai') {
                     // AI entry: dual if 2 distinct digits exist, otherwise single.
-                    executeAiEntry(tick);
+                    const didTrade = executeAiEntry(tick);
+                    if (!didTrade) {
+                        // Avoid deadlock when AI recommends but cannot enter yet.
+                        window.executionLock = false;
+                        window.nextTradeAllowed = true;
+                    }
                 } else {
                     window.stats.tradesExecuted++;
                     window.tradeCount++;
@@ -3237,13 +3242,12 @@ const isRecommended = Array.isArray(engine.currentRecommendations)
                 const d2 = recs[1]?.digit;
                 if (isValidDigit(d1) && isValidDigit(d2) && d1 !== d2) {
                     // executeDualTrade does its own S20 checks for both digits.
-                    executeDualTrade(tick);
-                    return;
+                    return executeDualTrade(tick);
                 }
             }
 
             // Fallback to single-digit AI trade.
-            if (!isValidDigit(best)) return;
+            if (!isValidDigit(best)) return false;
 
             // Keep UI in sync
             document.getElementById('predictedDigit').value = best;
@@ -3258,7 +3262,7 @@ const isRecommended = Array.isArray(engine.currentRecommendations)
                 log(`🛑 Max trades reached (${maxTrades})`, 'CRITICAL');
                 updateTradeStatus('MAX TRADES', `Maximum trades reached (${maxTrades})`, 'Bot stopped', 'loss');
                 stopBot();
-                return;
+                return false;
             }
 
             window.stats.tradesExecuted++;
@@ -3275,6 +3279,7 @@ const isRecommended = Array.isArray(engine.currentRecommendations)
 
             playAudioFeedback('EXECUTION');
             executeTrade(tick);
+            return true;
         }
 
 function executeDualTrade(tick) {
@@ -3351,6 +3356,7 @@ function executeDualTrade(tick) {
             placeDigitMatchTrade(digitB, stakeB, tick);
 
             cycleIndex++;
+            return true;
         }
 
 // EXECUTE TRADE - CRITICAL FUNCTION
