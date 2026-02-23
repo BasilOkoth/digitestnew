@@ -3054,10 +3054,17 @@ const isRecommended = Array.isArray(engine.currentRecommendations)
         function processTickImmediately(tick) {
             if (window.stopAfterWin) return;
             
-            // In AI mode, wait for engine recommendation
-            if (sessionState.mode === 'ai' && (!window.digitIntelligenceEngine.warmupDone || !(window.digitIntelligenceEngine.currentRecommendations && window.digitIntelligenceEngine.currentRecommendations.length))) {
-                log('🤖 Waiting for AI recommendation...', 'ENGINE');
-                return;
+            // In AI mode, wait for 2 DISTINCT engine recommendations (AI is dual-only)
+            if (sessionState.mode === 'ai') {
+                const recs = window.digitIntelligenceEngine?.currentRecommendations || [];
+                const d1 = recs[0]?.digit;
+                const d2 = recs[1]?.digit;
+                const hasDual = window.digitIntelligenceEngine?.warmupDone && isValidDigit(d1) && isValidDigit(d2) && d1 !== d2;
+                if (!hasDual) {
+                    log('🤖 Waiting for 2 distinct AI recommendations (dual-only)...', 'ENGINE');
+                    updateSessionDisplay();
+                    return;
+                }
             }
             
             // AI AUTO: lock the CURRENT prediction for trading when the bot is running (once per START)
@@ -3183,15 +3190,20 @@ const isRecommended = Array.isArray(engine.currentRecommendations)
 
         function onTradeResult(result) {
             if (result && result.status === 'won') {
-                log('🛑 Win detected — stopping bot immediately', 'WIN');
-                updateTradeStatus('WIN 🎯', 'Win detected', 'Bot stopped after win', 'win');
+                log('🛑 Win detected — stopping trading immediately (PnL updates will continue)', 'WIN');
+                updateTradeStatus('WIN 🎯', 'Win detected', 'Trading stopped after win (PnL updating)', 'win');
+
+                // Freeze trading instantly, but keep streams + PnL timers alive.
                 window.stopAfterWin = true;
-                stopBot();
+                window.isBotRunning = false;
+                window.nextTradeAllowed = false;
+                updateButtonState();
+
                 return;
             }
         }
 
-        function placeDigitMatchTrade(digit, stake, tick) {
+function placeDigitMatchTrade(digit, stake, tick) {
             const contractType = document.getElementById('contractType').value;
             const symbol = document.getElementById('symbol').value;
 
@@ -3234,52 +3246,22 @@ const isRecommended = Array.isArray(engine.currentRecommendations)
         function executeAiEntry(tick) {
             const engine = window.digitIntelligenceEngine;
             const recs = engine?.currentRecommendations || [];
-            const best = recs[0]?.digit ?? engine?.currentRecommendation?.digit;
+            const d1 = recs[0]?.digit;
+            const d2 = recs[1]?.digit;
 
-            // Prefer dual only when we truly have 2 distinct digits.
-            if (recs.length >= 2) {
-                const d1 = recs[0]?.digit;
-                const d2 = recs[1]?.digit;
-                if (isValidDigit(d1) && isValidDigit(d2) && d1 !== d2) {
-                    // executeDualTrade does its own S20 checks for both digits.
-                    return executeDualTrade(tick);
-                }
-            }
-
-            // Fallback to single-digit AI trade.
-            if (!isValidDigit(best)) return false;
-
-            // Keep UI in sync
-            document.getElementById('predictedDigit').value = best;
-
-            sessionState.sessionStarted = true;
-            sessionState.sessionDigit = best;
-            updateSessionDisplay();
-
-            // Max-trades guard (single trade)
-            const maxTrades = parseInt(document.getElementById('maxTrades').value) || 10;
-            if (window.tradeCount >= maxTrades) {
-                log(`🛑 Max trades reached (${maxTrades})`, 'CRITICAL');
-                updateTradeStatus('MAX TRADES', `Maximum trades reached (${maxTrades})`, 'Bot stopped', 'loss');
-                stopBot();
+            // AI is dual-only: NEVER fall back to single-digit.
+            if (!engine?.warmupDone || !isValidDigit(d1) || !isValidDigit(d2) || d1 === d2) {
+                updateSessionDisplay();
                 return false;
             }
 
-            window.stats.tradesExecuted++;
-            window.tradeCount++;
-            document.getElementById('metricTradeCount').textContent = window.tradeCount;
+            // Keep UI in sync (Active Session shows A/B via updateSessionDisplay()).
+            sessionState.sessionStarted = true;
+            sessionState.sessionDigit = null;
+            updateSessionDisplay();
 
-            log(`⚡ Trade #${window.tradeCount}: $${window.currentStake.toFixed(2)} on digit ${best}`, 'TRADE');
-            updateTradeStatus(
-                'TRADING',
-                `Trade #${window.tradeCount}: $${window.currentStake.toFixed(2)} on digit ${best}`,
-                'Executing trade...',
-                'trade'
-            );
-
-            playAudioFeedback('EXECUTION');
-            executeTrade(tick);
-            return true;
+            // executeDualTrade includes its own max-trades guard and S20 checks per digit.
+            return executeDualTrade(tick);
         }
 
 function executeDualTrade(tick) {
@@ -3827,6 +3809,11 @@ window.isBotRunning = true;
         }
         
         function executeBuy(proposal_id, ask_price, pending) {
+            if (window.stopAfterWin || !window.isBotRunning) {
+                log('⛔ Buy suppressed (trading stopped)', 'SYSTEM');
+                return;
+            }
+
             const buyRequest = {
                 buy: proposal_id,
                 price: ask_price,
