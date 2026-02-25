@@ -3035,6 +3035,8 @@ const isRecommended = Array.isArray(engine.currentRecommendations)
                 handleProposalResponse(data.proposal, data.req_id);
             } else if (data.msg_type === 'buy') {
                 handleBuyResponse(data.buy);
+            } else if (data.msg_type === 'proposal_open_contract') {
+                handleOpenContractUpdate(data.proposal_open_contract);
             } else if (data.msg_type === 'balance') {
                 handleBalanceUpdate(data.balance);
             }
@@ -3755,7 +3757,47 @@ window.isBotRunning = true;
             log('💰 Subscribed to balance', 'SYSTEM');
         }
         
-        function handleBalanceUpdate(balanceData) {
+function subscribeToOpenContract(contractId) {
+            if (!contractId) return;
+            sendRequest({
+                proposal_open_contract: 1,
+                contract_id: contractId,
+                subscribe: 1,
+                req_id: getNextReqId()
+            });
+        }
+
+        function stopTradingAfterWin(profit) {
+            if (window.stopAfterWin) return;
+            window.stopAfterWin = true;
+            window.isBotRunning = false; // Stop placing new trades but keep socket/balance updates alive
+            updateSessionDisplay();
+            updateTradeStatus('STOPPED', '✅ Win detected — trading stopped', `Profit: ${formatMoney(profit)} (PnL will keep updating)`, 'win');
+            log(`🛑 Win detected (profit ${formatMoney(profit)}). Trading stopped; balance/PnL will continue updating.`, 'TRADE');
+        }
+
+        function handleOpenContractUpdate(oc) {
+            if (!oc) return;
+
+            // Only act once the contract is sold/settled
+            if (!oc.is_sold) return;
+
+            const profit = Number(oc.profit ?? 0);
+            const isWin = profit > 0;
+
+            try { onTradeResult({ status: isWin ? 'won' : 'lost', openContract: oc }); } catch (_) {}
+
+            // Keep legacy stake progression for INSTANT mode based on actual result
+            if (window.sessionState?.mode !== 'ai') {
+                updateStake(isWin ? 'win' : 'loss');
+            }
+
+            if (isWin) {
+                stopTradingAfterWin(profit);
+            }
+        }
+
+                function handleBalanceUpdate(balanceData) {
             const newBalance = parseFloat(balanceData.balance);
             
             if (window.startingBalance === 0) {
@@ -3838,17 +3880,9 @@ window.isBotRunning = true;
             if (buyData.contract_id) {
                 log(`✅ Trade executed successfully`, 'TRADE');
                 
-                // Check if this was a win or loss
-                const wasWin = buyData.longcode && buyData.longcode.includes("win");
-                
-                try { onTradeResult({ status: wasWin ? 'won' : 'lost', buyData }); } catch (_) {}
+                subscribeToOpenContract(buyData.contract_id);
 
-                // Legacy single-trade stake progression (keep for INSTANT mode)
-                if (sessionState.mode !== 'ai') {
-                    updateStake(wasWin ? 'win' : 'loss');
-                }
-
-                onTradeComplete(true);
+                                onTradeComplete(true);
             } else {
                 log(`❌ Trade failed`, 'ERROR');
                 updateTradeStatus('ERROR', 'Trade execution failed', 'Retrying...', 'loss');
