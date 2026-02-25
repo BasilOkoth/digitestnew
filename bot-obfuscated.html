@@ -3199,26 +3199,22 @@ function isValidDigit(digit) {
 }
 
 
-            function onTradeResult(result) {
+        function onTradeResult(result) {
             if (result && result.status === 'won') {
-                log('🛑 Win detected — halting trading immediately (PnL will update for ~10s)', 'WIN');
+                log('🛑 Win detected — stopping trading immediately (PnL updates will continue)', 'WIN');
+                updateTradeStatus('WIN 🎯', 'Win detected', 'Trading stopped after win (PnL updating)', 'win');
 
-                // Centralized stop-after-win handler (keeps socket alive briefly).
-                const profit = Number(result.openContract?.profit ?? 0);
-                if (typeof stopTradingAfterWin === 'function') {
-                    stopTradingAfterWin(profit);
-                } else {
-                    window.stopAfterWin = true;
-                    window.nextTradeAllowed = false;
-                }
-
+                // Freeze trading instantly, but keep streams + PnL timers alive.
+                window.stopAfterWin = true;
+                window.isBotRunning = false;
+                window.nextTradeAllowed = false;
                 updateButtonState();
+
                 return;
             }
         }
 
 function placeDigitMatchTrade(digit, stake, tick) {
-            if (window.stopAfterWin || !window.nextTradeAllowed) return;
             const contractType = document.getElementById('contractType').value;
             const symbol = document.getElementById('symbol').value;
 
@@ -3276,7 +3272,6 @@ function placeDigitMatchTrade(digit, stake, tick) {
         }
 
 function executeDualTrade(tick) {
-            if (window.stopAfterWin || !window.nextTradeAllowed) return false;
             const maxTrades = parseInt(document.getElementById('maxTrades').value) || 10;
 
             if (window.tradeCount >= maxTrades) {
@@ -3773,33 +3768,13 @@ function subscribeToOpenContract(contractId) {
         }
 
         function stopTradingAfterWin(profit) {
-        // Halt trading immediately, but keep socket alive long enough for balance/PnL to refresh.
-        if (window.stopAfterWin) return;
-
-        window.stopAfterWin = true;
-        window.nextTradeAllowed = false;
-
-        // Keep the bot "running" for a short grace period so subscriptions keep flowing,
-        // but all trade entry points are hard-blocked by stopAfterWin/nextTradeAllowed.
-        const GRACE_MS = 10000; // 10 seconds
-
-        updateSessionDisplay();
-        updateTradeStatus(
-            'STOPPING…',
-            '✅ Win detected — trading halted',
-            `Allowing ${Math.round(GRACE_MS/1000)}s for PnL to update…`,
-            'win'
-        );
-        log(`🛑 Win detected (profit ${formatMoney(profit)}). Trading halted; allowing ${Math.round(GRACE_MS/1000)}s for balance/PnL to update.`, 'TRADE');
-
-        try { startExtendedPnlUpdate(); } catch (_) {}
-
-        // After grace period, fully stop (closes socket). Until then: NO trades can execute.
-        setTimeout(() => {
-            try { stopBot(); } catch (_) {}
-        }, GRACE_MS);
-    }
-
+            if (window.stopAfterWin) return;
+            window.stopAfterWin = true;
+            window.isBotRunning = false; // Stop placing new trades but keep socket/balance updates alive
+            updateSessionDisplay();
+            updateTradeStatus('STOPPED', '✅ Win detected — trading stopped', `Profit: ${formatMoney(profit)} (PnL will keep updating)`, 'win');
+            log(`🛑 Win detected (profit ${formatMoney(profit)}). Trading stopped; balance/PnL will continue updating.`, 'TRADE');
+        }
 
         function handleOpenContractUpdate(oc) {
             if (!oc) return;
@@ -3865,7 +3840,6 @@ function subscribeToOpenContract(contractId) {
         }
         
         function handleProposalResponse(proposal, req_id) {
-            if (window.stopAfterWin || !window.nextTradeAllowed) return;
             if (!proposal || !proposal.id) {
                 log(`❌ Proposal failed`, 'ERROR');
                 updateTradeStatus('ERROR', 'Proposal failed', 'Retrying...', 'loss');
