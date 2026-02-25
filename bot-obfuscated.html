@@ -3078,11 +3078,8 @@ const isRecommended = Array.isArray(engine.currentRecommendations)
             }
             // 🧱 TAIL-RISK GATE (AI dual-only): both digits must have s20 <= UI threshold
             if (sessionState.mode === 'ai' && window.isBotRunning) {
-                const recs = window.digitIntelligenceEngine?.currentRecommendations || [];
-                const d1 = recs[0]?.digit;
-                const d2 = recs[1]?.digit;
-
-                const hasDual = isValidDigit(d1) && isValidDigit(d2) && d1 !== d2;
+                const [d1, d2] = getAiDualDigits();
+const hasDual = isValidDigit(d1) && isValidDigit(d2) && d1 !== d2;
                 if (!hasDual) {
                     // Recommendation gate is handled above, but keep this as a safety net.
                     updateTradeStatus('NO TRADE', 'Waiting for 2 distinct digits', 'AI dual-only', 'loss');
@@ -3164,53 +3161,41 @@ const isRecommended = Array.isArray(engine.currentRecommendations)
             cycleIndex = 0;
         }
 
-        function isValidDigit(digit) {
-            const d = Number(digit);
-            if (!Number.isFinite(d) || d < 0 || d > 9) return false;
-
-            const engine = window.digitIntelligenceEngine;
-            if (!engine || !engine.warmupDone) return false;
-
-            const thresholds = window.AI_THRESHOLDS || {};
-            const s = engine.digitStats?.[d];
-            if (!s) return false;
-
-            const g = Number(s.currentGap);
-            const p90 = Math.max(Number(s.p90Gap) || 0, 1);
-            const p90Ratio = g / p90;
-
-            const minRatio = (typeof thresholds.pressureZoneMinFloorP90Ratio === "number") ? thresholds.pressureZoneMinFloorP90Ratio : 0.0;
-            const maxRatio = (typeof thresholds.pressureZoneMaxP90Ratio === "number") ? thresholds.pressureZoneMaxP90Ratio : 1.0;
-
-            if (thresholds.require_g_lt_p90 && g >= p90) return false;
-            if (thresholds.pressureZoneEnabled) {
-                if (p90Ratio < minRatio) return false;
-                if (p90Ratio >= maxRatio) return false;
-            }
-
         /**
-         * Returns two distinct AI-recommended digits for dual-only trading.
-         * Source of truth is the engine's currentRecommendations; falls back to the UI display
-         * to avoid desync where the UI shows two digits but the engine array is null.
-         */
-        function getAiDualDigits() {
-            const engine = window.digitIntelligenceEngine;
-            const recs = (engine && Array.isArray(engine.currentRecommendations)) ? engine.currentRecommendations : null;
+ * Basic digit validation (0-9).
+ * AI already applies its own selection filters; do not re-filter here.
+ */
+function isDigit0to9(digit) {
+    const d = Number(digit);
+    return Number.isFinite(d) && d >= 0 && d <= 9;
+}
 
-            if (recs && recs.length >= 2) {
-                return [recs[0]?.digit, recs[1]?.digit];
-            }
+/**
+ * Returns two distinct AI-recommended digits for dual-only trading.
+ * Source of truth is the engine's currentRecommendations; falls back to the UI display
+ * to avoid desync where the UI shows two digits but the engine array is null.
+ */
+function getAiDualDigits() {
+    const engine = window.digitIntelligenceEngine;
+    const recs = (engine && Array.isArray(engine.currentRecommendations)) ? engine.currentRecommendations : null;
 
-            const el = document.getElementById('ai-recommended-digit');
-            const txt = (el && (el.innerText || el.textContent)) ? (el.innerText || el.textContent) : '';
-            const a = /Digit\s*A:\s*([0-9])/.exec(txt)?.[1];
-            const b = /Digit\s*B:\s*([0-9])/.exec(txt)?.[1];
+    if (recs && recs.length >= 2) {
+        return [recs[0]?.digit, recs[1]?.digit];
+    }
 
-            return [a, b];
-        }
+    const el = document.getElementById('ai-recommended-digit');
+    const txt = (el && (el.innerText || el.textContent)) ? (el.innerText || el.textContent) : '';
+    const a = /Digit\s*A:\s*([0-9])/.exec(txt)?.[1];
+    const b = /Digit\s*B:\s*([0-9])/.exec(txt)?.[1];
 
-            return true;
-        }
+    return [a, b];
+}
+
+// Backwards-compatible name used across the codebase.
+function isValidDigit(digit) {
+    return isDigit0to9(digit);
+}
+
 
         function onTradeResult(result) {
             if (result && result.status === 'won') {
@@ -3268,12 +3253,8 @@ function placeDigitMatchTrade(digit, stake, tick) {
 
         
         function executeAiEntry(tick) {
-            const engine = window.digitIntelligenceEngine;
-            const recs = engine?.currentRecommendations || [];
-            const d1 = recs[0]?.digit;
-            const d2 = recs[1]?.digit;
-
-            // AI is dual-only: NEVER fall back to single-digit.
+            const [d1, d2] = getAiDualDigits();
+// AI is dual-only: NEVER fall back to single-digit.
             if (!isValidDigit(d1) || !isValidDigit(d2) || d1 === d2) {
                 updateSessionDisplay();
                 return false;
@@ -3306,13 +3287,11 @@ function executeDualTrade(tick) {
                 return;
             }
 
-            const recs = window.digitIntelligenceEngine?.currentRecommendations;
-            if (!recs || recs.length < 2) return;
-
-            const digitA = recs[0]?.digit;
-            const digitB = recs[1]?.digit;
+            const [digitA, digitB] = getAiDualDigits();
 
             if (!isValidDigit(digitA)) return;
+            if (!isValidDigit(digitB)) return;
+if (!isValidDigit(digitA)) return;
             if (!isValidDigit(digitB)) return;
 
             // Require TWO DISTINCT digits before trading.
