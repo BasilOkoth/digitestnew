@@ -2306,33 +2306,18 @@ const isRecommended = Array.isArray(engine.currentRecommendations)
     const pnlElem = document.getElementById('metricTotalProfit');
     if (!pnlElem) return 0;
 
-    // Primary PnL definition: Total Payout - Total Investment (total stake used)
     const inv = Number(window.pnlTracker?.totalInvestment ?? 0);
     const pay = Number(window.pnlTracker?.totalPayout ?? 0);
 
-    if (Number.isFinite(inv) && Number.isFinite(pay) && (inv !== 0 || pay !== 0)) {
-        window.netProfit = pay - inv;
-        if (window.pnlTracker) window.pnlTracker.netProfit = window.netProfit;
-    } else if (
-        typeof window.startingBalance === 'number' &&
-        typeof window.currentBalance === 'number' &&
-        Number.isFinite(window.startingBalance) &&
-        Number.isFinite(window.currentBalance)
-    ) {
-        // Fallback only when tracker isn't available yet
-        window.netProfit = window.currentBalance - window.startingBalance;
-        if (window.pnlTracker) window.pnlTracker.netProfit = window.netProfit;
-    } else {
-        window.netProfit = 0;
-        if (window.pnlTracker) window.pnlTracker.netProfit = 0;
-    }
+    window.netProfit = pay - inv;
+    if (window.pnlTracker) window.pnlTracker.netProfit = window.netProfit;
 
-    const formattedProfit = Number(window.netProfit).toFixed(2);
+    const formattedProfit = window.netProfit.toFixed(2);
     const isPositive = window.netProfit > 0;
     const isNegative = window.netProfit < 0;
 
     pnlElem.textContent = `${isPositive ? '+' : ''}$${formattedProfit}`;
-    pnlElem.classList.remove('profit-positive', 'profit-negative', 'profit-neutral');
+    pnlElem.classList.remove('profit-positive','profit-negative','profit-neutral');
 
     if (isPositive) pnlElem.classList.add('profit-positive');
     else if (isNegative) pnlElem.classList.add('profit-negative');
@@ -2340,6 +2325,7 @@ const isRecommended = Array.isArray(engine.currentRecommendations)
 
     return window.netProfit;
 }
+
 
         function trackTradeInvestment(amount) {
             window.pnlTracker.totalInvestment += parseFloat(amount);
