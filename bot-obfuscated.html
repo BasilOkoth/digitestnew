@@ -3392,7 +3392,8 @@ if (!isValidDigit(digitA)) return;
                 window.lastTradeResult = 'win';
                 window.stopAfterWin = true;
                 if (sessionState.mode === 'ai') { resetCycle(); }
-                stopBot();
+                // Soft-stop trading (keep WebSocket alive for PnL updates)
+                updateStake('win');
                 window.stats.wins++;
                 window.tradeCount++;
                 
