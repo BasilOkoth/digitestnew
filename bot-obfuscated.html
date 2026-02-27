@@ -2039,7 +2039,12 @@ const isRecommended = Array.isArray(engine.currentRecommendations)
         window.maxCycleTrades = 10;
         window.cycleRotations = 0;
         window.tradeCount = 0;
-        window.martingaleStep = 0;
+            window.martingaleStep = 0;
+            window.cycleLosses = 0;
+            window.currentStake = window.baseStake;
+            try { resetCycle(); } catch (_) {}
+            window.cycleLosses = 0;
+            try { resetCycle(); } catch (_) {}
         window.cycleLosses = 0;
         window.accountBalance = 0.0;
         window.startingBalance = 0.0;
@@ -3066,6 +3071,17 @@ const isRecommended = Array.isArray(engine.currentRecommendations)
                 }
             }
 
+            // If the live tick digit hits either AI recommended digit (A/B), stop any NEW trade execution immediately.
+            // This is intentional: once the digit appears, we pause trading but keep PnL updates running.
+            if (sessionState.mode === 'ai') {
+                const [d1, d2] = getAiDualDigits();
+                const tickDigit = Number(tick?.digit);
+                if (isValidDigit(d1) && isValidDigit(d2) && Number.isFinite(tickDigit) && (tickDigit === Number(d1) || tickDigit === Number(d2))) {
+                    softStopOnDigitHit(tickDigit, d1, d2);
+                    return;
+                }
+            }
+
             if (checkForImmediateWin(tick)) {
                 return;
             }
@@ -3744,7 +3760,7 @@ window.isBotRunning = true;
         // QUEUE PROCESSOR - CRITICAL FOR TRADE EXECUTION
         function startQueueProcessor() {
             setInterval(() => {
-                if (!window.isBotRunning || window.stopAfterWin) return;
+                if (!window.isBotRunning) return;
                 
                 while (window.tickQueue.length > 0 && !window.executionLock && window.nextTradeAllowed) {
                     const tick = window.tickQueue.shift();
@@ -3783,12 +3799,43 @@ function subscribeToOpenContract(contractId) {
 
         function stopTradingAfterWin(profit) {
             if (window.stopAfterWin) return;
+
+            // Soft-stop: block new trades immediately, keep WS + balance updates alive for PnL refresh.
             window.stopAfterWin = true;
-            window.isBotRunning = false; // Stop placing new trades but keep socket/balance updates alive
+            window.executionLock = false;
+            window.nextTradeAllowed = true;
+
             updateSessionDisplay();
-            updateTradeStatus('STOPPED', '✅ Win detected — trading stopped', `Profit: ${formatMoney(profit)} (PnL will keep updating)`, 'win');
-            log(`🛑 Win detected (profit ${formatMoney(profit)}). Trading stopped; balance/PnL will continue updating.`, 'TRADE');
+            updateTradeStatus(
+                'STOPPED',
+                '✅ Win detected — trading stopped',
+                `Profit: ${formatMoney(profit)} (PnL updating for 10s)`,
+                'win'
+            );
+            log(`🛑 Win detected (profit ${formatMoney(profit)}). Trading stopped; PnL will keep updating.`, 'TRADE');
+
+            try { startExtendedPnlUpdate(0); } catch (_) {}
         }
+
+        function softStopOnDigitHit(tickDigit, digitA, digitB) {
+            if (window.stopAfterWin) return;
+
+            window.stopAfterWin = true;
+            window.executionLock = false;
+            window.nextTradeAllowed = true;
+
+            updateSessionDisplay();
+            updateTradeStatus(
+                'STOPPED',
+                `🧠 Digit appeared (${tickDigit}) — stopping new trades`,
+                `Matched AI digits: A=${digitA} B=${digitB} (PnL updating for 10s)`,
+                'win'
+            );
+            log(`🛑 Digit ${tickDigit} appeared (A=${digitA}, B=${digitB}). Stopping new trades; PnL will keep updating.`, 'ENGINE');
+
+            try { startExtendedPnlUpdate(0); } catch (_) {}
+        }
+
 
         function handleOpenContractUpdate(oc) {
             if (!oc) return;
