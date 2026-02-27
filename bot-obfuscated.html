@@ -3153,14 +3153,14 @@ const hasDual = isValidDigit(d1) && isValidDigit(d2) && d1 !== d2;
         
         // ============================================================================
         // DUAL-TRADE EXECUTION ENGINE (TOP-2 DIGITS)
-        // - Stakes alternate per cycleIndex: A uses (step*2), B uses (step*2+1)
-        // - Stop-on-first-win resets the cycleIndex
+        // - Stakes alternate per window.cycleIndex: A uses (step*2), B uses (step*2+1)
+        // - Stop-on-first-win resets the window.cycleIndex
         // - Safety filter prevents execution if either digit is outside release band
         // ============================================================================
-        let cycleIndex = 0;
+        window.window.cycleIndex = 0;
 
         function resetCycle() {
-            cycleIndex = 0;
+            window.window.cycleIndex = 0;
         }
 
         /**
@@ -3321,7 +3321,7 @@ if (!isValidDigit(digitA)) return;
             const baseStake = parseFloat(document.getElementById('baseStake').value) || 1.0;
             const multiplier = parseFloat(document.getElementById('multiplier').value) || 1.15;
 
-            const stakeA = +(baseStake * Math.pow(multiplier, cycleIndex)).toFixed(2);
+            const stakeA = +(baseStake * Math.pow(multiplier, window.cycleIndex)).toFixed(2);
             const stakeB = +(stakeA * multiplier).toFixed(2);
 
             // Count this as ONE cycle step but TWO trades.
@@ -3338,7 +3338,7 @@ if (!isValidDigit(digitA)) return;
 
             updateSessionDisplay();
 
-            log(`⚡ Dual Trade cycle ${cycleIndex + 1}: A(${digitA}) $${stakeA.toFixed(2)} | B(${digitB}) $${stakeB.toFixed(2)}`, 'TRADE');
+            log(`⚡ Dual Trade cycle ${window.cycleIndex + 1}: A(${digitA}) $${stakeA.toFixed(2)} | B(${digitB}) $${stakeB.toFixed(2)}`, 'TRADE');
             updateTradeStatus(
                 'TRADING',
                 `Dual: A $${stakeA.toFixed(2)} @${digitA} | B $${stakeB.toFixed(2)} @${digitB}`,
@@ -3351,7 +3351,7 @@ if (!isValidDigit(digitA)) return;
             placeDigitMatchTrade(digitA, stakeA, tick);
             placeDigitMatchTrade(digitB, stakeB, tick);
 
-            cycleIndex++;
+            window.cycleIndex++;
             return true;
         }
 
@@ -3991,6 +3991,7 @@ function subscribeToOpenContract(contractId) {
             window.lastTradeResult = null;
             window.tradeCount = 0;
             window.martingaleStep = 0;
+            resetCycle();
             window.pendingProposals.clear();
             window.botTickTimestamps = [];
             
