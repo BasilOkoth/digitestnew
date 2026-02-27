@@ -2048,8 +2048,10 @@ const isRecommended = Array.isArray(engine.currentRecommendations)
         window.cycleLosses = 0;
         window.accountBalance = 0.0;
         window.startingBalance = 0.0;
-        window.currentBalance = 0.0;
-        window.netProfit = 0.0;
+            window.currentBalance = 0.0;
+            window.netProfit = 0.0;
+            window.startingBalanceSet = false;
+            window.startingBalanceSet = false;
         
         // PnL Tracking - UPDATED TO 10 SECONDS
         window.pnlTracker = {
@@ -2302,43 +2304,39 @@ const isRecommended = Array.isArray(engine.currentRecommendations)
         
         function updatePnL() {
             const pnlElem = document.getElementById('metricTotalProfit');
-            
-            if (window.startingBalance > 0 && window.currentBalance > 0) {
+
+            // Use balance if available (REAL source of truth)
+            if (typeof window.startingBalance === 'number' &&
+                typeof window.currentBalance === 'number' &&
+                Number.isFinite(window.startingBalance) &&
+                Number.isFinite(window.currentBalance)) {
+
                 window.netProfit = window.currentBalance - window.startingBalance;
-                const formattedProfit = window.netProfit.toFixed(2);
-                const isPositive = window.netProfit > 0;
-                const isNegative = window.netProfit < 0;
-                
-                pnlElem.textContent = `${isPositive ? '+' : ''}$${formattedProfit}`;
-                pnlElem.classList.remove('profit-positive', 'profit-negative', 'profit-neutral');
-                
-                if (isPositive) pnlElem.classList.add('profit-positive');
-                else if (isNegative) pnlElem.classList.add('profit-negative');
-                else pnlElem.classList.add('profit-neutral');
-                
-                return window.netProfit;
+
             }
-            
-            if (window.pnlTracker.totalPayout > 0 || window.pnlTracker.totalInvestment > 0) {
-                window.netProfit = window.pnlTracker.totalPayout - window.pnlTracker.totalInvestment;
-                const formattedProfit = window.netProfit.toFixed(2);
-                const isPositive = window.netProfit > 0;
-                const isNegative = window.netProfit < 0;
-                
-                pnlElem.textContent = `${isPositive ? '+' : ''}$${formattedProfit}`;
-                pnlElem.classList.remove('profit-positive', 'profit-negative', 'profit-neutral');
-                
-                if (isPositive) pnlElem.classList.add('profit-positive');
-                else if (isNegative) pnlElem.classList.add('profit-negative');
-                else pnlElem.classList.add('profit-neutral');
-                
-                return window.netProfit;
+            // Fallback to internal tracker if balance not ready
+            else if (window.pnlTracker) {
+
+                window.netProfit =
+                    (window.pnlTracker.totalPayout || 0) -
+                    (window.pnlTracker.totalInvestment || 0);
+
+            } else {
+                return 0;
             }
-            
-            pnlElem.textContent = '$0.00';
-            pnlElem.classList.remove('profit-positive', 'profit-negative');
-            pnlElem.classList.add('profit-neutral');
-            return 0;
+
+            const formattedProfit = window.netProfit.toFixed(2);
+            const isPositive = window.netProfit > 0;
+            const isNegative = window.netProfit < 0;
+
+            pnlElem.textContent = `${isPositive ? '+' : ''}$${formattedProfit}`;
+            pnlElem.classList.remove('profit-positive', 'profit-negative', 'profit-neutral');
+
+            if (isPositive) pnlElem.classList.add('profit-positive');
+            else if (isNegative) pnlElem.classList.add('profit-negative');
+            else pnlElem.classList.add('profit-neutral');
+
+            return window.netProfit;
         }
         
         function trackTradeInvestment(amount) {
@@ -3859,14 +3857,22 @@ function subscribeToOpenContract(contractId) {
         }
 
                 function handleBalanceUpdate(balanceData) {
-            const newBalance = parseFloat(balanceData.balance);
-            
-            if (window.startingBalance === 0) {
+            const rawBalance = (balanceData && balanceData.balance && typeof balanceData.balance === 'object')
+                ? balanceData.balance.balance
+                : balanceData?.balance;
+
+            const newBalance = parseFloat(rawBalance);
+
+            if (!Number.isFinite(newBalance)) return;
+
+            window.currentBalance = newBalance;
+
+            if (!window.startingBalanceSet) {
                 window.startingBalance = newBalance;
+                window.startingBalanceSet = true;
                 log(`💰 Starting Balance: $${window.startingBalance.toFixed(2)}`, 'PNL');
             }
-            
-            window.currentBalance = newBalance;
+
             const balanceElem = document.getElementById('metricAccountBalance');
             balanceElem.textContent = `$${window.currentBalance.toFixed(2)}`;
             balanceElem.className = 'text-lg font-bold balance-green';
