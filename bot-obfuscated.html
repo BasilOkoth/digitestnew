@@ -2271,13 +2271,8 @@ const isRecommended = Array.isArray(engine.currentRecommendations)
                     
                     // Final update
                     updatePnL();
-                    
-                    // Stop bot after PnL updates are complete
-                    setTimeout(() => {
-                        if (window.isBotRunning) {
-                            stopBot();
-                        }
-                    }, 100);
+                    // Keep connection alive so PnL/balance can continue updating.
+                    // Trading is already blocked by window.stopAfterWin.
                 } else {
                     // Continue updating PnL with visual feedback
                     updatePnL();
@@ -3054,6 +3049,8 @@ const isRecommended = Array.isArray(engine.currentRecommendations)
         
         // PROCESS TICK IMMEDIATELY - CRITICAL TRADE EXECUTION FUNCTION
         function processTickImmediately(tick) {
+            updatePnL(); // Always refresh PnL display on every tick
+            
             if (window.stopAfterWin) return;
             
             // In AI mode, wait for 2 DISTINCT engine recommendations (AI is dual-only)
@@ -3272,6 +3269,7 @@ function placeDigitMatchTrade(digit, stake, tick) {
         }
 
 function executeDualTrade(tick) {
+            if (window.stopAfterWin) return false;
             const maxTrades = parseInt(document.getElementById('maxTrades').value) || 10;
 
             if (window.tradeCount >= maxTrades) {
@@ -3429,6 +3427,10 @@ if (!isValidDigit(digitA)) return;
             window.maxCycleTrades = parseInt(document.getElementById('maxCycleTrades')?.value) || 10;
             
             if (winOrLoss === 'win') {
+                window.stopAfterWin = true; // Stop trading immediately after a win
+                window.executionLock = false;
+                window.nextTradeAllowed = true;
+
                 window.martingaleStep = 0;
                 window.cycleLosses = 0;
                 window.currentStake = window.baseStake;
