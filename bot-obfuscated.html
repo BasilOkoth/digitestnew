@@ -1409,8 +1409,9 @@ return unique.length === 2 ? unique : null;
                         survivalLabel = ` | Survival: warming up (${n}/${minDigits})`;
                     }
 
+                    const safeP10 = Number.isFinite(best.P10) ? best.P10 : 0;
                     document.getElementById('ai-digit-score').textContent =
-                        `Score: ${(best.score * 100).toFixed(1)}% | P10: ${(best.P10 * 100).toFixed(1)}%${sourceLabel}${survivalLabel}`;
+                        `Score: ${(best.score * 100).toFixed(1)}% | P10: ${(safeP10 * 100).toFixed(1)}%${sourceLabel}${survivalLabel}`;
 
                     // Color code based on score
                     const scoreElem = document.getElementById('ai-digit-score');
@@ -3179,15 +3180,23 @@ function getAiDualDigits() {
     const recs = (engine && Array.isArray(engine.currentRecommendations)) ? engine.currentRecommendations : null;
 
     if (recs && recs.length >= 2) {
-        return [recs[0]?.digit, recs[1]?.digit];
+        const a = recs[0]?.digit;
+        const b = recs[1]?.digit;
+        return [a, b];
     }
 
     const el = document.getElementById('ai-recommended-digit');
-    const txt = (el && (el.innerText || el.textContent)) ? (el.innerText || el.textContent) : '';
-    const a = /Digit\s*A:\s*([0-9])/.exec(txt)?.[1];
-    const b = /Digit\s*B:\s*([0-9])/.exec(txt)?.[1];
+    const txt = (el && (el.innerText || el.textContent)) ? String(el.innerText || el.textContent) : '';
 
-    return [a, b];
+    // Robust parse: collect digits shown anywhere in the widget and take first 2 unique.
+    const matches = Array.from(txt.matchAll(/([0-9])/g)).map(m => m[1]);
+    const uniq = [];
+    for (const d of matches) {
+        if (!uniq.includes(d)) uniq.push(d);
+        if (uniq.length >= 2) break;
+    }
+
+    return [uniq[0] ?? null, uniq[1] ?? null];
 }
 
 // Backwards-compatible name used across the codebase.
@@ -3382,6 +3391,8 @@ if (!isValidDigit(digitA)) return;
         // CHECK FOR IMMEDIATE WIN - CRITICAL FUNCTION
         function checkForImmediateWin(tick) {
             if (!window.isBotRunning || window.stopAfterWin) return false;
+            // Immediate-win shortcut is for Instant (single-digit) mode only.
+            if (sessionState.mode !== 'instant') return false;
             
             const predictedDigit = parseInt(document.getElementById('predictedDigit').value);
             const tickDigit = parseInt(tick.digit);
